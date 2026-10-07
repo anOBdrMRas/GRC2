@@ -6,6 +6,7 @@ import 'bpmn-js/dist/assets/bpmn-font/css/bpmn-embedded.css';
 import type { ProcessModel, StepAssignment } from '../types';
 import { modules } from '../schema';
 import { translateModule } from './translate';
+import { useUi } from '../ui';
 
 // bpmn-js services are loosely typed on purpose; the prototype only uses a small surface.
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -142,7 +143,7 @@ export const BpmnEditor = forwardRef<BpmnEditorHandle, Props>(function BpmnEdito
         }
       })
       .catch((err: Error) => {
-        if (!disposed) alert(`BPMN konnte nicht geladen werden: ${err.message}`);
+        if (!disposed) useUi.getState().setNotice(`Das BPMN-Diagramm konnte nicht geladen werden: ${err.message}`);
       });
 
     return () => {

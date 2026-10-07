@@ -5,7 +5,7 @@ import { useStore } from '../store';
 import { useUi } from '../ui';
 import { elementNames, findUsages, kpiStatus, residualScore, riskLevel, riskScore } from '../logic';
 import { Field } from './Fields';
-import { Empty, LevelBadge, Tag, TrafficLight } from './common';
+import { ConfirmButton, Empty, LevelBadge, Tag, TrafficLight } from './common';
 import { Heatmap } from './Heatmap';
 import { Sparkline } from './Sparkline';
 
@@ -212,17 +212,14 @@ function EntityEditor({ kind, entity }: { kind: EntityKind; entity: AnyEntity })
             <span className="mono">{entity.code}</span> {entity.title}
           </h3>
         </div>
-        <button
-          className="danger"
-          onClick={() => {
-            if (confirm(`${def.label} „${entity.title}“ löschen? Alle Zuordnungen werden entfernt.`)) {
-              remove(kind, entity.id);
-              select(kind, undefined);
-            }
+        <ConfirmButton
+          label="Löschen"
+          confirmLabel="Wirklich löschen? (inkl. Zuordnungen)"
+          onConfirm={() => {
+            remove(kind, entity.id);
+            select(kind, undefined);
           }}
-        >
-          Löschen
-        </button>
+        />
       </div>
       <Insights kind={kind} entity={entity} />
       {def.sections.map((sec) => (

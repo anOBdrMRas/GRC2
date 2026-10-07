@@ -6,7 +6,7 @@ import { modules } from '../schema';
 import { activityTypes, assignedIds, emptyAssignment, parseElements } from '../logic';
 import { BpmnEditor, type BpmnEditorHandle, type SelectedElement } from '../bpmn/BpmnEditor';
 import { StepPanel } from './StepPanel';
-import { Empty, download } from './common';
+import { ConfirmButton, Empty, download } from './common';
 
 const categories: ProcessModel['category'][] = ['Führungsprozess', 'Kernprozess', 'Unterstützungsprozess'];
 
@@ -17,6 +17,8 @@ export function ProcessView() {
   const selectedId = useUi((s) => s.selected.processes);
   const select = useUi((s) => s.select);
   const fileInput = useRef<HTMLInputElement>(null);
+  const [naming, setNaming] = useState(false);
+  const [newTitle, setNewTitle] = useState('');
   const process = processes.find((p) => p.id === selectedId) ?? processes[0];
 
   const importBpmn = async (file: File) => {
@@ -33,13 +35,7 @@ export function ProcessView() {
           <h2>Prozesse</h2>
         </div>
         <div className="row gap">
-          <button
-            className="primary"
-            onClick={() => {
-              const title = prompt('Name des neuen Prozesses:');
-              if (title) select('processes', createProcess(title).id);
-            }}
-          >
+          <button className="primary" onClick={() => setNaming(true)}>
             + Prozess
           </button>
           <button onClick={() => fileInput.current?.click()}>BPMN importieren</button>
@@ -55,6 +51,23 @@ export function ProcessView() {
             }}
           />
         </div>
+        {naming && (
+          <form
+            className="row gap"
+            onSubmit={(e) => {
+              e.preventDefault();
+              const title = newTitle.trim();
+              if (title) select('processes', createProcess(title).id);
+              setNewTitle('');
+              setNaming(false);
+            }}
+          >
+            <input id="new-process-title" autoFocus placeholder="Name des Prozesses" value={newTitle} onChange={(e) => setNewTitle(e.target.value)} />
+            <button type="submit" className="primary" disabled={!newTitle.trim()}>
+              Anlegen
+            </button>
+          </form>
+        )}
         {categories.map((cat) => (
           <div key={cat} className="proc-group">
             <div className="proc-group-title">{cat}</div>
@@ -123,17 +136,14 @@ function ProcessWorkspace({ process }: { process: ProcessModel }) {
               <button onClick={async () => download(`${fileBase}.svg`, await editor.current!.saveSvg(), 'image/svg+xml')}>⬇ SVG</button>
             </>
           )}
-          <button
-            className="danger"
-            onClick={() => {
-              if (confirm(`Prozess „${process.title}“ löschen?`)) {
-                deleteProcess(process.id);
-                select('processes', undefined);
-              }
+          <ConfirmButton
+            label="Löschen"
+            confirmLabel="Prozess wirklich löschen?"
+            onConfirm={() => {
+              deleteProcess(process.id);
+              select('processes', undefined);
             }}
-          >
-            Löschen
-          </button>
+          />
         </div>
       </div>
 

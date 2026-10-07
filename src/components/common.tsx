@@ -1,5 +1,6 @@
 import { useMemo, useRef, useState, type ReactNode } from 'react';
 import type { Level, Traffic } from '../logic';
+import { useUi, type ExportFile } from '../ui';
 import { levelLabel } from '../logic';
 
 export function LevelBadge({ level, score }: { level: Level; score?: number }) {
@@ -119,11 +120,89 @@ export function Empty({ children }: { children: ReactNode }) {
   return <div className="empty">{children}</div>;
 }
 
+/** Opens the export dialog, which offers download and copy-to-clipboard. */
 export function download(filename: string, content: string, type = 'application/octet-stream') {
+  useUi.getState().setExportFile({ filename, content, type });
+}
+
+function saveFile({ filename, content, type }: ExportFile) {
   const url = URL.createObjectURL(new Blob([content], { type }));
   const a = document.createElement('a');
   a.href = url;
   a.download = filename;
   a.click();
   URL.revokeObjectURL(url);
+}
+
+export function ExportDialog() {
+  const file = useUi((s) => s.exportFile);
+  const close = useUi((s) => s.setExportFile);
+  const [copied, setCopied] = useState(false);
+  const area = useRef<HTMLTextAreaElement>(null);
+  if (!file) return null;
+  const copy = async () => {
+    try {
+      await navigator.clipboard.writeText(file.content);
+      setCopied(true);
+    } catch {
+      area.current?.select();
+    }
+  };
+  return (
+    <div className="modal-backdrop" onClick={() => close(null)}>
+      <div className="modal" role="dialog" aria-label="Export" onClick={(e) => e.stopPropagation()}>
+        <div className="row space">
+          <h3>Export: {file.filename}</h3>
+          <button className="tag-x" onClick={() => close(null)} title="Schließen">
+            ×
+          </button>
+        </div>
+        <p className="muted small">Falls der Download in dieser Umgebung blockiert ist, den Inhalt kopieren und als Datei speichern.</p>
+        <textarea id="export-content" ref={area} readOnly rows={14} value={file.content} />
+        <div className="row gap">
+          <button className="primary" onClick={() => saveFile(file)}>
+            Herunterladen
+          </button>
+          <button onClick={copy}>{copied ? 'Kopiert ✓' : 'In Zwischenablage kopieren'}</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+export function Notice() {
+  const notice = useUi((s) => s.notice);
+  const setNotice = useUi((s) => s.setNotice);
+  if (!notice) return null;
+  return (
+    <div className="notice" role="alert">
+      {notice}
+      <button className="tag-x" onClick={() => setNotice(null)} title="Schließen">
+        ×
+      </button>
+    </div>
+  );
+}
+
+/** Two-step button: the first click arms it, the second executes. Replaces window.confirm. */
+export function ConfirmButton({ label, confirmLabel, onConfirm, className = 'danger' }: { label: string; confirmLabel: string; onConfirm: () => void; className?: string }) {
+  const [armed, setArmed] = useState(false);
+  const timer = useRef<number>(undefined);
+  return (
+    <button
+      className={`${className} ${armed ? 'armed' : ''}`}
+      onClick={() => {
+        window.clearTimeout(timer.current);
+        if (armed) {
+          setArmed(false);
+          onConfirm();
+        } else {
+          setArmed(true);
+          timer.current = window.setTimeout(() => setArmed(false), 4000);
+        }
+      }}
+    >
+      {armed ? confirmLabel : label}
+    </button>
+  );
 }

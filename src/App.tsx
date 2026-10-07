@@ -5,7 +5,7 @@ import { modules, kindOrder } from './schema';
 import { Dashboard } from './components/Dashboard';
 import { ProcessView } from './components/ProcessView';
 import { EntityModule } from './components/EntityModule';
-import { download } from './components/common';
+import { ConfirmButton, ExportDialog, Notice, download } from './components/common';
 
 const nav: { view: View; label: string; icon: string; color?: string }[] = [
   { view: 'dashboard', label: 'Cockpit', icon: '◧' },
@@ -49,13 +49,7 @@ export default function App() {
           <div className="muted small">ISO 9001 · ISO 27001 · ISO 37301</div>
           <button onClick={exportAll}>Daten exportieren</button>
           <button onClick={() => fileInput.current?.click()}>Daten importieren</button>
-          <button
-            onClick={() => {
-              if (confirm('Alle Daten durch die Demodaten ersetzen?')) resetDemo();
-            }}
-          >
-            Demodaten laden
-          </button>
+          <ConfirmButton label="Demodaten laden" confirmLabel="Alle Daten ersetzen?" className="" onConfirm={resetDemo} />
           <input
             ref={fileInput}
             type="file"
@@ -68,7 +62,7 @@ export default function App() {
               try {
                 importAll(JSON.parse(await f.text()));
               } catch {
-                alert('Datei konnte nicht gelesen werden.');
+                useUi.getState().setNotice('Die Datei konnte nicht gelesen werden. Bitte eine mit „Daten exportieren“ erzeugte JSON-Datei wählen.');
               }
             }}
           />
@@ -79,6 +73,8 @@ export default function App() {
         {view === 'processes' && <ProcessView />}
         {kindOrder.includes(view as never) && <EntityModule key={view} kind={view as (typeof kindOrder)[number]} />}
       </main>
+      <ExportDialog />
+      <Notice />
     </div>
   );
 }

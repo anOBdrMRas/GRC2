@@ -3,6 +3,12 @@ import type { EntityKind } from './types';
 
 export type View = 'dashboard' | 'processes' | EntityKind;
 
+export interface ExportFile {
+  filename: string;
+  content: string;
+  type: string;
+}
+
 interface UiState {
   view: View;
   /** selected entity id per module */
@@ -13,6 +19,11 @@ interface UiState {
   openStep: (processId: string, elementId: string) => void;
   select: (view: View, id: string | undefined) => void;
   clearFocus: () => void;
+  /** file offered in the export dialog (downloads may be blocked, e.g. when embedded) */
+  exportFile: ExportFile | null;
+  setExportFile: (f: ExportFile | null) => void;
+  notice: string | null;
+  setNotice: (msg: string | null) => void;
 }
 
 export const useUi = create<UiState>()((set) => ({
@@ -24,4 +35,8 @@ export const useUi = create<UiState>()((set) => ({
     set((s) => ({ view: 'processes', selected: { ...s.selected, processes: processId }, focusElementId: elementId })),
   select: (view, id) => set((s) => ({ selected: { ...s.selected, [view]: id } })),
   clearFocus: () => set({ focusElementId: null }),
+  exportFile: null,
+  setExportFile: (exportFile) => set({ exportFile }),
+  notice: null,
+  setNotice: (notice) => set({ notice }),
 }));
