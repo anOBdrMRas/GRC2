@@ -310,7 +310,7 @@ function EntityEditor({ kind, entity }: { kind: EntityKind; entity: AnyEntity })
         </div>
       </div>
       {kind === 'role' && showProfile && <RoleProfile role={entity as Role} onClose={() => setShowProfile(false)} />}
-      {kind === 'role' ? <RoleInsights role={entity as Role} /> : kind === 'user' ? <UserInsights user={entity as User} /> : <Insights kind={kind} entity={entity} />}
+      {kind === 'role' ? <RoleInsights role={entity as Role} part="warnings" /> : kind === 'user' ? <UserInsights user={entity as User} /> : <Insights kind={kind} entity={entity} />}
       <fieldset className="plain" disabled={!editable}>
         {def.sections.map((sec) => (
           <fieldset key={sec.title}>
@@ -323,6 +323,7 @@ function EntityEditor({ kind, entity }: { kind: EntityKind; entity: AnyEntity })
           </fieldset>
         ))}
       </fieldset>
+      {kind === 'role' && <RoleInsights role={entity as Role} part="derived" />}
       <div className="muted small">
         Angelegt {new Date(entity.createdAt).toLocaleString('de-DE')} · zuletzt geändert {new Date(entity.updatedAt).toLocaleString('de-DE')}
       </div>

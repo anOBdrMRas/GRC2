@@ -224,16 +224,12 @@ export const modules: Record<EntityKind, ModuleDef> = {
         ],
       },
       {
-        title: 'Zugeordnete Personen',
-        fields: [{ key: 'members', label: 'Stelleninhaber & Stellvertretungen', type: 'members', wide: true, hint: 'aus der Benutzerverwaltung' }],
-      },
-      {
-        title: 'Bestellung / Ernennung',
+        title: 'Verantwortung & Kompetenz',
         fields: [
-          { key: 'appointmentRequired', label: 'Formale Bestellung erforderlich', type: 'bool', hint: 'ISO 37301 5.3.2 · ISO 27001 5.3' },
-          { key: 'appointedAt', label: 'Bestellt am', type: 'date' },
-          { key: 'appointedByUserId', label: 'Bestellt durch', type: 'ref', refKind: 'user' },
-          { key: 'appointmentDocument', label: 'Bestellungsdokument', type: 'text', hint: 'Dokumentenname, Ablageort oder Link' },
+          { key: 'responsibilities', label: 'Verantwortlichkeiten', type: 'textarea', wide: true, hint: 'ISO 9001 5.3' },
+          { key: 'authorities', label: 'Befugnisse', type: 'textarea', wide: true },
+          { key: 'competencies', label: 'Erforderliche Kompetenzen', type: 'textarea', hint: 'ISO 9001 7.2' },
+          { key: 'trainings', label: 'Pflichtschulungen / Awareness', type: 'textarea', hint: 'ISO 27001 A.6.3 · ISO 37301 7.2.3' },
         ],
       },
       {
@@ -245,12 +241,16 @@ export const modules: Record<EntityKind, ModuleDef> = {
         ],
       },
       {
-        title: 'Verantwortung & Kompetenz',
+        title: 'Zugeordnete Personen',
+        fields: [{ key: 'members', label: 'Stelleninhaber & Stellvertretungen', type: 'members', wide: true, hint: 'aus der Benutzerverwaltung' }],
+      },
+      {
+        title: 'Bestellung / Ernennung',
         fields: [
-          { key: 'responsibilities', label: 'Verantwortlichkeiten', type: 'textarea', wide: true, hint: 'ISO 9001 5.3' },
-          { key: 'authorities', label: 'Befugnisse', type: 'textarea', wide: true },
-          { key: 'competencies', label: 'Erforderliche Kompetenzen', type: 'textarea', hint: 'ISO 9001 7.2' },
-          { key: 'trainings', label: 'Pflichtschulungen / Awareness', type: 'textarea', hint: 'ISO 27001 A.6.3 · ISO 37301 7.2.3' },
+          { key: 'appointmentRequired', label: 'Formale Bestellung erforderlich', type: 'bool', hint: 'ISO 37301 5.3.2 · ISO 27001 5.3' },
+          { key: 'appointedAt', label: 'Bestellt am', type: 'date' },
+          { key: 'appointedByUserId', label: 'Bestellt durch', type: 'ref', refKind: 'user' },
+          { key: 'appointmentDocument', label: 'Bestellungsdokument', type: 'text', hint: 'Dokumentenname, Ablageort oder Link' },
         ],
       },
       {
