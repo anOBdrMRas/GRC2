@@ -1,11 +1,12 @@
 import type { ReactNode } from 'react';
-import type { AnyEntity, Control, EntityKind, Kpi, ProcessModel, Raci, Risk } from '../types';
+import type { AnyEntity, Control, AssignableKind, Kpi, ProcessModel, Raci, Risk } from '../types';
 import type { SelectedElement } from '../bpmn/BpmnEditor';
 import { useStore } from '../store';
 import { useUi } from '../ui';
 import { modules } from '../schema';
 import { assignedIds, emptyAssignment, kpiStatus, residualScore, riskLevel, riskScore } from '../logic';
 import { LevelBadge, Picker, TrafficLight } from './common';
+import { useRights } from '../useRights';
 
 const typeLabels: Record<string, string> = {
   task: 'Aufgabe',
@@ -30,10 +31,12 @@ const raciHelp: Record<Raci, string> = {
 export function StepPanel({
   process,
   element,
+  readOnly = false,
   onOpenSubProcess,
 }: {
   process: ProcessModel;
   element: SelectedElement | null;
+  readOnly?: boolean;
   onOpenSubProcess: (id: string) => void;
 }) {
   if (!element) return <ProcessSummary process={process} />;
@@ -50,16 +53,21 @@ export function StepPanel({
       </div>
     );
   }
-  return <ActivityPanel process={process} element={element} onOpenSubProcess={onOpenSubProcess} />;
+  return (
+    <fieldset className="plain panel-fieldset" disabled={readOnly}>
+      <ActivityPanel process={process} element={element} onOpenSubProcess={onOpenSubProcess} />
+    </fieldset>
+  );
 }
 
 function ActivityPanel({ process, element, onOpenSubProcess }: { process: ProcessModel; element: SelectedElement; onOpenSubProcess: (id: string) => void }) {
   const store = useStore();
   const go = useUi((s) => s.go);
   const a = process.assignments[element.id] ?? emptyAssignment();
+  const { canEdit } = useRights();
 
-  const assign = (kind: EntityKind, id: string) => store.assign(process.id, element.id, kind, id);
-  const quickCreate = (kind: EntityKind, title: string) => {
+  const assign = (kind: AssignableKind, id: string) => store.assign(process.id, element.id, kind, id);
+  const quickCreate = (kind: AssignableKind, title: string) => {
     const e = store.createEntity(kind, title);
     assign(kind, e.id);
   };
@@ -69,7 +77,7 @@ function ActivityPanel({ process, element, onOpenSubProcess }: { process: Proces
   const uncovered = store.risk.filter((r) => a.risks.includes(r.id) && !stepControls.some((c) => c.mitigatesRiskIds.includes(r.id)));
   const suggestions = store.control.filter((c) => !a.controls.includes(c.id) && uncovered.some((r) => c.mitigatesRiskIds.includes(r.id)));
 
-  const section = (kind: EntityKind, extra: (e: AnyEntity) => ReactNode) => {
+  const section = (kind: AssignableKind, extra: (e: AnyEntity) => ReactNode) => {
     const def = modules[kind];
     const all = store[kind] as AnyEntity[];
     const ids = assignedIds(a, kind);
@@ -98,7 +106,7 @@ function ActivityPanel({ process, element, onOpenSubProcess }: { process: Proces
           exclude={ids}
           placeholder={`${def.label} zuordnen oder neu anlegen…`}
           onPick={(id) => assign(kind, id)}
-          onCreate={(title) => quickCreate(kind, title)}
+          onCreate={canEdit(kind) ? (title) => quickCreate(kind, title) : undefined}
         />
       </div>
     );
@@ -224,7 +232,7 @@ function CallLink({ process, elementId }: { process: ProcessModel; elementId: st
 function ProcessSummary({ process }: { process: ProcessModel }) {
   const store = useStore();
   const all = Object.values(process.assignments);
-  const uniq = (kind: EntityKind) => new Set(all.flatMap((a) => assignedIds(a, kind))).size;
+  const uniq = (kind: AssignableKind) => new Set(all.flatMap((a) => assignedIds(a, kind))).size;
   const risks = store.risk.filter((r) => all.some((a) => a.risks.includes(r.id)));
   const maxGross = Math.max(0, ...risks.map((r) => riskScore(r.likelihood, r.impact)));
   return (
@@ -235,7 +243,7 @@ function ProcessSummary({ process }: { process: ProcessModel }) {
       </div>
       <p className="muted small">Element im Diagramm auswählen, um Rollen, Risiken, Chancen, Controls und KPI zuzuordnen.</p>
       <div className="stat-grid">
-        {(['role', 'risk', 'opportunity', 'control', 'kpi'] as EntityKind[]).map((k) => (
+        {(['role', 'risk', 'opportunity', 'control', 'kpi'] as AssignableKind[]).map((k) => (
           <div className="stat" key={k} style={{ borderColor: modules[k].color }}>
             <div className="stat-num">{uniq(k)}</div>
             <div className="stat-label">{modules[k].plural}</div>

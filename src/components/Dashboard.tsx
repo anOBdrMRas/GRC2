@@ -2,7 +2,7 @@ import type { EntityKind } from '../types';
 import { useStore } from '../store';
 import { useUi } from '../ui';
 import { modules } from '../schema';
-import { activityTypes, kpiStatus, parseElements, residualScore, riskLevel, today } from '../logic';
+import { activityTypes, continuityGap, kpiStatus, personSodConflicts, parseElements, residualScore, riskLevel, today } from '../logic';
 import { Heatmap } from './Heatmap';
 import { LevelBadge, TrafficLight } from './common';
 
@@ -30,6 +30,15 @@ export function Dashboard() {
   const withoutRole = steps.filter((s) => !s.a?.roles.some((r) => r.raci === 'R' || r.raci === 'A'));
   const coverage = steps.length ? Math.round((withRole.length / steps.length) * 100) : 0;
 
+  const roleIssues = [
+    ...store.role
+      .filter((r) => r.mandatoryBy.length > 0 && !r.members.some((m) => m.function === 'Inhaber'))
+      .map((r) => ({ r, text: 'Pflichtrolle unbesetzt' })),
+    ...store.role.filter((r) => continuityGap(r)).map((r) => ({ r, text: continuityGap(r)! })),
+    ...personSodConflicts(store.role, store.user).map((c) => ({ r: c.role, text: `${c.user.title}: unvereinbar mit „${c.other.title}“` })),
+    ...store.role.filter((r) => r.nextReview && r.nextReview < t).map((r) => ({ r, text: 'Review überfällig' })),
+  ];
+
   const effectiveness = ['Wirksam', 'Eingeschränkt wirksam', 'Nicht wirksam', 'Nicht geprüft'].map((v) => ({
     v,
     n: store.control.filter((c) => c.operatingEffectiveness === v).length,
@@ -43,7 +52,7 @@ export function Dashboard() {
           <div className="stat-num">{store.processes.length}</div>
           <div className="stat-label">Prozesse · {steps.length} Aktivitäten</div>
         </div>
-        {(['risk', 'opportunity', 'control', 'role', 'kpi'] as EntityKind[]).map((k) => (
+        {(['risk', 'opportunity', 'control', 'role', 'kpi', 'user'] as EntityKind[]).map((k) => (
           <div key={k} className="stat clickable" style={{ borderColor: modules[k].color }} onClick={() => go(k)}>
             <div className="stat-num">{store[k].length}</div>
             <div className="stat-label">{modules[k].plural}</div>
@@ -127,6 +136,13 @@ export function Dashboard() {
           {withoutRole.map((s) => (
             <div key={s.p.id + s.e.id} className="link small" onClick={() => openStep(s.p.id, s.e.id)}>
               {s.p.code} › {s.e.name}
+            </div>
+          ))}
+        </Finding>
+        <Finding title="Rollen: Besetzung, Vertretung & Funktionstrennung" count={roleIssues.length}>
+          {roleIssues.map(({ r, text }, i) => (
+            <div key={i} className="link small" onClick={() => go('role', r.id)}>
+              {r.code} {r.title} – <span className="muted">{text}</span>
             </div>
           ))}
         </Finding>

@@ -14,7 +14,10 @@ export type FieldType =
   | 'refs' // multiple references
   | 'iso' // ISO clause references
   | 'annexA'
-  | 'measurements';
+  | 'measurements'
+  | 'members' // persons holding a role
+  | 'permissions' // IT roles / access rights
+  | 'systemRoles'; // tool system roles of a user
 
 export interface FieldDef {
   key: string;
@@ -207,10 +210,38 @@ export const modules: Record<EntityKind, ModuleDef> = {
         ...base,
         fields: [
           ...base.fields,
+          { key: 'roleType', label: 'Rollentyp', type: 'select', options: ['Führungsrolle', 'Fachrolle', 'Gremium', 'Beauftragter'] },
           { key: 'orgUnit', label: 'Organisationseinheit', type: 'text' },
-          { key: 'holders', label: 'Stelleninhaber', type: 'text', hint: 'Namen, kommagetrennt' },
-          { key: 'deputyRoleId', label: 'Stellvertretung', type: 'ref', refKind: 'role' },
+          {
+            key: 'mandatoryBy',
+            label: 'Pflichtrolle gemäß',
+            type: 'multiselect',
+            options: ['ISO 9001', 'ISO 27001', 'ISO 37301', 'DSGVO'],
+            hint: 'Rolle wird von der Norm / dem Gesetz gefordert',
+          },
           { key: 'complianceRelevant', label: 'Compliance-Funktion / sensible Rolle', type: 'bool', hint: 'ISO 37301 5.3.2' },
+          { key: 'roleOwnerUserId', label: 'Rollenverantwortlicher', type: 'ref', refKind: 'user', hint: 'definiert und reviewt die Rolle' },
+        ],
+      },
+      {
+        title: 'Zugeordnete Personen',
+        fields: [{ key: 'members', label: 'Stelleninhaber & Stellvertretungen', type: 'members', wide: true, hint: 'aus der Benutzerverwaltung' }],
+      },
+      {
+        title: 'Bestellung / Ernennung',
+        fields: [
+          { key: 'appointmentRequired', label: 'Formale Bestellung erforderlich', type: 'bool', hint: 'ISO 37301 5.3.2 · ISO 27001 5.3' },
+          { key: 'appointedAt', label: 'Bestellt am', type: 'date' },
+          { key: 'appointedByUserId', label: 'Bestellt durch', type: 'ref', refKind: 'user' },
+          { key: 'appointmentDocument', label: 'Bestellungsdokument', type: 'text', hint: 'Dokumentenname, Ablageort oder Link' },
+        ],
+      },
+      {
+        title: 'Berichtslinien',
+        fields: [
+          { key: 'reportsToFunctionalRoleId', label: 'Berichtet fachlich an', type: 'ref', refKind: 'role' },
+          { key: 'reportsToDisciplinaryRoleId', label: 'Berichtet disziplinarisch an', type: 'ref', refKind: 'role' },
+          { key: 'directAccessToManagement', label: 'Direkter Zugang zur Geschäftsleitung', type: 'bool', hint: 'Unabhängigkeit, ISO 37301 5.3.2' },
         ],
       },
       {
@@ -223,8 +254,37 @@ export const modules: Record<EntityKind, ModuleDef> = {
         ],
       },
       {
+        title: 'Systemberechtigungen',
+        fields: [
+          {
+            key: 'systemPermissions',
+            label: 'IT-Rollen und Zugriffsrechte der Rolle',
+            type: 'permissions',
+            wide: true,
+            hint: 'ISO 27001 A.5.15 · A.5.18 · A.8.2',
+          },
+        ],
+      },
+      {
         title: 'Funktionstrennung',
         fields: [{ key: 'incompatibleRoleIds', label: 'Unvereinbare Rollen (SoD)', type: 'refs', refKind: 'role', wide: true, hint: 'ISO 27001 A.5.3' }],
+      },
+      {
+        title: 'Kritikalität & Vertretung',
+        fields: [
+          { key: 'criticality', label: 'Kritikalität', type: 'select', options: ['Normal', 'Hoch', 'Schlüsselposition'], hint: 'ISO 27001 A.5.29 / A.5.30' },
+          { key: 'deputyRoleId', label: 'Vertretung durch Rolle', type: 'ref', refKind: 'role' },
+          { key: 'continuityNote', label: 'Vertretungsregelung / Notfallvorsorge', type: 'textarea', wide: true },
+        ],
+      },
+      {
+        title: 'Gültigkeit & Review',
+        fields: [
+          { key: 'version', label: 'Version', type: 'text' },
+          { key: 'status', label: 'Status', type: 'select', options: ['Entwurf', 'In Prüfung', 'Freigegeben', 'Archiviert'] },
+          { key: 'lastReview', label: 'Letzte Überprüfung', type: 'date' },
+          { key: 'nextReview', label: 'Nächste Überprüfung', type: 'date' },
+        ],
       },
       { title: 'Normbezug', fields: [{ key: 'isoRefs', label: 'Normreferenzen', type: 'iso', wide: true }] },
     ],
@@ -264,6 +324,32 @@ export const modules: Record<EntityKind, ModuleDef> = {
       { title: 'Normbezug', fields: [{ key: 'isoRefs', label: 'Normreferenzen', type: 'iso', wide: true }] },
     ],
   },
+  user: {
+    kind: 'user',
+    label: 'Benutzer',
+    plural: 'Benutzerverwaltung',
+    codePrefix: 'U',
+    color: '#495057',
+    sections: [
+      {
+        title: 'Benutzer',
+        fields: [
+          { key: 'code', label: 'Benutzer-ID', type: 'text' },
+          { key: 'title', label: 'Name', type: 'text' },
+          { key: 'email', label: 'E-Mail / Login', type: 'text' },
+          { key: 'status', label: 'Status', type: 'select', options: ['Aktiv', 'Inaktiv', 'Gesperrt'] },
+          { key: 'department', label: 'Abteilung', type: 'text' },
+          { key: 'jobTitle', label: 'Stellenbezeichnung', type: 'text' },
+          { key: 'validUntil', label: 'Zugang gültig bis', type: 'date', hint: 'leer = unbefristet' },
+          { key: 'description', label: 'Bemerkung', type: 'textarea', wide: true },
+        ],
+      },
+      {
+        title: 'Systemrollen (Berechtigungen im Tool)',
+        fields: [{ key: 'systemRoles', label: 'Zugewiesene Systemrollen', type: 'systemRoles', wide: true }],
+      },
+    ],
+  },
 };
 
-export const kindOrder: EntityKind[] = ['risk', 'opportunity', 'control', 'role', 'kpi'];
+export const kindOrder: EntityKind[] = ['risk', 'opportunity', 'control', 'role', 'kpi', 'user'];

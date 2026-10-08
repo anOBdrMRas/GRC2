@@ -1,11 +1,15 @@
 import { useMemo, useState, type ReactNode } from 'react';
-import type { AnyEntity, Control, EntityKind, Kpi, Opportunity, Risk, Role } from '../types';
+import type { AnyEntity, Control, EntityKind, Kpi, Opportunity, Risk, Role, User } from '../types';
 import { modules } from '../schema';
 import { useStore } from '../store';
 import { useUi } from '../ui';
-import { elementNames, findUsages, kpiStatus, residualScore, riskLevel, riskScore } from '../logic';
+import { continuityGap, findUsages, roleMembers, kpiStatus, residualScore, riskLevel, riskScore } from '../logic';
 import { Field } from './Fields';
-import { ConfirmButton, Empty, LevelBadge, Tag, TrafficLight } from './common';
+import { ConfirmButton, Empty, LevelBadge, StatusPill, Tag, TrafficLight } from './common';
+import { useRights } from '../useRights';
+import { systemRoleById } from '../permissions';
+import { RoleInsights, RoleProfile } from './RoleInsights';
+import { SystemRoleMatrix, UserInsights } from './UserInsights';
 import { Heatmap } from './Heatmap';
 import { Sparkline } from './Sparkline';
 
@@ -17,6 +21,7 @@ interface Column {
 
 function useColumns(kind: EntityKind): Column[] {
   const roles = useStore((s) => s.role);
+  const users = useStore((s) => s.user);
   const controls = useStore((s) => s.control);
   const roleName = (id: string) => roles.find((r) => r.id === id)?.title ?? '—';
 
@@ -73,9 +78,36 @@ function useColumns(kind: EntityKind): Column[] {
       ];
     case 'role':
       return [
-        { label: 'Org.-Einheit', render: (e) => (e as Role).orgUnit },
-        { label: 'Stelleninhaber', render: (e) => (e as Role).holders },
-        { label: 'Compliance', render: (e) => ((e as Role).complianceRelevant ? '●' : '') },
+        { label: 'Typ', render: (e) => (e as Role).roleType, sort: (e) => (e as Role).roleType },
+        {
+          label: 'Inhaber',
+          render: (e) =>
+            roleMembers(e as Role, users)
+              .filter((m) => m.function === 'Inhaber')
+              .map((m) => m.user.title)
+              .join(', ') || <span className="warn">unbesetzt</span>,
+        },
+        {
+          label: 'Kritikalität',
+          render: (e) => {
+            const r = e as Role;
+            const gap = continuityGap(r);
+            return (
+              <span className={gap ? 'warn' : undefined} title={gap ?? undefined}>
+                {r.criticality}
+                {gap && ' ⚠'}
+              </span>
+            );
+          },
+        },
+        { label: 'Pflicht', render: (e) => (e as Role).mandatoryBy.map((x) => x.replace('ISO ', '')).join(', ') },
+        { label: 'Status', render: (e) => <StatusPill status={(e as Role).status} /> },
+      ];
+    case 'user':
+      return [
+        { label: 'Abteilung', render: (e) => (e as User).department, sort: (e) => (e as User).department },
+        { label: 'Systemrollen', render: (e) => (e as User).systemRoles.map((id) => systemRoleById.get(id)?.name ?? id).join(', ') },
+        { label: 'Status', render: (e) => <StatusPill status={(e as User).status} /> },
       ];
     case 'kpi':
       return [
@@ -110,6 +142,10 @@ export function EntityModule({ kind }: { kind: EntityKind }) {
   const [heatMode, setHeatMode] = useState<'gross' | 'net'>('gross');
   const [heatCell, setHeatCell] = useState<string | null>(null);
   const [sortCol, setSortCol] = useState<number | null>(null);
+  const [roleType, setRoleType] = useState<string>('');
+  const [mandatoryOnly, setMandatoryOnly] = useState(false);
+  const [userTab, setUserTab] = useState<'users' | 'matrix'>('users');
+  const { canRead, canEdit } = useRights();
 
   const filtered = useMemo(() => {
     const needle = q.trim().toLowerCase();
@@ -121,28 +157,72 @@ export function EntityModule({ kind }: { kind: EntityKind }) {
         return key === heatCell;
       });
     }
+    if (kind === 'role') {
+      list = list.filter((e) => (!roleType || (e as Role).roleType === roleType) && (!mandatoryOnly || (e as Role).mandatoryBy.length > 0));
+    }
     const sorter = sortCol !== null ? columns[sortCol].sort : undefined;
     if (sorter) list = [...list].sort((a, b) => (sorter(a) < sorter(b) ? -1 : sorter(a) > sorter(b) ? 1 : 0));
     return list;
-  }, [items, q, kind, heatCell, heatMode, sortCol, columns]);
+  }, [items, q, kind, heatCell, heatMode, sortCol, columns, roleType, mandatoryOnly]);
 
   const selected = items.find((e) => e.id === selectedId);
+  if (!canRead(kind)) return <Empty>Ihre Systemrollen erlauben keinen Zugriff auf {def.plural}.</Empty>;
 
-  return (
-    <div className="module">
-      <div className="module-list">
-        <div className="module-head">
-          <h2 style={{ color: def.color }}>{def.plural}</h2>
+  const head = (
+    <div className="module-head">
+      <h2 style={{ color: def.color }}>{def.plural}</h2>
+      <div className="row gap">
+        {kind === 'user' && (
+          <div className="seg">
+            <button className={userTab === 'users' ? 'active' : ''} onClick={() => setUserTab('users')}>
+              Benutzer
+            </button>
+            <button className={userTab === 'matrix' ? 'active' : ''} onClick={() => setUserTab('matrix')}>
+              Systemrollen
+            </button>
+          </div>
+        )}
+        {!canEdit(kind) && <span className="badge readonly">Nur Lesen</span>}
+        {canEdit(kind) && !(kind === 'user' && userTab === 'matrix') && (
           <button
             className="primary"
             onClick={() => {
-              const e = createEntity(kind, `Neue(s) ${def.label}`);
+              const e = createEntity(kind, kind === 'user' ? 'Neuer Benutzer' : `Neue(s) ${def.label}`);
               select(kind, e.id);
             }}
           >
             + {def.label}
           </button>
-        </div>
+        )}
+      </div>
+    </div>
+  );
+
+  if (kind === 'user' && userTab === 'matrix') {
+    return (
+      <div className="module-full">
+        {head}
+        <SystemRoleMatrix />
+      </div>
+    );
+  }
+
+  return (
+    <div className="module">
+      <div className="module-list">
+        {head}
+        {kind === 'role' && (
+          <div className="filter-bar">
+            {['', 'Führungsrolle', 'Fachrolle', 'Gremium', 'Beauftragter'].map((t) => (
+              <button key={t || 'all'} className={`chip ${roleType === t ? 'active' : ''}`} onClick={() => setRoleType(t)}>
+                {t || 'Alle Typen'}
+              </button>
+            ))}
+            <label className="checkbox small">
+              <input type="checkbox" checked={mandatoryOnly} onChange={(e) => setMandatoryOnly(e.target.checked)} /> nur Pflichtrollen (Norm/Gesetz)
+            </label>
+          </div>
+        )}
         {kind === 'risk' && (
           <div className="card heat-card">
             <div className="row space">
@@ -201,6 +281,9 @@ function EntityEditor({ kind, entity }: { kind: EntityKind; entity: AnyEntity })
   const update = useStore((s) => s.updateEntity);
   const remove = useStore((s) => s.deleteEntity);
   const select = useUi((s) => s.select);
+  const { canEdit } = useRights();
+  const editable = canEdit(kind);
+  const [showProfile, setShowProfile] = useState(false);
   const values = entity as unknown as Record<string, unknown>;
 
   return (
@@ -212,26 +295,34 @@ function EntityEditor({ kind, entity }: { kind: EntityKind; entity: AnyEntity })
             <span className="mono">{entity.code}</span> {entity.title}
           </h3>
         </div>
-        <ConfirmButton
-          label="Löschen"
-          confirmLabel="Wirklich löschen? (inkl. Zuordnungen)"
-          onConfirm={() => {
-            remove(kind, entity.id);
-            select(kind, undefined);
-          }}
-        />
+        <div className="row gap">
+          {kind === 'role' && <button onClick={() => setShowProfile(true)}>Rollenbeschreibung</button>}
+          {editable && (
+            <ConfirmButton
+              label="Löschen"
+              confirmLabel="Wirklich löschen? (inkl. Zuordnungen)"
+              onConfirm={() => {
+                remove(kind, entity.id);
+                select(kind, undefined);
+              }}
+            />
+          )}
+        </div>
       </div>
-      <Insights kind={kind} entity={entity} />
-      {def.sections.map((sec) => (
-        <fieldset key={sec.title}>
-          <legend>{sec.title}</legend>
-          <div className="grid">
-            {sec.fields.map((f) => (
-              <Field key={f.key} def={f} value={values[f.key]} onChange={(v) => update(kind, entity.id, { [f.key]: v })} />
-            ))}
-          </div>
-        </fieldset>
-      ))}
+      {kind === 'role' && showProfile && <RoleProfile role={entity as Role} onClose={() => setShowProfile(false)} />}
+      {kind === 'role' ? <RoleInsights role={entity as Role} /> : kind === 'user' ? <UserInsights user={entity as User} /> : <Insights kind={kind} entity={entity} />}
+      <fieldset className="plain" disabled={!editable}>
+        {def.sections.map((sec) => (
+          <fieldset key={sec.title}>
+            <legend>{sec.title}</legend>
+            <div className="grid">
+              {sec.fields.map((f) => (
+                <Field key={f.key} def={f} value={values[f.key]} onChange={(v) => update(kind, entity.id, { [f.key]: v })} />
+              ))}
+            </div>
+          </fieldset>
+        ))}
+      </fieldset>
       <div className="muted small">
         Angelegt {new Date(entity.createdAt).toLocaleString('de-DE')} · zuletzt geändert {new Date(entity.updatedAt).toLocaleString('de-DE')}
       </div>
@@ -243,26 +334,9 @@ function EntityEditor({ kind, entity }: { kind: EntityKind; entity: AnyEntity })
 function Insights({ kind, entity }: { kind: EntityKind; entity: AnyEntity }) {
   const processes = useStore((s) => s.processes);
   const controls = useStore((s) => s.control);
-  const roles = useStore((s) => s.role);
   const openStep = useUi((s) => s.openStep);
   const go = useUi((s) => s.go);
   const usages = findUsages(processes, kind, entity.id);
-
-  // Segregation of duties: this role and an incompatible role both carry R/A on the same step.
-  const isRa = (raci: string) => raci === 'R' || raci === 'A';
-  const sodConflicts =
-    kind === 'role'
-      ? processes.flatMap((p) => {
-          const names = elementNames(p.xml);
-          return Object.entries(p.assignments)
-            .filter(([el, a]) => el in names && a.roles.some((r) => r.roleId === entity.id && isRa(r.raci)))
-            .flatMap(([el, a]) =>
-              a.roles
-                .filter((r) => (entity as Role).incompatibleRoleIds.includes(r.roleId) && isRa(r.raci))
-                .map((r) => ({ p, el, name: names[el], other: roles.find((x) => x.id === r.roleId) })),
-            );
-        })
-      : [];
 
   return (
     <div className="insights">
@@ -291,16 +365,6 @@ function Insights({ kind, entity }: { kind: EntityKind; entity: AnyEntity }) {
               ))}
           </div>
           {!controls.some((c) => c.mitigatesRiskIds.includes(entity.id)) && <div className="warn small">Keine Kontrolle zugeordnet.</div>}
-        </div>
-      )}
-      {kind === 'role' && sodConflicts.length > 0 && (
-        <div className="insight warn-box">
-          <div className="insight-title">⚠ Funktionstrennungskonflikte</div>
-          {sodConflicts.map((c, i) => (
-            <div key={i} className="small link" onClick={() => openStep(c.p.id, c.el)}>
-              {c.p.code} › {c.name}: R/A gemeinsam mit „{c.other?.title}“
-            </div>
-          ))}
         </div>
       )}
       {kind === 'kpi' && (

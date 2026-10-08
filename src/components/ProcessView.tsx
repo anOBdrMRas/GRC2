@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react';
-import type { EntityKind, ProcessModel } from '../types';
+import type { AssignableKind, ProcessModel } from '../types';
 import { useStore } from '../store';
 import { useUi } from '../ui';
 import { modules } from '../schema';
@@ -7,6 +7,7 @@ import { activityTypes, assignedIds, emptyAssignment, parseElements } from '../l
 import { BpmnEditor, type BpmnEditorHandle, type SelectedElement } from '../bpmn/BpmnEditor';
 import { StepPanel } from './StepPanel';
 import { ConfirmButton, Empty, download } from './common';
+import { useRights } from '../useRights';
 
 const categories: ProcessModel['category'][] = ['Führungsprozess', 'Kernprozess', 'Unterstützungsprozess'];
 
@@ -17,6 +18,7 @@ export function ProcessView() {
   const selectedId = useUi((s) => s.selected.processes);
   const select = useUi((s) => s.select);
   const fileInput = useRef<HTMLInputElement>(null);
+  const editable = useRights().canEdit('processes');
   const [naming, setNaming] = useState(false);
   const [newTitle, setNewTitle] = useState('');
   const process = processes.find((p) => p.id === selectedId) ?? processes[0];
@@ -34,6 +36,7 @@ export function ProcessView() {
         <div className="module-head">
           <h2>Prozesse</h2>
         </div>
+        {editable ? (
         <div className="row gap">
           <button className="primary" onClick={() => setNaming(true)}>
             + Prozess
@@ -51,6 +54,9 @@ export function ProcessView() {
             }}
           />
         </div>
+        ) : (
+          <span className="badge readonly">Nur Lesen</span>
+        )}
         {naming && (
           <form
             className="row gap"
@@ -103,6 +109,7 @@ function ProcessWorkspace({ process }: { process: ProcessModel }) {
   const clearFocus = useUi((s) => s.clearFocus);
   const openStep = useUi((s) => s.openStep);
   const select = useUi((s) => s.select);
+  const editable = useRights().canEdit('processes');
 
   // A focus request coming from a module switches back to the model tab.
   if (focusElementId && tab !== 'model') setTab('model');
@@ -136,14 +143,18 @@ function ProcessWorkspace({ process }: { process: ProcessModel }) {
               <button onClick={async () => download(`${fileBase}.svg`, await editor.current!.saveSvg(), 'image/svg+xml')}>⬇ SVG</button>
             </>
           )}
-          <ConfirmButton
-            label="Löschen"
-            confirmLabel="Prozess wirklich löschen?"
-            onConfirm={() => {
-              deleteProcess(process.id);
-              select('processes', undefined);
-            }}
-          />
+          {editable ? (
+            <ConfirmButton
+              label="Löschen"
+              confirmLabel="Prozess wirklich löschen?"
+              onConfirm={() => {
+                deleteProcess(process.id);
+                select('processes', undefined);
+              }}
+            />
+          ) : (
+            <span className="badge readonly">Nur Lesen</span>
+          )}
         </div>
       </div>
 
@@ -152,15 +163,20 @@ function ProcessWorkspace({ process }: { process: ProcessModel }) {
           <BpmnEditor
             ref={editor}
             process={process}
+            readOnly={!editable}
             focusElementId={focusElementId}
             onFocused={clearFocus}
             onSelect={setSelected}
             onXmlChange={(id, xml) => updateProcess(id, { xml })}
           />
-          <StepPanel process={process} element={selected} onOpenSubProcess={(id) => editor.current?.openSubProcess(id)} />
+          <StepPanel process={process} element={selected} readOnly={!editable} onOpenSubProcess={(id) => editor.current?.openSubProcess(id)} />
         </div>
       )}
-      {tab === 'profile' && <ProcessProfile process={process} />}
+      {tab === 'profile' && (
+        <fieldset className="plain" disabled={!editable}>
+          <ProcessProfile process={process} />
+        </fieldset>
+      )}
       {tab === 'matrix' && <StepMatrix process={process} onOpen={(el) => openStep(process.id, el)} />}
     </section>
   );
@@ -250,14 +266,14 @@ function ProcessProfile({ process }: { process: ProcessModel }) {
   );
 }
 
-const matrixKinds: EntityKind[] = ['role', 'risk', 'control', 'opportunity', 'kpi'];
+const matrixKinds: AssignableKind[] = ['role', 'risk', 'control', 'opportunity', 'kpi'];
 
 function StepMatrix({ process, onOpen }: { process: ProcessModel; onOpen: (elementId: string) => void }) {
   const store = useStore();
   const steps = parseElements(process.xml).filter((e) => activityTypes.includes(e.type));
-  const label = (kind: EntityKind, id: string) => (store[kind] as { id: string; code: string }[]).find((e) => e.id === id)?.code ?? id;
+  const label = (kind: AssignableKind, id: string) => (store[kind] as { id: string; code: string }[]).find((e) => e.id === id)?.code ?? id;
 
-  const cell = (kind: EntityKind, elementId: string) => {
+  const cell = (kind: AssignableKind, elementId: string) => {
     const a = process.assignments[elementId] ?? emptyAssignment();
     if (kind === 'role') return a.roles.map((r) => `${label('role', r.roleId)} (${r.raci})`).join(', ');
     return assignedIds(a, kind)

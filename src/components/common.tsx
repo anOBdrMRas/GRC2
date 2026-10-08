@@ -206,3 +206,17 @@ export function ConfirmButton({ label, confirmLabel, onConfirm, className = 'dan
     </button>
   );
 }
+
+const statusTone: Record<string, string> = {
+  Freigegeben: 'ok',
+  Aktiv: 'ok',
+  'In Prüfung': 'warn',
+  Entwurf: 'neutral',
+  Inaktiv: 'neutral',
+  Archiviert: 'neutral',
+  Gesperrt: 'bad',
+};
+
+export function StatusPill({ status }: { status: string }) {
+  return <span className={`pill pill-${statusTone[status] ?? 'neutral'}`}>{status}</span>;
+}

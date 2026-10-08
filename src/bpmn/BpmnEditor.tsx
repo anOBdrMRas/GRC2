@@ -1,5 +1,6 @@
 import { forwardRef, useEffect, useImperativeHandle, useRef } from 'react';
 import Modeler from 'bpmn-js/lib/Modeler';
+import NavigatedViewer from 'bpmn-js/lib/NavigatedViewer';
 import 'bpmn-js/dist/assets/diagram-js.css';
 import 'bpmn-js/dist/assets/bpmn-js.css';
 import 'bpmn-js/dist/assets/bpmn-font/css/bpmn-embedded.css';
@@ -29,6 +30,8 @@ export interface BpmnEditorHandle {
 
 interface Props {
   process: ProcessModel;
+  /** show the diagram without editing tools (no edit rights) */
+  readOnly?: boolean;
   focusElementId: string | null;
   onFocused: () => void;
   onSelect: (el: SelectedElement | null) => void;
@@ -55,7 +58,7 @@ function describe(element: Svc): SelectedElement {
 }
 
 export const BpmnEditor = forwardRef<BpmnEditorHandle, Props>(function BpmnEditor(
-  { process, focusElementId, onFocused, onSelect, onXmlChange },
+  { process, readOnly = false, focusElementId, onFocused, onSelect, onXmlChange },
   ref,
 ) {
   const container = useRef<HTMLDivElement>(null);
@@ -101,7 +104,8 @@ export const BpmnEditor = forwardRef<BpmnEditorHandle, Props>(function BpmnEdito
 
   // One modeler instance per opened process.
   useEffect(() => {
-    const modeler: Svc = new Modeler({ container: container.current!, additionalModules: [translateModule] });
+    const Ctor = readOnly ? NavigatedViewer : Modeler;
+    const modeler: Svc = new Ctor({ container: container.current!, additionalModules: [translateModule] });
     modelerRef.current = modeler;
     let saveTimer: number | undefined;
     let dirty = false;
@@ -155,7 +159,7 @@ export const BpmnEditor = forwardRef<BpmnEditorHandle, Props>(function BpmnEdito
       modelerRef.current = null;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [process.id]);
+  }, [process.id, readOnly]);
 
   useEffect(renderOverlays, [process.assignments]);
 

@@ -1,7 +1,9 @@
 // Domain model of the GRC prototype.
 // Metadata fields are aligned with ISO 9001:2015, ISO/IEC 27001:2022 and ISO 37301:2021.
 
-export type EntityKind = 'risk' | 'opportunity' | 'control' | 'role' | 'kpi';
+export type EntityKind = 'risk' | 'opportunity' | 'control' | 'role' | 'kpi' | 'user';
+/** Kinds that can be assigned to process steps. */
+export type AssignableKind = Exclude<EntityKind, 'user'>;
 
 export interface BaseEntity {
   id: string;
@@ -73,18 +75,67 @@ export interface Control extends BaseEntity {
   isoRefs: string[];
 }
 
+export type RoleType = 'Führungsrolle' | 'Fachrolle' | 'Gremium' | 'Beauftragter';
+
+/** A person holding a role (as holder or deputy). */
+export interface RoleMember {
+  userId: string;
+  function: 'Inhaber' | 'Stellvertretung';
+  since: string;
+  /** deputy has been trained / inducted (ISO 27001 A.5.29) */
+  inducted: boolean;
+}
+
+/** IT role / access right that belongs to an organisational role (ISO 27001 A.5.15, A.5.18, A.8.2). */
+export interface SystemPermission {
+  system: string;
+  permission: string;
+  level: 'Lesen' | 'Schreiben' | 'Freigabe' | 'Administration';
+}
+
 /** ISO 9001 5.3 / 7.2 · ISO/IEC 27001 5.2 / 5.3 (A) · ISO 37301 5.3 */
 export interface Role extends BaseEntity {
+  roleType: RoleType;
+  mandatoryBy: string[];
   orgUnit: string;
+  members: RoleMember[];
+  roleOwnerUserId: string;
   responsibilities: string;
   authorities: string;
   competencies: string;
   trainings: string;
-  holders: string;
   deputyRoleId: string;
   incompatibleRoleIds: string[];
   complianceRelevant: boolean;
+  // appointment (ISO 37301 5.3.2, ISO 27001 5.3)
+  appointmentRequired: boolean;
+  appointedAt: string;
+  appointedByUserId: string;
+  appointmentDocument: string;
+  // reporting lines
+  reportsToFunctionalRoleId: string;
+  reportsToDisciplinaryRoleId: string;
+  directAccessToManagement: boolean;
+  systemPermissions: SystemPermission[];
+  // criticality & continuity (ISO 27001 A.5.29 / A.5.30)
+  criticality: 'Normal' | 'Hoch' | 'Schlüsselposition';
+  continuityNote: string;
+  // validity & review
+  version: string;
+  status: string;
+  lastReview: string;
+  nextReview: string;
   isoRefs: string[];
+}
+
+/** Tool user (user management module). */
+export interface User extends BaseEntity {
+  email: string;
+  department: string;
+  jobTitle: string;
+  status: 'Aktiv' | 'Inaktiv' | 'Gesperrt';
+  systemRoles: string[];
+  validUntil: string;
 }
 
 export interface Measurement {
@@ -150,6 +201,7 @@ export interface EntityMap {
   control: Control;
   role: Role;
   kpi: Kpi;
+  user: User;
 }
 
 export type AnyEntity = EntityMap[EntityKind];

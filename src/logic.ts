@@ -1,4 +1,4 @@
-import type { AnyEntity, EntityKind, EntityMap, Kpi, ProcessModel, Risk, StepAssignment } from './types';
+import type { AnyEntity, AssignableKind, EntityKind, EntityMap, Kpi, ProcessModel, Risk, Role, StepAssignment, User } from './types';
 
 export const uid = () => Math.random().toString(36).slice(2, 10);
 export const now = () => new Date().toISOString();
@@ -52,7 +52,7 @@ export const assignmentKey = {
   kpi: 'kpis',
 } as const;
 
-export function assignedIds(a: StepAssignment, kind: EntityKind): string[] {
+export function assignedIds(a: StepAssignment, kind: AssignableKind): string[] {
   return kind === 'role' ? a.roles.map((r) => r.roleId) : a[assignmentKey[kind]];
 }
 
@@ -119,16 +119,42 @@ export function blankEntity<K extends EntityKind>(kind: K, code: string, title =
     },
     role: {
       ...common,
+      roleType: 'Fachrolle',
+      mandatoryBy: [],
       orgUnit: '',
+      members: [],
+      roleOwnerUserId: '',
       responsibilities: '',
       authorities: '',
       competencies: '',
       trainings: '',
-      holders: '',
       deputyRoleId: '',
       incompatibleRoleIds: [],
       complianceRelevant: false,
+      appointmentRequired: false,
+      appointedAt: '',
+      appointedByUserId: '',
+      appointmentDocument: '',
+      reportsToFunctionalRoleId: '',
+      reportsToDisciplinaryRoleId: '',
+      directAccessToManagement: false,
+      systemPermissions: [],
+      criticality: 'Normal',
+      continuityNote: '',
+      version: '0.1',
+      status: 'Entwurf',
+      lastReview: '',
+      nextReview: '',
       isoRefs: ['9001:5.3'],
+    },
+    user: {
+      ...common,
+      email: '',
+      department: '',
+      jobTitle: '',
+      status: 'Aktiv',
+      systemRoles: ['reader'],
+      validUntil: '',
     },
     kpi: {
       ...common,
@@ -212,6 +238,7 @@ export function elementNames(xml: string): Record<string, string> {
 /** Finds all process steps an entity is assigned to. */
 export function findUsages(processes: ProcessModel[], kind: EntityKind, id: string): Usage[] {
   const out: Usage[] = [];
+  if (kind === 'user') return out;
   for (const p of processes) {
     const names = elementNames(p.xml);
     for (const [elementId, a] of Object.entries(p.assignments)) {
@@ -233,4 +260,64 @@ export function entityName(e: AnyEntity | undefined) {
 
 export function residualScore(r: Risk) {
   return riskScore(r.residualLikelihood, r.residualImpact);
+}
+
+/** Fills fields added in later versions so older stored data keeps working. */
+export function normalizeRole(r: Partial<Role> & { holders?: string }): Role {
+  const base = blankEntity('role', r.code ?? '', r.title ?? '');
+  const merged = { ...base, ...r, id: r.id ?? base.id } as Role & { holders?: string };
+  if (merged.holders && !r.members) merged.description = [merged.description, `Stelleninhaber (alt): ${merged.holders}`].filter(Boolean).join('\n');
+  delete merged.holders;
+  return merged;
+}
+
+export function normalizeUser(u: Partial<User>): User {
+  const base = blankEntity('user', u.code ?? '', u.title ?? '');
+  return { ...base, ...u, id: u.id ?? base.id } as User;
+}
+
+/** Persons assigned to a role, resolved to users. */
+export function roleMembers(role: Role, users: User[]) {
+  return role.members
+    .map((m) => ({ ...m, user: users.find((u) => u.id === m.userId) }))
+    .filter((m): m is typeof m & { user: User } => !!m.user);
+}
+
+/** Key positions need at least one inducted deputy (ISO 27001 A.5.29). */
+export function continuityGap(role: Role) {
+  if (role.criticality === 'Normal') return null;
+  const deputies = role.members.filter((m) => m.function === 'Stellvertretung');
+  if (deputies.length === 0 && !role.deputyRoleId) return 'Keine Stellvertretung benannt.';
+  if (deputies.length > 0 && !deputies.some((d) => d.inducted)) return 'Stellvertretung ist nicht eingearbeitet.';
+  return null;
+}
+
+export interface PersonSodConflict {
+  user: User;
+  role: Role;
+  other: Role;
+  /** systems where both roles grant write/approve/admin rights */
+  systems: string[];
+}
+
+/** Persons who hold two roles that are declared incompatible (technical SoD check). */
+export function personSodConflicts(roles: Role[], users: User[]): PersonSodConflict[] {
+  // system names with write/approve/admin rights, keyed case-insensitively
+  const strong = (r: Role) => new Map(r.systemPermissions.filter((p) => p.level !== 'Lesen').map((p) => [p.system.trim().toLowerCase(), p.system.trim()]));
+  const out: PersonSodConflict[] = [];
+  for (const role of roles) {
+    for (const other of roles) {
+      // each pair once, declared on either side
+      if (role.id >= other.id) continue;
+      if (!role.incompatibleRoleIds.includes(other.id) && !other.incompatibleRoleIds.includes(role.id)) continue;
+      const a = strong(role);
+      const systems = [...strong(other)].filter(([key]) => a.has(key)).map(([, name]) => name);
+      for (const m of role.members) {
+        if (!other.members.some((o) => o.userId === m.userId)) continue;
+        const user = users.find((u) => u.id === m.userId);
+        if (user) out.push({ user, role, other, systems });
+      }
+    }
+  }
+  return out;
 }

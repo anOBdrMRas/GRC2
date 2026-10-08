@@ -23,8 +23,16 @@ BPMN-2.0-Prozessmodellierung und integrierten GRC-Modulen.
   - *Controls (IKS)*: Kontrollziel, Art, Automatisierung, Frequenz, Key Control, Verantwortliche,
     Nachweis, adressierte Risiken, Statement of Applicability (alle 93 Annex-A-Controls),
     Design- und operative Wirksamkeit, Prüfmethode, Prüftermine
-  - *Rollen*: Verantwortlichkeiten, Befugnisse, Kompetenzen, Schulungen, Stellvertretung,
-    Compliance-Funktion, unvereinbare Rollen (Funktionstrennung) inkl. automatischer SoD-Konfliktprüfung
+  - *Rollen*: Rollentyp (Führungsrolle, Fachrolle, Gremium, Beauftragter), Pflichtrolle gemäß Norm/Gesetz,
+    Stelleninhaber und Stellvertretungen aus der Benutzerverwaltung (inkl. „eingearbeitet“),
+    Rollenverantwortlicher, Bestellung/Ernennung (Datum, durch, Dokument), fachliche und disziplinarische
+    Berichtslinie, Systemberechtigungen (IT-Rollen), Kritikalität und Vertretungsregelung, Version/Status/Review,
+    unvereinbare Rollen mit Funktionstrennungsprüfung auf Prozess- und Personenebene,
+    abgeleitete Verantwortung (Risiken, Controls, KPI, Prozessschritte) und druckbare Rollenbeschreibung
+  - *Benutzerverwaltung*: Benutzer mit Systemrollen (Administrator, GRC-Manager, Prozessmodellierer,
+    Risikomanager, IKS-Verantwortlicher, Compliance Officer, Organisationsverantwortlicher,
+    KPI-Verantwortlicher, Auditor, Leser), Berechtigungsmatrix und simulierte Anmeldung („Angemeldet als“),
+    die Lese-/Bearbeitungsrechte in allen Modulen durchsetzt
   - *KPI*: Ziel, Formel, Einheit, Ziel-/Warn-/Kritisch-Schwellen, Frequenz, Datenquelle,
     Messreihe mit Ampel und Verlauf
   - Jedes Element zeigt, in welchen Prozessschritten es verwendet wird (mit Sprung ins Modell)

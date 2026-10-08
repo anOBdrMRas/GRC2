@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import type { EntityKind, EntityMap, ProcessModel, Raci, StepAssignment } from './types';
-import { assignmentKey, blankEntity, emptyAssignment, now, uid } from './logic';
+import type { AssignableKind, EntityKind, EntityMap, ProcessModel, Raci, Role, StepAssignment, User } from './types';
+import { assignmentKey, blankEntity, emptyAssignment, normalizeRole, normalizeUser, now, uid } from './logic';
 import { modules } from './schema';
 import { seedData } from './seed';
 import { emptyDiagram } from './bpmn/templates';
@@ -10,6 +10,9 @@ type Collections = { [K in EntityKind]: EntityMap[K][] };
 
 interface State extends Collections {
   processes: ProcessModel[];
+  /** simulated login (prototype has no authentication) */
+  currentUserId: string;
+  setCurrentUser: (id: string) => void;
 
   createEntity: <K extends EntityKind>(kind: K, title?: string) => EntityMap[K];
   updateEntity: <K extends EntityKind>(kind: K, id: string, patch: Partial<EntityMap[K]>) => void;
@@ -19,12 +22,12 @@ interface State extends Collections {
   updateProcess: (id: string, patch: Partial<ProcessModel>) => void;
   deleteProcess: (id: string) => void;
 
-  assign: (processId: string, elementId: string, kind: EntityKind, entityId: string) => void;
-  unassign: (processId: string, elementId: string, kind: EntityKind, entityId: string) => void;
+  assign: (processId: string, elementId: string, kind: AssignableKind, entityId: string) => void;
+  unassign: (processId: string, elementId: string, kind: AssignableKind, entityId: string) => void;
   setRaci: (processId: string, elementId: string, roleId: string, raci: Raci) => void;
   setStepNote: (processId: string, elementId: string, note: string) => void;
 
-  importAll: (data: Collections & { processes: ProcessModel[] }) => void;
+  importAll: (data: Partial<Collections> & { processes: ProcessModel[] }) => void;
   resetDemo: () => void;
 }
 
@@ -67,6 +70,17 @@ export const useStore = create<State>()(
 
       deleteEntity: (kind, id) =>
         set((s) => {
+          if (kind === 'user') {
+            return {
+              user: s.user.filter((u) => u.id !== id),
+              role: s.role.map((r) => ({
+                ...r,
+                members: r.members.filter((m) => m.userId !== id),
+                roleOwnerUserId: r.roleOwnerUserId === id ? '' : r.roleOwnerUserId,
+                appointedByUserId: r.appointedByUserId === id ? '' : r.appointedByUserId,
+              })),
+            };
+          }
           // Remove the entity and all references to it.
           const processes = s.processes.map((p) => {
             const assignments: Record<string, StepAssignment> = {};
@@ -168,9 +182,27 @@ export const useStore = create<State>()(
           processes: s.processes.map((p) => (p.id !== processId ? p : updateStep(p, elementId, (a) => ({ ...a, note })))),
         })),
 
-      importAll: (data) => set({ ...data }),
+      setCurrentUser: (currentUserId) => set({ currentUserId }),
+      importAll: (data) => set(normalizeData(data)),
       resetDemo: () => set(seedData()),
     }),
-    { name: 'grc-prototype-v1' },
+    {
+      name: 'grc-prototype-v1',
+      version: 2,
+      // v1 had no users and free-text role holders
+      migrate: (persisted) => normalizeData(persisted as Partial<State>),
+    },
   ),
 );
+
+/** Brings imported or previously stored data to the current shape. */
+function normalizeData(data: Partial<State>): Partial<State> {
+  const seed = seedData();
+  const users = (data.user?.length ? data.user : seed.user).map((u: Partial<User>) => normalizeUser(u));
+  return {
+    ...data,
+    user: users,
+    role: (data.role ?? []).map((r: Partial<Role>) => normalizeRole(r)),
+    currentUserId: data.currentUserId && users.some((u) => u.id === data.currentUserId) ? data.currentUserId : users[0]?.id ?? '',
+  };
+}
