@@ -23,12 +23,13 @@ BPMN-2.0-Prozessmodellierung und integrierten GRC-Modulen.
   - *Controls (IKS)*: Kontrollziel, Art, Automatisierung, Frequenz, Key Control, Verantwortliche,
     Nachweis, adressierte Risiken, Statement of Applicability (alle 93 Annex-A-Controls),
     Design- und operative Wirksamkeit, Prüfmethode, Prüftermine
-  - *Rollen*: Rollentyp (Führungsrolle, Fachrolle, Gremium, Beauftragter), Pflichtrolle gemäß Norm/Gesetz,
-    Stelleninhaber und Stellvertretungen aus der Benutzerverwaltung (inkl. „eingearbeitet“),
-    Rollenverantwortlicher, Bestellung/Ernennung (Datum, durch, Dokument), fachliche und disziplinarische
-    Berichtslinie, Systemberechtigungen (IT-Rollen), Kritikalität und Vertretungsregelung, Version/Status/Review,
-    unvereinbare Rollen mit Funktionstrennungsprüfung auf Prozess- und Personenebene,
-    abgeleitete Verantwortung (Risiken, Controls, KPI, Prozessschritte) und druckbare Rollenbeschreibung
+  - *Rollen*: automatisch vergebene ID, Rollentyp (Führungsrolle, Fachrolle, Gremium, Beauftragter),
+    Organisationseinheit (Generic, Technology, Operation, Marketing, Sales, Finance and Admin,
+    Business Enablement, Other), Pflichtrolle (ja/nein), Stelleninhaber und Stellvertretungen aus der
+    Benutzerverwaltung (inkl. „eingearbeitet“), Rollenverantwortlicher, fachliche und disziplinarische
+    Berichtslinie (auch „n/a“), unvereinbare Rollen per Mehrfachauswahl (wird bei beiden Rollen eingetragen)
+    mit Funktionstrennungsprüfung auf Prozess- und Personenebene, Bestellung/Ernennung, Kritikalität und
+    Vertretungsregelung, Version/Status/Review, abgeleitete Verantwortung und druckbare Rollenbeschreibung
   - *Benutzerverwaltung*: Benutzer mit Systemrollen (Administrator, GRC-Manager, Prozessmodellierer,
     Risikomanager, IKS-Verantwortlicher, Compliance Officer, Organisationsverantwortlicher,
     KPI-Verantwortlicher, Auditor, Leser), Berechtigungsmatrix und simulierte Anmeldung („Angemeldet als“),
@@ -37,6 +38,8 @@ BPMN-2.0-Prozessmodellierung und integrierten GRC-Modulen.
     Messreihe mit Ampel und Verlauf
   - Jedes Element zeigt, in welchen Prozessschritten es verwendet wird (mit Sprung ins Modell)
 - **Cockpit**: Risikomatrizen, IKS-Wirksamkeit, Rollenabdeckung, KPI-Ampel und Handlungsbedarf
+
+Die Oberfläche lässt sich oben links zwischen Deutsch und Englisch umschalten (eingegebene Inhalte werden nicht übersetzt).
 
 Alle Daten werden im Browser (localStorage) gespeichert und lassen sich als JSON exportieren/importieren.
 Beim ersten Start werden Demodaten (Beschaffungsprozess mit Subprozess, Berechtigungsmanagement) geladen.

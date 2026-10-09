@@ -8,6 +8,7 @@ import type { ProcessModel, StepAssignment } from '../types';
 import { modules } from '../schema';
 import { translateModule } from './translate';
 import { useUi } from '../ui';
+import { t } from '../i18n';
 
 // bpmn-js services are loosely typed on purpose; the prototype only uses a small surface.
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -38,7 +39,7 @@ interface Props {
   onXmlChange: (processId: string, xml: string) => void;
 }
 
-const badgeDefs: { key: keyof Omit<StepAssignment, 'note'>; label: string; color: string; title: string }[] = [
+export const badgeDefs: { key: keyof Omit<StepAssignment, 'note'>; label: string; color: string; title: string }[] = [
   { key: 'roles', label: 'Ro', color: modules.role.color, title: 'Rollen' },
   { key: 'risks', label: 'R', color: modules.risk.color, title: 'Risiken' },
   { key: 'opportunities', label: 'Ch', color: modules.opportunity.color, title: 'Chancen' },
@@ -50,7 +51,8 @@ function describe(element: Svc): SelectedElement {
   const bo = element.businessObject;
   return {
     id: element.id,
-    type: bo.$type.replace('bpmn:', ''),
+    // same casing as the BPMN XML tags, e.g. 'userTask', 'callActivity'
+    type: bo.$type.charAt(5).toLowerCase() + bo.$type.slice(6),
     name: bo.name ?? '',
     isActivity: bo.$instanceOf('bpmn:Activity'),
     isCollapsedSubProcess: bo.$instanceOf('bpmn:SubProcess') && element.collapsed === true,
@@ -81,7 +83,7 @@ export const BpmnEditor = forwardRef<BpmnEditorHandle, Props>(function BpmnEdito
       if (!el || el.waypoints) continue;
       const html = badgeDefs
         .filter((b) => a[b.key].length > 0)
-        .map((b) => `<span class="grc-badge" style="background:${b.color}" title="${b.title}">${b.label} ${a[b.key].length}</span>`)
+        .map((b) => `<span class="grc-badge" style="background:${b.color}" title="${t(b.title)}">${t(b.label)} ${a[b.key].length}</span>`)
         .join('');
       if (!html) continue;
       overlays.add(id, 'grc', { position: { bottom: 4, left: 0 }, html: `<div class="grc-badges">${html}</div>` });
@@ -147,7 +149,7 @@ export const BpmnEditor = forwardRef<BpmnEditorHandle, Props>(function BpmnEdito
         }
       })
       .catch((err: Error) => {
-        if (!disposed) useUi.getState().setNotice(`Das BPMN-Diagramm konnte nicht geladen werden: ${err.message}`);
+        if (!disposed) useUi.getState().setNotice(t('Das BPMN-Diagramm konnte nicht geladen werden: {msg}', { msg: err.message }));
       });
 
     return () => {

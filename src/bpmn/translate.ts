@@ -1,3 +1,5 @@
+import { useLang } from '../i18n';
+
 // German labels for the most common bpmn-js palette / context pad entries.
 const de: Record<string, string> = {
   'Activate the hand tool': 'Hand-Werkzeug',
@@ -48,7 +50,8 @@ const de: Record<string, string> = {
 };
 
 export function customTranslate(template: string, replacements?: Record<string, string>) {
-  const t = de[template] ?? template;
+  // bpmn-js ships English labels; only German needs a dictionary.
+  const t = useLang.getState().lang === 'de' ? (de[template] ?? template) : template;
   return t.replace(/{([^}]+)}/g, (_, key) => replacements?.[key] ?? `{${key}}`);
 }
 

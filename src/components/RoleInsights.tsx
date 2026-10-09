@@ -6,6 +6,7 @@ import { modules } from '../schema';
 import { continuityGap, elementNames, findUsages, personSodConflicts, residualScore, riskLevel, roleMembers, today } from '../logic';
 import { isoLabel } from '../iso';
 import { LevelBadge, StatusPill, Tag, download } from './common';
+import { t } from '../i18n';
 
 /** Everything the role is responsible for, derived from the other modules (not edited here). */
 function useRoleDerived(role: Role) {
@@ -51,15 +52,15 @@ function useRoleDerived(role: Role) {
 
 function findings(role: Role, d: ReturnType<typeof useRoleDerived>) {
   const out: string[] = [];
-  if (!d.members.some((m) => m.function === 'Inhaber')) out.push('Rolle ist nicht besetzt.');
+  if (!d.members.some((m) => m.function === 'Inhaber')) out.push(t('Rolle ist nicht besetzt.'));
   const gap = continuityGap(role);
-  if (gap) out.push(`${role.criticality}: ${gap}`);
+  if (gap) out.push(`${t(role.criticality)}: ${t(gap)}`);
   if (role.appointmentRequired && (!role.appointedAt || !role.appointmentDocument))
-    out.push('Formale Bestellung erforderlich, aber Datum oder Dokument fehlt.');
-  if (role.mandatoryBy.length > 0 && !role.roleOwnerUserId) out.push('Pflichtrolle ohne Rollenverantwortlichen.');
-  if (role.nextReview && role.nextReview < today()) out.push(`Review überfällig (fällig ${role.nextReview}).`);
+    out.push(t('Formale Bestellung erforderlich, aber Datum oder Dokument fehlt.'));
+  if (role.mandatory && !role.roleOwnerUserId) out.push(t('Pflichtrolle ohne Rollenverantwortlichen.'));
+  if (role.nextReview && role.nextReview < today()) out.push(t('Review überfällig (fällig {date}).', { date: role.nextReview }));
   for (const m of d.members)
-    if (m.user.status !== 'Aktiv') out.push(`${m.user.title} ist ${m.user.status.toLowerCase()}, aber der Rolle zugeordnet.`);
+    if (m.user.status !== 'Aktiv') out.push(t('{user} ist {status}, aber der Rolle zugeordnet.', { user: m.user.title, status: t(m.user.status).toLowerCase() }));
   return out;
 }
 
@@ -77,7 +78,7 @@ export function RoleInsights({ role, part }: { role: Role; part: 'warnings' | 'd
     extra?: (id: string) => ReactNode,
   ) => (
     <div className="derived-row">
-      <span className="derived-label">{title}</span>
+      <span className="derived-label">{t(title)}</span>
       <span className="tags">
         {items.length === 0 && <span className="muted small">–</span>}
         {items.map((e) => (
@@ -96,7 +97,7 @@ export function RoleInsights({ role, part }: { role: Role; part: 'warnings' | 'd
       <div className="insights">
         {(issues.length > 0 || d.personConflicts.length > 0 || d.processConflicts.length > 0) && (
           <div className="insight warn-box">
-            <div className="insight-title">⚠ Handlungsbedarf</div>
+            <div className="insight-title">⚠ {t('Handlungsbedarf')}</div>
             {issues.map((i) => (
               <div key={i} className="small">
                 {i}
@@ -106,14 +107,13 @@ export function RoleInsights({ role, part }: { role: Role; part: 'warnings' | 'd
               const other = c.role.id === role.id ? c.other : c.role;
               return (
                 <div key={'p' + i} className="small link" onClick={() => go('user', c.user.id)}>
-                  Funktionstrennung: {c.user.title} hat zusätzlich die unvereinbare Rolle „{other.title}“
-                  {c.systems.length > 0 && ` – überschneidende Schreib-/Freigaberechte in: ${c.systems.join(', ')}`}
+                  {t('Funktionstrennung: {user} hat zusätzlich die unvereinbare Rolle „{role}“', { user: c.user.title, role: other.title })}
                 </div>
               );
             })}
             {d.processConflicts.map((c, i) => (
               <div key={'s' + i} className="small link" onClick={() => openStep(c.p.id, c.el)}>
-                Funktionstrennung im Prozess: {c.p.code} › {c.name}: R/A gemeinsam mit „{c.other?.title}“
+                {t('Funktionstrennung im Prozess: {step}: R/A gemeinsam mit „{role}“', { step: `${c.p.code} › ${c.name}`, role: c.other?.title ?? '' })}
               </div>
             ))}
           </div>
@@ -125,10 +125,10 @@ export function RoleInsights({ role, part }: { role: Role; part: 'warnings' | 'd
   return (
     <div className="insights derived-section">
       <div className="insight">
-        <div className="insight-title">Abgeleitete Verantwortung (aus den anderen Modulen, nur Anzeige)</div>
+        <div className="insight-title">{t('Abgeleitete Verantwortung (aus den anderen Modulen, nur Anzeige)')}</div>
         <div className="derived">
           <div className="derived-row">
-            <span className="derived-label">Prozessschritte</span>
+            <span className="derived-label">{t('Prozessschritte')}</span>
             <span className="tags">
               {d.usages.length === 0 && <span className="muted small">–</span>}
               {d.usages.map((u) => (
@@ -140,7 +140,7 @@ export function RoleInsights({ role, part }: { role: Role; part: 'warnings' | 'd
             </span>
           </div>
           <div className="derived-row">
-            <span className="derived-label">Prozessverantwortung</span>
+            <span className="derived-label">{t('Prozessverantwortung')}</span>
             <span className="tags">
               {d.processesOwned.length === 0 && <span className="muted small">–</span>}
               {d.processesOwned.map((p) => (
@@ -172,59 +172,59 @@ export function RoleProfile({ role, onClose }: { role: Role; onClose: () => void
   const d = useRoleDerived(role);
   const area = useRef<HTMLDivElement>(null);
   const framed = window.self !== window.top; // print dialogs are blocked inside embedded frames
-  const name = (id: string) => d.roleById(id)?.title ?? '–';
+  const name = (id: string) => (id === 'n/a' ? 'n/a' : (d.roleById(id)?.title ?? '–'));
   const user = (id: string) => d.userById(id)?.title ?? '–';
   const items = (xs: { code: string; title: string }[]) => (xs.length ? xs.map((x) => `${x.code} ${x.title}`).join('; ') : '–');
 
   const exportHtml = () => {
-    const html = `<!doctype html><html lang="de"><head><meta charset="utf-8"><title>Rollenbeschreibung ${role.code} ${role.title}</title>
+    const html = `<!doctype html><html lang="de"><head><meta charset="utf-8"><title>${t('Rollenbeschreibung')} ${role.code} ${role.title}</title>
 <style>body{font-family:system-ui,sans-serif;max-width:820px;margin:32px auto;color:#1f2933}h1{font-size:22px}h2{font-size:15px;margin-top:22px;border-bottom:1px solid #ccc}table{border-collapse:collapse;width:100%}td,th{border:1px solid #ddd;padding:4px 8px;text-align:left;vertical-align:top;font-size:13px}th{background:#f3f5f8;width:32%}</style></head><body>${area.current?.innerHTML ?? ''}</body></html>`;
-    download(`Rollenbeschreibung_${role.code}.html`, html, 'text/html');
+    download(`${t('Rollenbeschreibung')}_${role.code}.html`, html, 'text/html');
   };
 
   const row = (label: string, value: ReactNode, key: string = label) => (
     <tr key={key}>
-      <th>{label}</th>
+      <th>{t(label)}</th>
       <td>{value || '–'}</td>
     </tr>
   );
 
   return (
     <div className="modal-backdrop" onClick={onClose}>
-      <div className="modal profile-modal" role="dialog" aria-label="Rollenbeschreibung" onClick={(e) => e.stopPropagation()}>
+      <div className="modal profile-modal" role="dialog" aria-label={t('Rollenbeschreibung')} onClick={(e) => e.stopPropagation()}>
         <div className="row space no-print">
           <div className="row gap">
             {!framed && (
               <button className="primary" onClick={() => window.print()}>
-                Drucken
+                {t('Drucken')}
               </button>
             )}
-            <button onClick={exportHtml}>Als HTML exportieren</button>
+            <button onClick={exportHtml}>{t('Als HTML exportieren')}</button>
           </div>
-          <button className="tag-x" onClick={onClose} title="Schließen">
+          <button className="tag-x" onClick={onClose} title={t('Schließen')}>
             ×
           </button>
         </div>
         <div className="print-area" ref={area}>
           <h1>
-            Rollenbeschreibung: {role.title} ({role.code})
+            {t('Rollenbeschreibung')}: {role.title} ({role.code})
           </h1>
           <p className="small">
-            Version {role.version} · Status: <StatusPill status={role.status} /> · letzte Überprüfung {role.lastReview || '–'} · nächste Überprüfung{' '}
+            {t('Version')} {role.version} · {t('Status')}: <StatusPill status={role.status} /> · {t('letzte Überprüfung')} {role.lastReview || '–'} · {t('nächste Überprüfung')}{' '}
             {role.nextReview || '–'}
           </p>
-          <h2>1. Einordnung</h2>
+          <h2>1. {t('Einordnung')}</h2>
           <table className="profile-table">
             <tbody>
-              {row('Rollentyp', role.roleType)}
+              {row('Rollentyp', t(role.roleType))}
               {row('Organisationseinheit', role.orgUnit)}
-              {row('Pflichtrolle gemäß', role.mandatoryBy.join(', '))}
-              {row('Compliance-Funktion / sensible Rolle', role.complianceRelevant ? 'ja' : 'nein')}
+              {row('Pflichtrolle', role.mandatory ? t('ja') : t('nein'))}
+              {row('Compliance-Funktion / sensible Rolle', role.complianceRelevant ? t('ja') : t('nein'))}
               {row('Rollenverantwortlicher', user(role.roleOwnerUserId))}
               {row('Beschreibung', role.description)}
             </tbody>
           </table>
-          <h2>2. Aufgaben, Befugnisse und Kompetenzen</h2>
+          <h2>2. {t('Aufgaben, Befugnisse und Kompetenzen')}</h2>
           <table className="profile-table">
             <tbody>
               {row('Verantwortlichkeiten', role.responsibilities)}
@@ -233,52 +233,47 @@ export function RoleProfile({ role, onClose }: { role: Role; onClose: () => void
               {row('Pflichtschulungen', role.trainings)}
             </tbody>
           </table>
-          <h2>3. Berichtslinien</h2>
+          <h2>3. {t('Berichtslinien')}</h2>
           <table className="profile-table">
             <tbody>
               {row('Berichtet fachlich an', role.reportsToFunctionalRoleId ? name(role.reportsToFunctionalRoleId) : '')}
               {row('Berichtet disziplinarisch an', role.reportsToDisciplinaryRoleId ? name(role.reportsToDisciplinaryRoleId) : '')}
-              {row('Direkter Zugang zur Geschäftsleitung', role.directAccessToManagement ? 'ja' : 'nein')}
               {row('Unterstellte Rollen', items(d.reportsFrom))}
             </tbody>
           </table>
-          <h2>4. Stelleninhaber und Vertretung</h2>
+          <h2>4. {t('Stelleninhaber und Vertretung')}</h2>
           <table className="profile-table">
             <tbody>
               {d.members.map((m) =>
                 row(
                   m.function,
-                  `${m.user.title}${m.user.jobTitle ? `, ${m.user.jobTitle}` : ''} (seit ${m.since || '–'}${m.function === 'Stellvertretung' ? `, ${m.inducted ? 'eingearbeitet' : 'nicht eingearbeitet'}` : ''})`,
+                  `${m.user.title}${m.user.jobTitle ? `, ${m.user.jobTitle}` : ''} (${t('seit')} ${m.since || '–'}${m.function === 'Stellvertretung' ? `, ${m.inducted ? t('eingearbeitet') : t('nicht eingearbeitet')}` : ''})`,
                   m.userId,
                 ),
               )}
-              {d.members.length === 0 && row('Inhaber', 'unbesetzt')}
+              {d.members.length === 0 && row('Inhaber', t('unbesetzt'))}
               {row('Vertretung durch Rolle', role.deputyRoleId ? name(role.deputyRoleId) : '')}
-              {row('Kritikalität', role.criticality)}
+              {row('Kritikalität', t(role.criticality))}
               {row('Vertretungsregelung', role.continuityNote)}
             </tbody>
           </table>
-          <h2>5. Bestellung / Ernennung</h2>
+          <h2>5. {t('Funktionstrennung')}</h2>
+          <table className="profile-table">
+            <tbody>{row('Unvereinbare Rollen', role.incompatibleRoleIds.map(name).join(', '))}</tbody>
+          </table>
+          <h2>6. {t('Bestellung / Ernennung')}</h2>
           <table className="profile-table">
             <tbody>
               {row(
                 'Formale Bestellung',
                 role.appointmentRequired
-                  ? `erforderlich – bestellt am ${role.appointedAt || '–'} durch ${user(role.appointedByUserId)}`
-                  : 'nicht erforderlich',
+                  ? t('erforderlich – bestellt am {date} durch {user}', { date: role.appointedAt || '–', user: user(role.appointedByUserId) })
+                  : t('nicht erforderlich'),
               )}
               {role.appointmentRequired && row('Bestellungsdokument', role.appointmentDocument)}
             </tbody>
           </table>
-          <h2>6. Systemberechtigungen und Funktionstrennung</h2>
-          <table className="profile-table">
-            <tbody>
-              {role.systemPermissions.map((p, i) => row(p.system, `${p.permission} (${p.level})`, `perm-${i}`))}
-              {role.systemPermissions.length === 0 && row('Systemberechtigungen', '')}
-              {row('Unvereinbare Rollen', role.incompatibleRoleIds.map(name).join(', '))}
-            </tbody>
-          </table>
-          <h2>7. Verantwortung im Managementsystem (abgeleitet)</h2>
+          <h2>7. {t('Verantwortung im Managementsystem (abgeleitet)')}</h2>
           <table className="profile-table">
             <tbody>
               {row('Prozessverantwortung', items(d.processesOwned))}
@@ -290,12 +285,12 @@ export function RoleProfile({ role, onClose }: { role: Role; onClose: () => void
               {row('KPI (Auswertung)', items(d.kpisEvaluated))}
             </tbody>
           </table>
-          <h2>8. Beteiligung an Prozessschritten (abgeleitet)</h2>
+          <h2>8. {t('Beteiligung an Prozessschritten (abgeleitet)')}</h2>
           <table className="profile-table">
             <thead>
               <tr>
-                <th>Prozess</th>
-                <th>Schritt</th>
+                <th>{t('Prozess')}</th>
+                <th>{t('Schritt')}</th>
                 <th>RACI</th>
               </tr>
             </thead>
@@ -316,7 +311,7 @@ export function RoleProfile({ role, onClose }: { role: Role; onClose: () => void
               )}
             </tbody>
           </table>
-          <p className="small muted">Normbezug: {role.isoRefs.map(isoLabel).join(', ') || '–'}</p>
+          <p className="small muted">{t('Normbezug')}: {role.isoRefs.map(isoLabel).join(', ') || '–'}</p>
         </div>
       </div>
     </div>

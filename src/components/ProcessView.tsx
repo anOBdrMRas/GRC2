@@ -8,6 +8,7 @@ import { BpmnEditor, type BpmnEditorHandle, type SelectedElement } from '../bpmn
 import { StepPanel } from './StepPanel';
 import { ConfirmButton, Empty, download } from './common';
 import { useRights } from '../useRights';
+import { t } from '../i18n';
 
 const categories: ProcessModel['category'][] = ['Führungsprozess', 'Kernprozess', 'Unterstützungsprozess'];
 
@@ -34,14 +35,14 @@ export function ProcessView() {
     <div className="process-view">
       <aside className="process-list">
         <div className="module-head">
-          <h2>Prozesse</h2>
+          <h2>{t('Prozesse')}</h2>
         </div>
         {editable ? (
         <div className="row gap">
           <button className="primary" onClick={() => setNaming(true)}>
-            + Prozess
+            {t('+ Prozess')}
           </button>
-          <button onClick={() => fileInput.current?.click()}>BPMN importieren</button>
+          <button onClick={() => fileInput.current?.click()}>{t('BPMN importieren')}</button>
           <input
             ref={fileInput}
             type="file"
@@ -55,7 +56,7 @@ export function ProcessView() {
           />
         </div>
         ) : (
-          <span className="badge readonly">Nur Lesen</span>
+          <span className="badge readonly">{t('Nur Lesen')}</span>
         )}
         {naming && (
           <form
@@ -68,15 +69,15 @@ export function ProcessView() {
               setNaming(false);
             }}
           >
-            <input id="new-process-title" autoFocus placeholder="Name des Prozesses" value={newTitle} onChange={(e) => setNewTitle(e.target.value)} />
+            <input id="new-process-title" autoFocus placeholder={t('Name des Prozesses')} value={newTitle} onChange={(e) => setNewTitle(e.target.value)} />
             <button type="submit" className="primary" disabled={!newTitle.trim()}>
-              Anlegen
+              {t('Anlegen')}
             </button>
           </form>
         )}
         {categories.map((cat) => (
           <div key={cat} className="proc-group">
-            <div className="proc-group-title">{cat}</div>
+            <div className="proc-group-title">{t(cat)}</div>
             {processes
               .filter((p) => p.category === cat)
               .map((p) => (
@@ -85,14 +86,14 @@ export function ProcessView() {
                     <span className="mono">{p.code}</span> {p.title}
                   </div>
                   <div className="muted small">
-                    v{p.version} · {p.status}
+                    v{p.version} · {t(p.status)}
                   </div>
                 </div>
               ))}
           </div>
         ))}
       </aside>
-      {process ? <ProcessWorkspace key={process.id} process={process} /> : <Empty>Noch keine Prozesse vorhanden.</Empty>}
+      {process ? <ProcessWorkspace key={process.id} process={process} /> : <Empty>{t('Noch keine Prozesse vorhanden.')}</Empty>}
     </div>
   );
 }
@@ -121,19 +122,19 @@ function ProcessWorkspace({ process }: { process: ProcessModel }) {
       <div className="workspace-head">
         <div>
           <div className="muted small">
-            {process.code} · {process.category} · v{process.version} · {process.status}
+            {process.code} · {t(process.category)} · v{process.version} · {t(process.status)}
           </div>
           <h2>{process.title}</h2>
         </div>
         <div className="tabs">
           <button className={tab === 'model' ? 'active' : ''} onClick={() => setTab('model')}>
-            Modell (BPMN)
+            {t('Modell (BPMN)')}
           </button>
           <button className={tab === 'profile' ? 'active' : ''} onClick={() => setTab('profile')}>
-            Steckbrief
+            {t('Steckbrief')}
           </button>
           <button className={tab === 'matrix' ? 'active' : ''} onClick={() => setTab('matrix')}>
-            Schrittmatrix
+            {t('Schrittmatrix')}
           </button>
         </div>
         <div className="row gap">
@@ -145,15 +146,15 @@ function ProcessWorkspace({ process }: { process: ProcessModel }) {
           )}
           {editable ? (
             <ConfirmButton
-              label="Löschen"
-              confirmLabel="Prozess wirklich löschen?"
+              label={t('Löschen')}
+              confirmLabel={t('Prozess wirklich löschen?')}
               onConfirm={() => {
                 deleteProcess(process.id);
                 select('processes', undefined);
               }}
             />
           ) : (
-            <span className="badge readonly">Nur Lesen</span>
+            <span className="badge readonly">{t('Nur Lesen')}</span>
           )}
         </div>
       </div>
@@ -188,15 +189,15 @@ function ProcessProfile({ process }: { process: ProcessModel }) {
   const set = (patch: Partial<ProcessModel>) => update(process.id, patch);
   const text = (key: 'code' | 'title' | 'version', label: string) => (
     <label className="field">
-      <span className="field-label">{label}</span>
+      <span className="field-label">{t(label)}</span>
       <input value={process[key]} onChange={(e) => set({ [key]: e.target.value })} />
     </label>
   );
   const area = (key: 'description' | 'inputs' | 'outputs' | 'resources', label: string, hint?: string) => (
     <label className="field wide">
       <span className="field-label">
-        {label}
-        {hint && <span className="hint"> · {hint}</span>}
+        {t(label)}
+        {hint && <span className="hint"> · {t(hint)}</span>}
       </span>
       <textarea rows={3} value={process[key] ?? ''} onChange={(e) => set({ [key]: e.target.value })} />
     </label>
@@ -205,22 +206,24 @@ function ProcessProfile({ process }: { process: ProcessModel }) {
   return (
     <div className="profile">
       <fieldset>
-        <legend>Prozesssteckbrief (ISO 9001 4.4)</legend>
+        <legend>{t('Prozesssteckbrief (ISO 9001 4.4)')}</legend>
         <div className="grid">
           {text('code', 'ID')}
           {text('title', 'Bezeichnung')}
           <label className="field">
-            <span className="field-label">Prozesskategorie</span>
+            <span className="field-label">{t('Prozesskategorie')}</span>
             <select value={process.category} onChange={(e) => set({ category: e.target.value as ProcessModel['category'] })}>
               {categories.map((c) => (
-                <option key={c}>{c}</option>
+                <option key={c} value={c}>
+                  {t(c)}
+                </option>
               ))}
             </select>
           </label>
           <label className="field">
-            <span className="field-label">Prozessverantwortlicher</span>
+            <span className="field-label">{t('Prozessverantwortlicher')}</span>
             <select value={process.ownerRoleId} onChange={(e) => set({ ownerRoleId: e.target.value })}>
-              <option value="">— nicht zugewiesen —</option>
+              <option value="">{t('— nicht zugewiesen —')}</option>
               {roles.map((r) => (
                 <option key={r.id} value={r.id}>
                   {r.code} {r.title}
@@ -230,19 +233,21 @@ function ProcessProfile({ process }: { process: ProcessModel }) {
           </label>
           {text('version', 'Version')}
           <label className="field">
-            <span className="field-label">Freigabestatus</span>
+            <span className="field-label">{t('Freigabestatus')}</span>
             <select value={process.status} onChange={(e) => set({ status: e.target.value })}>
               {['Entwurf', 'In Prüfung', 'Freigegeben', 'Archiviert'].map((s) => (
-                <option key={s}>{s}</option>
+                <option key={s} value={s}>
+                  {t(s)}
+                </option>
               ))}
             </select>
           </label>
           <label className="field">
-            <span className="field-label">Nächste Überprüfung</span>
+            <span className="field-label">{t('Nächste Überprüfung')}</span>
             <input type="date" value={process.nextReview} onChange={(e) => set({ nextReview: e.target.value })} />
           </label>
           <label className="field">
-            <span className="field-label">Relevante Managementsysteme</span>
+            <span className="field-label">{t('Relevante Managementsysteme')}</span>
             <div className="checks">
               {['ISO 9001', 'ISO 27001', 'ISO 37301'].map((s) => (
                 <label key={s} className="checkbox">
@@ -282,25 +287,25 @@ function StepMatrix({ process, onOpen }: { process: ProcessModel; onOpen: (eleme
   };
 
   const exportCsv = () => {
-    const head = ['Schritt-ID', 'Schritt', 'Typ', ...matrixKinds.map((k) => modules[k].plural)];
+    const head = [t('Schritt-ID'), t('Schritt'), t('Typ'), ...matrixKinds.map((k) => t(modules[k].plural))];
     const rows = steps.map((s) => [s.id, s.name, s.type, ...matrixKinds.map((k) => cell(k, s.id))]);
     const csv = [head, ...rows].map((r) => r.map((v) => `"${v.replace(/"/g, '""')}"`).join(';')).join('\n');
-    download(`${process.code}_Schrittmatrix.csv`, '﻿' + csv, 'text/csv');
+    download(`${process.code}_${t('Schrittmatrix')}.csv`, '﻿' + csv, 'text/csv');
   };
 
   return (
     <div className="matrix">
       <div className="row space">
-        <p className="muted small">Alle Aktivitäten inkl. Subprozess-Schritte mit ihren Zuordnungen. Klick auf eine Zeile öffnet den Schritt im Modell.</p>
+        <p className="muted small">{t('Alle Aktivitäten inkl. Subprozess-Schritte mit ihren Zuordnungen. Klick auf eine Zeile öffnet den Schritt im Modell.')}</p>
         <button onClick={exportCsv}>⬇ CSV (Excel)</button>
       </div>
       <table className="list">
         <thead>
           <tr>
-            <th>Schritt</th>
+            <th>{t('Schritt')}</th>
             {matrixKinds.map((k) => (
               <th key={k} style={{ color: modules[k].color }}>
-                {modules[k].plural}
+                {t(modules[k].plural)}
               </th>
             ))}
           </tr>

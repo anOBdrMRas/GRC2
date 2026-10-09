@@ -60,13 +60,28 @@ export const useStore = create<State>()(
         return e;
       },
 
-      updateEntity: (kind, id, patch) =>
+      updateEntity: (kind, id, patch) => {
+        // Incompatible roles are symmetric: keep the counterpart roles in sync.
+        if (kind === 'role' && 'incompatibleRoleIds' in patch) {
+          const next = (patch as Partial<Role>).incompatibleRoleIds ?? [];
+          set((s) => ({
+            role: s.role.map((r) => {
+              if (r.id === id) return { ...r, ...(patch as Partial<Role>), updatedAt: now() };
+              const has = r.incompatibleRoleIds.includes(id);
+              const should = next.includes(r.id);
+              if (has === should) return r;
+              return { ...r, incompatibleRoleIds: should ? [...r.incompatibleRoleIds, id] : r.incompatibleRoleIds.filter((x) => x !== id), updatedAt: now() };
+            }),
+          }));
+          return;
+        }
         set(
           (s) =>
             ({
               [kind]: (s[kind] as EntityMap[typeof kind][]).map((e) => (e.id === id ? { ...e, ...patch, updatedAt: now() } : e)),
             }) as Partial<State>,
-        ),
+        );
+      },
 
       deleteEntity: (kind, id) =>
         set((s) => {

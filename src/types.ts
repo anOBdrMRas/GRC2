@@ -86,17 +86,11 @@ export interface RoleMember {
   inducted: boolean;
 }
 
-/** IT role / access right that belongs to an organisational role (ISO 27001 A.5.15, A.5.18, A.8.2). */
-export interface SystemPermission {
-  system: string;
-  permission: string;
-  level: 'Lesen' | 'Schreiben' | 'Freigabe' | 'Administration';
-}
-
 /** ISO 9001 5.3 / 7.2 · ISO/IEC 27001 5.2 / 5.3 (A) · ISO 37301 5.3 */
 export interface Role extends BaseEntity {
   roleType: RoleType;
-  mandatoryBy: string[];
+  /** required by a standard, law or regulation (e.g. ISB, DPO, export control officer) */
+  mandatory: boolean;
   orgUnit: string;
   members: RoleMember[];
   roleOwnerUserId: string;
@@ -112,11 +106,9 @@ export interface Role extends BaseEntity {
   appointedAt: string;
   appointedByUserId: string;
   appointmentDocument: string;
-  // reporting lines
+  // reporting lines (role id, '' = not set, 'n/a' = not applicable)
   reportsToFunctionalRoleId: string;
   reportsToDisciplinaryRoleId: string;
-  directAccessToManagement: boolean;
-  systemPermissions: SystemPermission[];
   // criticality & continuity (ISO 27001 A.5.29 / A.5.30)
   criticality: 'Normal' | 'Hoch' | 'Schlüsselposition';
   continuityNote: string;

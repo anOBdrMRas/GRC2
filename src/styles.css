@@ -1105,3 +1105,53 @@ table.wide-table select {
     display: none;
   }
 }
+
+/* ---------- language switch & misc ---------- */
+.brand-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+}
+.lang-switch {
+  display: inline-flex;
+  margin-top: 8px;
+  border: 1px solid #2c435c;
+  border-radius: 6px;
+  overflow: hidden;
+}
+.lang-switch button {
+  border: none;
+  border-radius: 0;
+  background: transparent;
+  color: #8fa3b8;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 3px 7px;
+}
+.lang-switch button.active {
+  background: #74c0fc;
+  color: #14263a;
+}
+.readonly-value {
+  padding: 6px 8px;
+  border: 1px dashed var(--border);
+  border-radius: 6px;
+  background: #f6f7f9;
+}
+.role-checks {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 4px 12px;
+}
+.role-check {
+  padding: 3px 6px;
+  border-radius: 6px;
+}
+.role-check.on {
+  background: #fff4e6;
+}
+.legend-item {
+  margin-right: 8px;
+  white-space: nowrap;
+}

@@ -120,8 +120,8 @@ export function blankEntity<K extends EntityKind>(kind: K, code: string, title =
     role: {
       ...common,
       roleType: 'Fachrolle',
-      mandatoryBy: [],
-      orgUnit: '',
+      mandatory: false,
+      orgUnit: 'Generic',
       members: [],
       roleOwnerUserId: '',
       responsibilities: '',
@@ -137,8 +137,6 @@ export function blankEntity<K extends EntityKind>(kind: K, code: string, title =
       appointmentDocument: '',
       reportsToFunctionalRoleId: '',
       reportsToDisciplinaryRoleId: '',
-      directAccessToManagement: false,
-      systemPermissions: [],
       criticality: 'Normal',
       continuityNote: '',
       version: '0.1',
@@ -263,11 +261,33 @@ export function residualScore(r: Risk) {
 }
 
 /** Fills fields added in later versions so older stored data keeps working. */
-export function normalizeRole(r: Partial<Role> & { holders?: string }): Role {
+export const orgUnits = ['Generic', 'Technology', 'Operation', 'Marketing', 'Sales', 'Finance and Admin', 'Business Enablement', 'Other'];
+
+/** Maps free-text organisational units of older data to the fixed list. */
+const orgUnitMigration: Record<string, string> = {
+  Fachbereiche: 'Generic',
+  Geschäftsführung: 'Generic',
+  Einkauf: 'Operation',
+  Logistik: 'Operation',
+  Finanzen: 'Finance and Admin',
+  IT: 'Technology',
+  'IT / ISMS': 'Technology',
+  'Recht & Compliance': 'Business Enablement',
+  Qualitätsmanagement: 'Business Enablement',
+  Vertrieb: 'Sales',
+  Marketing: 'Marketing',
+};
+
+type LegacyRole = Partial<Role> & { holders?: string; mandatoryBy?: string[]; systemPermissions?: unknown; directAccessToManagement?: boolean };
+
+/** Fills fields added in later versions so older stored data keeps working. */
+export function normalizeRole(r: LegacyRole): Role {
   const base = blankEntity('role', r.code ?? '', r.title ?? '');
-  const merged = { ...base, ...r, id: r.id ?? base.id } as Role & { holders?: string };
-  if (merged.holders && !r.members) merged.description = [merged.description, `Stelleninhaber (alt): ${merged.holders}`].filter(Boolean).join('\n');
-  delete merged.holders;
+  const { holders, mandatoryBy, systemPermissions: _sp, directAccessToManagement: _dam, ...rest } = r;
+  const merged = { ...base, ...rest, id: r.id ?? base.id } as Role;
+  if (holders && !r.members) merged.description = [merged.description, `Stelleninhaber (alt): ${holders}`].filter(Boolean).join('\n');
+  if (r.mandatory === undefined) merged.mandatory = (mandatoryBy?.length ?? 0) > 0;
+  if (!orgUnits.includes(merged.orgUnit)) merged.orgUnit = merged.orgUnit ? (orgUnitMigration[merged.orgUnit] ?? 'Other') : 'Generic';
   return merged;
 }
 
@@ -296,26 +316,20 @@ export interface PersonSodConflict {
   user: User;
   role: Role;
   other: Role;
-  /** systems where both roles grant write/approve/admin rights */
-  systems: string[];
 }
 
-/** Persons who hold two roles that are declared incompatible (technical SoD check). */
+/** Persons who hold two roles that are declared incompatible (SoD check on person level). */
 export function personSodConflicts(roles: Role[], users: User[]): PersonSodConflict[] {
-  // system names with write/approve/admin rights, keyed case-insensitively
-  const strong = (r: Role) => new Map(r.systemPermissions.filter((p) => p.level !== 'Lesen').map((p) => [p.system.trim().toLowerCase(), p.system.trim()]));
   const out: PersonSodConflict[] = [];
   for (const role of roles) {
     for (const other of roles) {
       // each pair once, declared on either side
       if (role.id >= other.id) continue;
       if (!role.incompatibleRoleIds.includes(other.id) && !other.incompatibleRoleIds.includes(role.id)) continue;
-      const a = strong(role);
-      const systems = [...strong(other)].filter(([key]) => a.has(key)).map(([, name]) => name);
       for (const m of role.members) {
         if (!other.members.some((o) => o.userId === m.userId)) continue;
         const user = users.find((u) => u.id === m.userId);
-        if (user) out.push({ user, role, other, systems });
+        if (user) out.push({ user, role, other });
       }
     }
   }

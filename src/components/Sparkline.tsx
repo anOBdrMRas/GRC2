@@ -1,9 +1,10 @@
 import type { Kpi } from '../types';
+import { t } from '../i18n';
 
 /** Small trend chart with target line. */
 export function Sparkline({ kpi, width = 280, height = 80 }: { kpi: Kpi; width?: number; height?: number }) {
   const ms = kpi.measurements;
-  if (ms.length === 0) return <div className="muted small">Noch keine Messwerte.</div>;
+  if (ms.length === 0) return <div className="muted small">{t('Noch keine Messwerte.')}</div>;
   const values = [...ms.map((m) => m.value), kpi.target];
   const min = Math.min(...values);
   const max = Math.max(...values);
@@ -16,7 +17,7 @@ export function Sparkline({ kpi, width = 280, height = 80 }: { kpi: Kpi; width?:
     <svg width={width} height={height} className="sparkline">
       <line x1={pad} x2={width - pad} y1={y(kpi.target)} y2={y(kpi.target)} className="target" />
       <text x={width - pad} y={y(kpi.target) - 3} textAnchor="end" className="target-label">
-        Ziel {kpi.target}
+        {t('Ziel')} {kpi.target}
       </text>
       <polyline points={points} />
       {ms.map((m, i) => (

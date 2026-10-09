@@ -1,5 +1,6 @@
 // Declarative field definitions that drive the generic module editors.
 import type { EntityKind } from './types';
+import { orgUnits } from './logic';
 
 export type FieldType =
   | 'text'
@@ -16,7 +17,8 @@ export type FieldType =
   | 'annexA'
   | 'measurements'
   | 'members' // persons holding a role
-  | 'permissions' // IT roles / access rights
+  | 'readonly' // shown, not editable (e.g. generated IDs)
+  | 'roleChecks' // checkbox list of the other roles
   | 'systemRoles'; // tool system roles of a user
 
 export interface FieldDef {
@@ -25,6 +27,8 @@ export interface FieldDef {
   type: FieldType;
   options?: string[];
   refKind?: EntityKind;
+  /** ref fields: offer an explicit "n/a" (not applicable) choice */
+  allowNA?: boolean;
   hint?: string;
   wide?: boolean;
 }
@@ -209,16 +213,11 @@ export const modules: Record<EntityKind, ModuleDef> = {
       {
         ...base,
         fields: [
-          ...base.fields,
+          { key: 'code', label: 'ID', type: 'readonly', hint: 'wird automatisch vergeben' },
+          ...base.fields.filter((f) => f.key !== 'code'),
           { key: 'roleType', label: 'Rollentyp', type: 'select', options: ['Führungsrolle', 'Fachrolle', 'Gremium', 'Beauftragter'] },
-          { key: 'orgUnit', label: 'Organisationseinheit', type: 'text' },
-          {
-            key: 'mandatoryBy',
-            label: 'Pflichtrolle gemäß',
-            type: 'multiselect',
-            options: ['ISO 9001', 'ISO 27001', 'ISO 37301', 'DSGVO'],
-            hint: 'Rolle wird von der Norm / dem Gesetz gefordert',
-          },
+          { key: 'orgUnit', label: 'Organisationseinheit', type: 'select', options: orgUnits },
+          { key: 'mandatory', label: 'Pflichtrolle', type: 'bool', hint: 'von Norm, Gesetz oder Behörde gefordert, z. B. ISB, DSB, Ausfuhrverantwortlicher' },
           { key: 'complianceRelevant', label: 'Compliance-Funktion / sensible Rolle', type: 'bool', hint: 'ISO 37301 5.3.2' },
           { key: 'roleOwnerUserId', label: 'Rollenverantwortlicher', type: 'ref', refKind: 'user', hint: 'definiert und reviewt die Rolle' },
         ],
@@ -235,14 +234,25 @@ export const modules: Record<EntityKind, ModuleDef> = {
       {
         title: 'Berichtslinien',
         fields: [
-          { key: 'reportsToFunctionalRoleId', label: 'Berichtet fachlich an', type: 'ref', refKind: 'role' },
-          { key: 'reportsToDisciplinaryRoleId', label: 'Berichtet disziplinarisch an', type: 'ref', refKind: 'role' },
-          { key: 'directAccessToManagement', label: 'Direkter Zugang zur Geschäftsleitung', type: 'bool', hint: 'Unabhängigkeit, ISO 37301 5.3.2' },
+          { key: 'reportsToFunctionalRoleId', label: 'Berichtet fachlich an', type: 'ref', refKind: 'role', allowNA: true },
+          { key: 'reportsToDisciplinaryRoleId', label: 'Berichtet disziplinarisch an', type: 'ref', refKind: 'role', allowNA: true },
         ],
       },
       {
         title: 'Zugeordnete Personen',
         fields: [{ key: 'members', label: 'Stelleninhaber & Stellvertretungen', type: 'members', wide: true, hint: 'aus der Benutzerverwaltung' }],
+      },
+      {
+        title: 'Funktionstrennung',
+        fields: [
+          {
+            key: 'incompatibleRoleIds',
+            label: 'Unvereinbare Rollen (SoD)',
+            type: 'roleChecks',
+            wide: true,
+            hint: 'ISO 27001 A.5.3 · wird bei beiden Rollen eingetragen',
+          },
+        ],
       },
       {
         title: 'Bestellung / Ernennung',
@@ -252,22 +262,6 @@ export const modules: Record<EntityKind, ModuleDef> = {
           { key: 'appointedByUserId', label: 'Bestellt durch', type: 'ref', refKind: 'user' },
           { key: 'appointmentDocument', label: 'Bestellungsdokument', type: 'text', hint: 'Dokumentenname, Ablageort oder Link' },
         ],
-      },
-      {
-        title: 'Systemberechtigungen',
-        fields: [
-          {
-            key: 'systemPermissions',
-            label: 'IT-Rollen und Zugriffsrechte der Rolle',
-            type: 'permissions',
-            wide: true,
-            hint: 'ISO 27001 A.5.15 · A.5.18 · A.8.2',
-          },
-        ],
-      },
-      {
-        title: 'Funktionstrennung',
-        fields: [{ key: 'incompatibleRoleIds', label: 'Unvereinbare Rollen (SoD)', type: 'refs', refKind: 'role', wide: true, hint: 'ISO 27001 A.5.3' }],
       },
       {
         title: 'Kritikalität & Vertretung',

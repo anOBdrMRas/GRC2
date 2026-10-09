@@ -7,6 +7,7 @@ import { continuityGap, findUsages, roleMembers, kpiStatus, residualScore, riskL
 import { Field } from './Fields';
 import { ConfirmButton, Empty, LevelBadge, StatusPill, Tag, TrafficLight } from './common';
 import { useRights } from '../useRights';
+import { dateLocale, t } from '../i18n';
 import { systemRoleById } from '../permissions';
 import { RoleInsights, RoleProfile } from './RoleInsights';
 import { SystemRoleMatrix, UserInsights } from './UserInsights';
@@ -28,7 +29,7 @@ function useColumns(kind: EntityKind): Column[] {
   switch (kind) {
     case 'risk':
       return [
-        { label: 'Kategorie', render: (e) => (e as Risk).category, sort: (e) => (e as Risk).category },
+        { label: 'Kategorie', render: (e) => t((e as Risk).category), sort: (e) => (e as Risk).category },
         { label: 'Eigner', render: (e) => roleName((e as Risk).ownerRoleId) },
         {
           label: 'Brutto',
@@ -47,45 +48,45 @@ function useColumns(kind: EntityKind): Column[] {
           sort: (e) => -residualScore(e as Risk),
         },
         { label: 'Controls', render: (e) => controls.filter((c) => c.mitigatesRiskIds.includes(e.id)).length || <span className="warn">0</span> },
-        { label: 'Status', render: (e) => (e as Risk).status },
+        { label: 'Status', render: (e) => t((e as Risk).status) },
       ];
     case 'opportunity':
       return [
-        { label: 'Kategorie', render: (e) => (e as Opportunity).category },
+        { label: 'Kategorie', render: (e) => t((e as Opportunity).category) },
         { label: 'Verantwortlich', render: (e) => roleName((e as Opportunity).ownerRoleId) },
         {
           label: 'Potenzial',
           render: (e) => (e as Opportunity).likelihood * (e as Opportunity).benefitScore,
           sort: (e) => -(e as Opportunity).likelihood * (e as Opportunity).benefitScore,
         },
-        { label: 'Status', render: (e) => (e as Opportunity).status },
+        { label: 'Status', render: (e) => t((e as Opportunity).status) },
       ];
     case 'control':
       return [
-        { label: 'Art', render: (e) => (e as Control).controlType },
-        { label: 'Automatisierung', render: (e) => (e as Control).automation },
+        { label: 'Art', render: (e) => t((e as Control).controlType) },
+        { label: 'Automatisierung', render: (e) => t((e as Control).automation) },
         { label: 'Key', render: (e) => ((e as Control).keyControl ? '★' : '') },
-        { label: 'Umsetzung', render: (e) => (e as Control).implementation },
+        { label: 'Umsetzung', render: (e) => t((e as Control).implementation) },
         {
           label: 'Wirksamkeit',
           render: (e) => {
             const v = (e as Control).operatingEffectiveness;
             const cls = v === 'Wirksam' ? 'ok' : v === 'Nicht geprüft' ? 'muted' : 'warn';
-            return <span className={cls}>{v}</span>;
+            return <span className={cls}>{t(v)}</span>;
           },
         },
         { label: 'Annex A', render: (e) => (e as Control).annexA.join(', ') },
       ];
     case 'role':
       return [
-        { label: 'Typ', render: (e) => (e as Role).roleType, sort: (e) => (e as Role).roleType },
+        { label: 'Typ', render: (e) => t((e as Role).roleType), sort: (e) => (e as Role).roleType },
         {
           label: 'Inhaber',
           render: (e) =>
             roleMembers(e as Role, users)
               .filter((m) => m.function === 'Inhaber')
               .map((m) => m.user.title)
-              .join(', ') || <span className="warn">unbesetzt</span>,
+              .join(', ') || <span className="warn">{t('unbesetzt')}</span>,
         },
         {
           label: 'Kritikalität',
@@ -93,20 +94,20 @@ function useColumns(kind: EntityKind): Column[] {
             const r = e as Role;
             const gap = continuityGap(r);
             return (
-              <span className={gap ? 'warn' : undefined} title={gap ?? undefined}>
-                {r.criticality}
+              <span className={gap ? 'warn' : undefined} title={gap ? t(gap) : undefined}>
+                {t(r.criticality)}
                 {gap && ' ⚠'}
               </span>
             );
           },
         },
-        { label: 'Pflicht', render: (e) => (e as Role).mandatoryBy.map((x) => x.replace('ISO ', '')).join(', ') },
+        { label: 'Pflicht', render: (e) => ((e as Role).mandatory ? '●' : '') },
         { label: 'Status', render: (e) => <StatusPill status={(e as Role).status} /> },
       ];
     case 'user':
       return [
         { label: 'Abteilung', render: (e) => (e as User).department, sort: (e) => (e as User).department },
-        { label: 'Systemrollen', render: (e) => (e as User).systemRoles.map((id) => systemRoleById.get(id)?.name ?? id).join(', ') },
+        { label: 'Systemrollen', render: (e) => (e as User).systemRoles.map((id) => t(systemRoleById.get(id)?.name ?? id)).join(', ') },
         { label: 'Status', render: (e) => <StatusPill status={(e as User).status} /> },
       ];
     case 'kpi':
@@ -125,7 +126,7 @@ function useColumns(kind: EntityKind): Column[] {
           },
         },
         { label: 'Ziel', render: (e) => `${(e as Kpi).direction === 'higher' ? '≥' : '≤'} ${(e as Kpi).target} ${(e as Kpi).unit}` },
-        { label: 'Frequenz', render: (e) => (e as Kpi).frequency },
+        { label: 'Frequenz', render: (e) => t((e as Kpi).frequency) },
         { label: 'Verantwortlich', render: (e) => roleName((e as Kpi).ownerRoleId) },
       ];
   }
@@ -158,7 +159,7 @@ export function EntityModule({ kind }: { kind: EntityKind }) {
       });
     }
     if (kind === 'role') {
-      list = list.filter((e) => (!roleType || (e as Role).roleType === roleType) && (!mandatoryOnly || (e as Role).mandatoryBy.length > 0));
+      list = list.filter((e) => (!roleType || (e as Role).roleType === roleType) && (!mandatoryOnly || (e as Role).mandatory));
     }
     const sorter = sortCol !== null ? columns[sortCol].sort : undefined;
     if (sorter) list = [...list].sort((a, b) => (sorter(a) < sorter(b) ? -1 : sorter(a) > sorter(b) ? 1 : 0));
@@ -166,32 +167,32 @@ export function EntityModule({ kind }: { kind: EntityKind }) {
   }, [items, q, kind, heatCell, heatMode, sortCol, columns, roleType, mandatoryOnly]);
 
   const selected = items.find((e) => e.id === selectedId);
-  if (!canRead(kind)) return <Empty>Ihre Systemrollen erlauben keinen Zugriff auf {def.plural}.</Empty>;
+  if (!canRead(kind)) return <Empty>{t('Ihre Systemrollen erlauben keinen Zugriff auf {name}.', { name: t(def.plural) })}</Empty>;
 
   const head = (
     <div className="module-head">
-      <h2 style={{ color: def.color }}>{def.plural}</h2>
+      <h2 style={{ color: def.color }}>{t(def.plural)}</h2>
       <div className="row gap">
         {kind === 'user' && (
           <div className="seg">
             <button className={userTab === 'users' ? 'active' : ''} onClick={() => setUserTab('users')}>
-              Benutzer
+              {t('Benutzer')}
             </button>
             <button className={userTab === 'matrix' ? 'active' : ''} onClick={() => setUserTab('matrix')}>
-              Systemrollen
+              {t('Systemrollen')}
             </button>
           </div>
         )}
-        {!canEdit(kind) && <span className="badge readonly">Nur Lesen</span>}
+        {!canEdit(kind) && <span className="badge readonly">{t('Nur Lesen')}</span>}
         {canEdit(kind) && !(kind === 'user' && userTab === 'matrix') && (
           <button
             className="primary"
             onClick={() => {
-              const e = createEntity(kind, kind === 'user' ? 'Neuer Benutzer' : `Neue(s) ${def.label}`);
+              const e = createEntity(kind, kind === 'user' ? t('Neuer Benutzer') : t('Neue(s) {label}', { label: t(def.label) }));
               select(kind, e.id);
             }}
           >
-            + {def.label}
+            + {t(def.label)}
           </button>
         )}
       </div>
@@ -213,42 +214,42 @@ export function EntityModule({ kind }: { kind: EntityKind }) {
         {head}
         {kind === 'role' && (
           <div className="filter-bar">
-            {['', 'Führungsrolle', 'Fachrolle', 'Gremium', 'Beauftragter'].map((t) => (
-              <button key={t || 'all'} className={`chip ${roleType === t ? 'active' : ''}`} onClick={() => setRoleType(t)}>
-                {t || 'Alle Typen'}
+            {['', 'Führungsrolle', 'Fachrolle', 'Gremium', 'Beauftragter'].map((rt) => (
+              <button key={rt || 'all'} className={`chip ${roleType === rt ? 'active' : ''}`} onClick={() => setRoleType(rt)}>
+                {rt ? t(rt) : t('Alle Typen')}
               </button>
             ))}
             <label className="checkbox small">
-              <input type="checkbox" checked={mandatoryOnly} onChange={(e) => setMandatoryOnly(e.target.checked)} /> nur Pflichtrollen (Norm/Gesetz)
+              <input type="checkbox" checked={mandatoryOnly} onChange={(e) => setMandatoryOnly(e.target.checked)} /> {t('nur Pflichtrollen')}
             </label>
           </div>
         )}
         {kind === 'risk' && (
           <div className="card heat-card">
             <div className="row space">
-              <strong>Risikomatrix</strong>
+              <strong>{t('Risikomatrix')}</strong>
               <div className="seg">
                 <button className={heatMode === 'gross' ? 'active' : ''} onClick={() => setHeatMode('gross')}>
-                  Brutto
+                  {t('Brutto')}
                 </button>
                 <button className={heatMode === 'net' ? 'active' : ''} onClick={() => setHeatMode('net')}>
-                  Netto
+                  {t('Netto')}
                 </button>
               </div>
             </div>
             <Heatmap risks={items as Risk[]} mode={heatMode} selected={heatCell} onSelect={setHeatCell} />
           </div>
         )}
-        <input className="search" placeholder="Filtern…" value={q} onChange={(e) => setQ(e.target.value)} />
+        <input className="search" placeholder={t('Filtern…')} value={q} onChange={(e) => setQ(e.target.value)} />
         <div className="table-wrap">
           <table className="list">
             <thead>
               <tr>
                 <th>ID</th>
-                <th>Bezeichnung</th>
+                <th>{t('Bezeichnung')}</th>
                 {columns.map((c, i) => (
                   <th key={c.label} className={c.sort ? 'sortable' : ''} onClick={() => c.sort && setSortCol(sortCol === i ? null : i)}>
-                    {c.label}
+                    {t(c.label)}
                     {sortCol === i && ' ▾'}
                   </th>
                 ))}
@@ -266,11 +267,11 @@ export function EntityModule({ kind }: { kind: EntityKind }) {
               ))}
             </tbody>
           </table>
-          {filtered.length === 0 && <Empty>Keine Einträge.</Empty>}
+          {filtered.length === 0 && <Empty>{t('Keine Einträge.')}</Empty>}
         </div>
       </div>
       <div className="module-detail">
-        {selected ? <EntityEditor kind={kind} entity={selected} /> : <Empty>Eintrag auswählen oder neu anlegen.</Empty>}
+        {selected ? <EntityEditor kind={kind} entity={selected} /> : <Empty>{t('Eintrag auswählen oder neu anlegen.')}</Empty>}
       </div>
     </div>
   );
@@ -290,17 +291,17 @@ function EntityEditor({ kind, entity }: { kind: EntityKind; entity: AnyEntity })
     <div className="editor">
       <div className="editor-head" style={{ borderColor: def.color }}>
         <div>
-          <div className="muted small">{def.label}</div>
+          <div className="muted small">{t(def.label)}</div>
           <h3>
             <span className="mono">{entity.code}</span> {entity.title}
           </h3>
         </div>
         <div className="row gap">
-          {kind === 'role' && <button onClick={() => setShowProfile(true)}>Rollenbeschreibung</button>}
+          {kind === 'role' && <button onClick={() => setShowProfile(true)}>{t('Rollenbeschreibung')}</button>}
           {editable && (
             <ConfirmButton
-              label="Löschen"
-              confirmLabel="Wirklich löschen? (inkl. Zuordnungen)"
+              label={t('Löschen')}
+              confirmLabel={t('Wirklich löschen? (inkl. Zuordnungen)')}
               onConfirm={() => {
                 remove(kind, entity.id);
                 select(kind, undefined);
@@ -314,10 +315,10 @@ function EntityEditor({ kind, entity }: { kind: EntityKind; entity: AnyEntity })
       <fieldset className="plain" disabled={!editable}>
         {def.sections.map((sec) => (
           <fieldset key={sec.title}>
-            <legend>{sec.title}</legend>
+            <legend>{t(sec.title)}</legend>
             <div className="grid">
               {sec.fields.map((f) => (
-                <Field key={f.key} def={f} value={values[f.key]} onChange={(v) => update(kind, entity.id, { [f.key]: v })} />
+                <Field key={f.key} def={f} value={values[f.key]} entityId={entity.id} onChange={(v) => update(kind, entity.id, { [f.key]: v })} />
               ))}
             </div>
           </fieldset>
@@ -325,7 +326,7 @@ function EntityEditor({ kind, entity }: { kind: EntityKind; entity: AnyEntity })
       </fieldset>
       {kind === 'role' && <RoleInsights role={entity as Role} part="derived" />}
       <div className="muted small">
-        Angelegt {new Date(entity.createdAt).toLocaleString('de-DE')} · zuletzt geändert {new Date(entity.updatedAt).toLocaleString('de-DE')}
+        {t('Angelegt')} {new Date(entity.createdAt).toLocaleString(dateLocale())} · {t('zuletzt geändert')} {new Date(entity.updatedAt).toLocaleString(dateLocale())}
       </div>
     </div>
   );
@@ -342,8 +343,8 @@ function Insights({ kind, entity }: { kind: EntityKind; entity: AnyEntity }) {
   return (
     <div className="insights">
       <div className="insight">
-        <div className="insight-title">Verwendet in Prozessschritten ({usages.length})</div>
-        {usages.length === 0 && <div className="muted small">Noch keinem Prozessschritt zugeordnet.</div>}
+        <div className="insight-title">{t('Verwendet in Prozessschritten ({n})', { n: usages.length })}</div>
+        {usages.length === 0 && <div className="muted small">{t('Noch keinem Prozessschritt zugeordnet.')}</div>}
         <div className="tags">
           {usages.map((u) => (
             <Tag key={u.process.id + u.elementId} onClick={() => openStep(u.process.id, u.elementId)}>
@@ -355,7 +356,7 @@ function Insights({ kind, entity }: { kind: EntityKind; entity: AnyEntity }) {
       </div>
       {kind === 'risk' && (
         <div className="insight">
-          <div className="insight-title">Mitigierende Controls</div>
+          <div className="insight-title">{t('Mitigierende Controls')}</div>
           <div className="tags">
             {controls
               .filter((c) => c.mitigatesRiskIds.includes(entity.id))
@@ -365,12 +366,12 @@ function Insights({ kind, entity }: { kind: EntityKind; entity: AnyEntity }) {
                 </Tag>
               ))}
           </div>
-          {!controls.some((c) => c.mitigatesRiskIds.includes(entity.id)) && <div className="warn small">Keine Kontrolle zugeordnet.</div>}
+          {!controls.some((c) => c.mitigatesRiskIds.includes(entity.id)) && <div className="warn small">{t('Keine Kontrolle zugeordnet.')}</div>}
         </div>
       )}
       {kind === 'kpi' && (
         <div className="insight">
-          <div className="insight-title">Verlauf</div>
+          <div className="insight-title">{t('Verlauf')}</div>
           <Sparkline kpi={entity as Kpi} />
         </div>
       )}

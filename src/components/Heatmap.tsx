@@ -1,5 +1,6 @@
 import type { Risk } from '../types';
 import { riskLevel } from '../logic';
+import { t } from '../i18n';
 
 /** 5×5 risk matrix (likelihood × impact). */
 export function Heatmap({
@@ -21,7 +22,7 @@ export function Heatmap({
   }
   return (
     <div className="heatmap">
-      <div className="heat-y">Wahrscheinlichkeit →</div>
+      <div className="heat-y">{t('Wahrscheinlichkeit')} →</div>
       <div className="heat-grid">
         {[5, 4, 3, 2, 1].map((l) =>
           [1, 2, 3, 4, 5].map((i) => {
@@ -31,7 +32,7 @@ export function Heatmap({
               <button
                 key={key}
                 className={`heat-cell level-${riskLevel(l * i)} ${selected === key ? 'sel' : ''}`}
-                title={`W ${l} × A ${i} = ${l * i}`}
+                title={t('W {l} × A {i} = {s}', { l, i, s: l * i })}
                 onClick={() => onSelect?.(selected === key ? null : key)}
               >
                 {n || ''}
@@ -40,7 +41,7 @@ export function Heatmap({
           }),
         )}
       </div>
-      <div className="heat-x">Auswirkung →</div>
+      <div className="heat-x">{t('Auswirkung')} →</div>
     </div>
   );
 }

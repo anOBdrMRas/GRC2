@@ -7,6 +7,7 @@ import { ProcessView } from './components/ProcessView';
 import { EntityModule } from './components/EntityModule';
 import { ConfirmButton, Empty, ExportDialog, Notice, download } from './components/common';
 import { useRights } from './useRights';
+import { t, useLang } from './i18n';
 import { systemRoleById, type ModuleKey } from './permissions';
 
 const nav: { view: View; label: string; icon: string; color?: string }[] = [
@@ -31,6 +32,8 @@ export default function App() {
   const setCurrentUser = useStore((s) => s.setCurrentUser);
   const { canRead, canEdit, user } = useRights();
   const isAdmin = canEdit('user');
+  const lang = useLang((s) => s.lang);
+  const setLang = useLang((s) => s.setLang);
   const visibleNav = nav.filter((n) => n.view === 'dashboard' || canRead(n.view as ModuleKey));
 
   const exportAll = () => {
@@ -39,23 +42,33 @@ export default function App() {
   };
 
   return (
-    <div className="app">
+    // Re-mount on language change so every component picks up the new texts.
+    <div className="app" key={lang}>
       <nav className="sidebar">
-        <div className="brand">
-          GRC<span>Studio</span>
-          <div className="brand-sub">Prototyp</div>
+        <div className="brand-row">
+          <div className="brand">
+            GRC<span>Studio</span>
+            <div className="brand-sub">{t('Prototyp')}</div>
+          </div>
+          <div className="lang-switch" role="group" aria-label={t('Sprache')}>
+            {(['de', 'en'] as const).map((l) => (
+              <button key={l} className={lang === l ? 'active' : ''} aria-pressed={lang === l} onClick={() => setLang(l)}>
+                {l.toUpperCase()}
+              </button>
+            ))}
+          </div>
         </div>
         {visibleNav.map((n) => (
           <button key={n.view} className={`nav-item ${view === n.view ? 'active' : ''}`} onClick={() => go(n.view)}>
             <span className="nav-icon" style={n.color ? { color: n.color } : undefined}>
               {n.icon}
             </span>
-            {n.label}
+            {t(n.label)}
           </button>
         ))}
         <div className="sidebar-foot">
           <label className="login">
-            <span>Angemeldet als (Simulation)</span>
+            <span>{t('Angemeldet als (Simulation)')}</span>
             <select id="current-user" value={currentUserId} onChange={(e) => setCurrentUser(e.target.value)}>
               {users.map((u) => (
                 <option key={u.id} value={u.id}>
@@ -63,14 +76,14 @@ export default function App() {
                 </option>
               ))}
             </select>
-            <span className="login-roles">{user ? user.systemRoles.map((id) => systemRoleById.get(id)?.name ?? id).join(', ') || 'keine Systemrolle' : '–'}</span>
+            <span className="login-roles">{user ? user.systemRoles.map((id) => t(systemRoleById.get(id)?.name ?? id)).join(', ') || t('keine Systemrolle') : '–'}</span>
           </label>
           <div className="muted small">ISO 9001 · ISO 27001 · ISO 37301</div>
-          <button onClick={exportAll}>Daten exportieren</button>
+          <button onClick={exportAll}>{t('Daten exportieren')}</button>
           {isAdmin && (
             <>
-              <button onClick={() => fileInput.current?.click()}>Daten importieren</button>
-              <ConfirmButton label="Demodaten laden" confirmLabel="Alle Daten ersetzen?" className="" onConfirm={resetDemo} />
+              <button onClick={() => fileInput.current?.click()}>{t('Daten importieren')}</button>
+              <ConfirmButton label={t('Demodaten laden')} confirmLabel={t('Alle Daten ersetzen?')} className="" onConfirm={resetDemo} />
             </>
           )}
           <input
@@ -85,7 +98,7 @@ export default function App() {
               try {
                 importAll(JSON.parse(await f.text()));
               } catch {
-                useUi.getState().setNotice('Die Datei konnte nicht gelesen werden. Bitte eine mit „Daten exportieren“ erzeugte JSON-Datei wählen.');
+                useUi.getState().setNotice(t('Die Datei konnte nicht gelesen werden. Bitte eine mit „Daten exportieren“ erzeugte JSON-Datei wählen.'));
               }
             }}
           />
@@ -94,7 +107,7 @@ export default function App() {
       <main className="main">
         {view === 'dashboard' && <Dashboard />}
         {view === 'processes' && canRead('processes') && <ProcessView />}
-        {view !== 'dashboard' && !canRead(view as ModuleKey) && <Empty>Ihre Systemrollen erlauben keinen Zugriff auf diesen Bereich.</Empty>}
+        {view !== 'dashboard' && !canRead(view as ModuleKey) && <Empty>{t('Ihre Systemrollen erlauben keinen Zugriff auf diesen Bereich.')}</Empty>}
         {kindOrder.includes(view as never) && canRead(view as ModuleKey) && <EntityModule key={view} kind={view as (typeof kindOrder)[number]} />}
       </main>
       <ExportDialog />

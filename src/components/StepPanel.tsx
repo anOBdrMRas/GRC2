@@ -7,6 +7,8 @@ import { modules } from '../schema';
 import { assignedIds, emptyAssignment, kpiStatus, residualScore, riskLevel, riskScore } from '../logic';
 import { LevelBadge, Picker, TrafficLight } from './common';
 import { useRights } from '../useRights';
+import { t } from '../i18n';
+import { badgeDefs } from '../bpmn/BpmnEditor';
 
 const typeLabels: Record<string, string> = {
   task: 'Aufgabe',
@@ -19,6 +21,21 @@ const typeLabels: Record<string, string> = {
   receiveTask: 'Empfangsaufgabe',
   subProcess: 'Subprozess',
   callActivity: 'Aufrufaktivität',
+  startEvent: 'Startereignis',
+  endEvent: 'Endereignis',
+  intermediateThrowEvent: 'Zwischenereignis',
+  intermediateCatchEvent: 'Zwischenereignis',
+  boundaryEvent: 'Randereignis',
+  exclusiveGateway: 'Exklusives Gateway',
+  parallelGateway: 'Paralleles Gateway',
+  inclusiveGateway: 'Inklusives Gateway',
+  eventBasedGateway: 'Ereignisbasiertes Gateway',
+  dataObjectReference: 'Datenobjekt',
+  dataStoreReference: 'Datenspeicher',
+  textAnnotation: 'Anmerkung',
+  participant: 'Pool',
+  lane: 'Lane',
+  group: 'Gruppe',
 };
 
 const raciHelp: Record<Raci, string> = {
@@ -44,11 +61,11 @@ export function StepPanel({
     return (
       <div className="panel">
         <div className="panel-head">
-          <div className="muted small">{element.type}</div>
+          <div className="muted small">{t(typeLabels[element.type] ?? element.type)}</div>
           <h3>{element.name || element.id}</h3>
         </div>
         <p className="muted">
-          Risiken, Chancen, Rollen, KPI und Controls können Aktivitäten zugeordnet werden (Aufgaben, Subprozesse, Aufrufaktivitäten).
+          {t('Risiken, Chancen, Rollen, KPI und Controls können Aktivitäten zugeordnet werden (Aufgaben, Subprozesse, Aufrufaktivitäten).')}
         </p>
       </div>
     );
@@ -84,18 +101,18 @@ function ActivityPanel({ process, element, onOpenSubProcess }: { process: Proces
     return (
       <div className="assign-section" key={kind}>
         <div className="assign-title" style={{ color: def.color }}>
-          {def.plural} <span className="count">{ids.length}</span>
+          {t(def.plural)} <span className="count">{ids.length}</span>
         </div>
         {ids.map((id) => {
           const e = all.find((x) => x.id === id);
           if (!e) return null;
           return (
             <div className="assign-row" key={id}>
-              <span className="link grow" onClick={() => go(kind, id)} title="Im Modul öffnen">
+              <span className="link grow" onClick={() => go(kind, id)} title={t('Im Modul öffnen')}>
                 <span className="mono">{e.code}</span> {e.title}
               </span>
               {extra(e)}
-              <button className="tag-x" title="Zuordnung entfernen" onClick={() => store.unassign(process.id, element.id, kind, id)}>
+              <button className="tag-x" title={t('Zuordnung entfernen')} onClick={() => store.unassign(process.id, element.id, kind, id)}>
                 ×
               </button>
             </div>
@@ -104,7 +121,7 @@ function ActivityPanel({ process, element, onOpenSubProcess }: { process: Proces
         <Picker
           options={all.map((e) => ({ id: e.id, label: `${e.code} ${e.title}` }))}
           exclude={ids}
-          placeholder={`${def.label} zuordnen oder neu anlegen…`}
+          placeholder={t('{label} zuordnen oder neu anlegen…', { label: t(def.label) })}
           onPick={(id) => assign(kind, id)}
           onCreate={canEdit(kind) ? (title) => quickCreate(kind, title) : undefined}
         />
@@ -116,12 +133,12 @@ function ActivityPanel({ process, element, onOpenSubProcess }: { process: Proces
     <div className="panel">
       <div className="panel-head">
         <div className="muted small">
-          {typeLabels[element.type] ?? element.type} · <span className="mono">{element.id}</span>
+          {t(typeLabels[element.type] ?? element.type)} · <span className="mono">{element.id}</span>
         </div>
-        <h3>{element.name || '(ohne Namen)'}</h3>
+        <h3>{element.name || t('(ohne Namen)')}</h3>
         {element.isCollapsedSubProcess && (
           <button className="small-btn" onClick={() => onOpenSubProcess(element.id)}>
-            ⤵ Subprozess öffnen
+            ⤵ {t('Subprozess öffnen')}
           </button>
         )}
       </div>
@@ -131,16 +148,16 @@ function ActivityPanel({ process, element, onOpenSubProcess }: { process: Proces
       {section('role', (e) => {
         const r = a.roles.find((x) => x.roleId === e.id)!;
         return (
-          <select className="raci-select" value={r.raci} title={raciHelp[r.raci]} onChange={(ev) => store.setRaci(process.id, element.id, e.id, ev.target.value as Raci)}>
+          <select className="raci-select" value={r.raci} title={t(raciHelp[r.raci])} onChange={(ev) => store.setRaci(process.id, element.id, e.id, ev.target.value as Raci)}>
             {(['R', 'A', 'C', 'I'] as Raci[]).map((x) => (
-              <option key={x} value={x} title={raciHelp[x]}>
+              <option key={x} value={x} title={t(raciHelp[x])}>
                 {x}
               </option>
             ))}
           </select>
         );
       })}
-      {a.roles.length > 0 && !a.roles.some((r) => r.raci === 'R') && <div className="warn small pad">Keine durchführende Rolle (R) festgelegt.</div>}
+      {a.roles.length > 0 && !a.roles.some((r) => r.raci === 'R') && <div className="warn small pad">{t('Keine durchführende Rolle (R) festgelegt.')}</div>}
 
       {section('risk', (e) => {
         const r = e as Risk;
@@ -148,10 +165,10 @@ function ActivityPanel({ process, element, onOpenSubProcess }: { process: Proces
       })}
       {uncovered.length > 0 && (
         <div className="warn-box small">
-          ⚠ Ohne Kontrolle in diesem Schritt: {uncovered.map((r) => r.code).join(', ')}
+          ⚠ {t('Ohne Kontrolle in diesem Schritt')}: {uncovered.map((r) => r.code).join(', ')}
           {suggestions.length > 0 && (
             <div className="suggest">
-              Vorschlag:{' '}
+              {t('Vorschlag')}:{' '}
               {suggestions.map((c) => (
                 <button key={c.id} className="small-btn" onClick={() => assign('control', c.id)}>
                   + {c.code} {c.title}
@@ -166,9 +183,9 @@ function ActivityPanel({ process, element, onOpenSubProcess }: { process: Proces
         const c = e as Control;
         const cls = c.operatingEffectiveness === 'Wirksam' ? 'ok' : c.operatingEffectiveness === 'Nicht geprüft' ? 'muted' : 'warn';
         return (
-          <span className={`small ${cls}`} title={`Operative Wirksamkeit: ${c.operatingEffectiveness}`}>
+          <span className={`small ${cls}`} title={`${t('Operative Wirksamkeit')}: ${t(c.operatingEffectiveness)}`}>
             {c.keyControl ? '★ ' : ''}
-            {c.controlType.slice(0, 4)}.
+            {t(c.controlType).slice(0, 4)}.
           </span>
         );
       })}
@@ -190,7 +207,7 @@ function ActivityPanel({ process, element, onOpenSubProcess }: { process: Proces
       })}
 
       <div className="assign-section">
-        <div className="assign-title">Notiz / Arbeitsanweisung</div>
+        <div className="assign-title">{t('Notiz / Arbeitsanweisung')}</div>
         <textarea rows={3} value={a.note} onChange={(e) => store.setStepNote(process.id, element.id, e.target.value)} />
       </div>
     </div>
@@ -204,13 +221,13 @@ function CallLink({ process, elementId }: { process: ProcessModel; elementId: st
   const linked = process.callLinks[elementId] ?? '';
   return (
     <div className="assign-section">
-      <div className="assign-title">Aufgerufener Prozess</div>
+      <div className="assign-title">{t('Aufgerufener Prozess')}</div>
       <div className="row gap">
         <select
           value={linked}
           onChange={(e) => updateProcess(process.id, { callLinks: { ...process.callLinks, [elementId]: e.target.value } })}
         >
-          <option value="">— nicht verknüpft —</option>
+          <option value="">{t('— nicht verknüpft —')}</option>
           {processes
             .filter((p) => p.id !== process.id)
             .map((p) => (
@@ -221,7 +238,7 @@ function CallLink({ process, elementId }: { process: ProcessModel; elementId: st
         </select>
         {linked && (
           <button className="small-btn" onClick={() => go('processes', linked)}>
-            Öffnen →
+            {t('Öffnen')} →
           </button>
         )}
       </div>
@@ -238,35 +255,38 @@ function ProcessSummary({ process }: { process: ProcessModel }) {
   return (
     <div className="panel">
       <div className="panel-head">
-        <div className="muted small">Prozess</div>
+        <div className="muted small">{t('Prozess')}</div>
         <h3>{process.title}</h3>
       </div>
-      <p className="muted small">Element im Diagramm auswählen, um Rollen, Risiken, Chancen, Controls und KPI zuzuordnen.</p>
+      <p className="muted small">{t('Element im Diagramm auswählen, um Rollen, Risiken, Chancen, Controls und KPI zuzuordnen.')}</p>
       <div className="stat-grid">
         {(['role', 'risk', 'opportunity', 'control', 'kpi'] as AssignableKind[]).map((k) => (
           <div className="stat" key={k} style={{ borderColor: modules[k].color }}>
             <div className="stat-num">{uniq(k)}</div>
-            <div className="stat-label">{modules[k].plural}</div>
+            <div className="stat-label">{t(modules[k].plural)}</div>
           </div>
         ))}
       </div>
       {risks.length > 0 && (
         <p className="small">
-          Höchstes Bruttorisiko: <LevelBadge level={riskLevel(maxGross)} score={maxGross} />
+          {t('Höchstes Bruttorisiko')}: <LevelBadge level={riskLevel(maxGross)} score={maxGross} />
         </p>
       )}
       <div className="legend small">
         <div>
-          <b>Badges im Diagramm:</b>
+          <b>{t('Badges im Diagramm')}:</b>
         </div>
         <div>
-          <span className="grc-badge" style={{ background: modules.role.color }}>Ro</span> Rollen{' '}
-          <span className="grc-badge" style={{ background: modules.risk.color }}>R</span> Risiken{' '}
-          <span className="grc-badge" style={{ background: modules.opportunity.color }}>Ch</span> Chancen{' '}
-          <span className="grc-badge" style={{ background: modules.control.color }}>K</span> Controls{' '}
-          <span className="grc-badge" style={{ background: modules.kpi.color }}>KPI</span> KPI
+          {badgeDefs.map((b) => (
+            <span key={b.key} className="legend-item">
+              <span className="grc-badge" style={{ background: b.color }}>
+                {t(b.label)}
+              </span>{' '}
+              {t(b.title)}
+            </span>
+          ))}
         </div>
-        <div className="muted">Subprozess anlegen: Aufgabe auswählen → Schraubenschlüssel (Typ ändern) → „Sub-Process (collapsed)“. Hineinnavigieren über „⤵ Subprozess öffnen“ oder das blaue Symbol am Element; zurück über die Brotkrumen-Navigation oben links.</div>
+        <div className="muted">{t('Subprozess anlegen: Aufgabe auswählen → Schraubenschlüssel (Typ ändern) → „Sub-Process (collapsed)“. Hineinnavigieren über „⤵ Subprozess öffnen“ oder das blaue Symbol am Element; zurück über die Brotkrumen-Navigation oben links.')}</div>
       </div>
     </div>
   );

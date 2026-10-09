@@ -2,18 +2,19 @@ import { useMemo, useRef, useState, type ReactNode } from 'react';
 import type { Level, Traffic } from '../logic';
 import { useUi, type ExportFile } from '../ui';
 import { levelLabel } from '../logic';
+import { t } from '../i18n';
 
 export function LevelBadge({ level, score }: { level: Level; score?: number }) {
   return (
     <span className={`badge level-${level}`}>
-      {levelLabel[level]}
+      {t(levelLabel[level])}
       {score !== undefined && ` (${score})`}
     </span>
   );
 }
 
 export function TrafficLight({ status }: { status: Traffic }) {
-  const label = { green: 'im Ziel', yellow: 'Warnung', red: 'kritisch', none: 'keine Werte' }[status];
+  const label = t({ green: 'im Ziel', yellow: 'Warnung', red: 'kritisch', none: 'keine Werte' }[status]);
   return <span className={`dot dot-${status}`} title={label} />;
 }
 
@@ -24,7 +25,7 @@ export function Tag({ children, color, onRemove, onClick }: { children: ReactNod
         {children}
       </span>
       {onRemove && (
-        <button className="tag-x" onClick={onRemove} title="Entfernen">
+        <button className="tag-x" onClick={onRemove} title={t('Entfernen')}>
           ×
         </button>
       )}
@@ -42,7 +43,7 @@ export interface PickOption {
 export function Picker({
   options,
   exclude = [],
-  placeholder = 'Suchen und hinzufügen…',
+  placeholder = t('Suchen und hinzufügen…'),
   onPick,
   onCreate,
 }: {
@@ -107,7 +108,7 @@ export function Picker({
                 setQ('');
               }}
             >
-              + Neu anlegen: „{q.trim()}“
+              {t('+ Neu anlegen: „{name}“', { name: q.trim() })}
             </div>
           )}
         </div>
@@ -152,18 +153,18 @@ export function ExportDialog() {
     <div className="modal-backdrop" onClick={() => close(null)}>
       <div className="modal" role="dialog" aria-label="Export" onClick={(e) => e.stopPropagation()}>
         <div className="row space">
-          <h3>Export: {file.filename}</h3>
-          <button className="tag-x" onClick={() => close(null)} title="Schließen">
+          <h3>{t('Export')}: {file.filename}</h3>
+          <button className="tag-x" onClick={() => close(null)} title={t('Schließen')}>
             ×
           </button>
         </div>
-        <p className="muted small">Falls der Download in dieser Umgebung blockiert ist, den Inhalt kopieren und als Datei speichern.</p>
+        <p className="muted small">{t('Falls der Download in dieser Umgebung blockiert ist, den Inhalt kopieren und als Datei speichern.')}</p>
         <textarea id="export-content" ref={area} readOnly rows={14} value={file.content} />
         <div className="row gap">
           <button className="primary" onClick={() => saveFile(file)}>
-            Herunterladen
+            {t('Herunterladen')}
           </button>
-          <button onClick={copy}>{copied ? 'Kopiert ✓' : 'In Zwischenablage kopieren'}</button>
+          <button onClick={copy}>{copied ? t('Kopiert ✓') : t('In Zwischenablage kopieren')}</button>
         </div>
       </div>
     </div>
@@ -177,7 +178,7 @@ export function Notice() {
   return (
     <div className="notice" role="alert">
       {notice}
-      <button className="tag-x" onClick={() => setNotice(null)} title="Schließen">
+      <button className="tag-x" onClick={() => setNotice(null)} title={t('Schließen')}>
         ×
       </button>
     </div>
@@ -218,5 +219,5 @@ const statusTone: Record<string, string> = {
 };
 
 export function StatusPill({ status }: { status: string }) {
-  return <span className={`pill pill-${statusTone[status] ?? 'neutral'}`}>{status}</span>;
+  return <span className={`pill pill-${statusTone[status] ?? 'neutral'}`}>{t(status)}</span>;
 }

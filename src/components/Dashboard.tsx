@@ -4,20 +4,21 @@ import { useUi } from '../ui';
 import { modules } from '../schema';
 import { activityTypes, continuityGap, kpiStatus, personSodConflicts, parseElements, residualScore, riskLevel, today } from '../logic';
 import { Heatmap } from './Heatmap';
+import { t } from '../i18n';
 import { LevelBadge, TrafficLight } from './common';
 
 export function Dashboard() {
   const store = useStore();
   const go = useUi((s) => s.go);
   const openStep = useUi((s) => s.openStep);
-  const t = today();
+  const now = today();
 
   const risksWithoutControl = store.risk.filter((r) => !store.control.some((c) => c.mitigatesRiskIds.includes(r.id)));
   const highResidual = store.risk.filter((r) => residualScore(r) >= 10);
   const weakControls = store.control.filter((c) => c.operatingEffectiveness !== 'Wirksam');
   const overdue = [
-    ...store.risk.filter((r) => r.nextReview && r.nextReview < t).map((r) => ({ kind: 'risk' as EntityKind, e: r })),
-    ...store.control.filter((c) => c.nextTest && c.nextTest < t).map((c) => ({ kind: 'control' as EntityKind, e: c })),
+    ...store.risk.filter((r) => r.nextReview && r.nextReview < now).map((r) => ({ kind: 'risk' as EntityKind, e: r })),
+    ...store.control.filter((c) => c.nextTest && c.nextTest < now).map((c) => ({ kind: 'control' as EntityKind, e: c })),
   ];
 
   // Process coverage: activities that have a responsible (R) role.
@@ -32,11 +33,11 @@ export function Dashboard() {
 
   const roleIssues = [
     ...store.role
-      .filter((r) => r.mandatoryBy.length > 0 && !r.members.some((m) => m.function === 'Inhaber'))
-      .map((r) => ({ r, text: 'Pflichtrolle unbesetzt' })),
-    ...store.role.filter((r) => continuityGap(r)).map((r) => ({ r, text: continuityGap(r)! })),
-    ...personSodConflicts(store.role, store.user).map((c) => ({ r: c.role, text: `${c.user.title}: unvereinbar mit „${c.other.title}“` })),
-    ...store.role.filter((r) => r.nextReview && r.nextReview < t).map((r) => ({ r, text: 'Review überfällig' })),
+      .filter((r) => r.mandatory && !r.members.some((m) => m.function === 'Inhaber'))
+      .map((r) => ({ r, text: t('Pflichtrolle unbesetzt') })),
+    ...store.role.filter((r) => continuityGap(r)).map((r) => ({ r, text: t(continuityGap(r)!) })),
+    ...personSodConflicts(store.role, store.user).map((c) => ({ r: c.role, text: t('{user}: unvereinbar mit „{role}“', { user: c.user.title, role: c.other.title }) })),
+    ...store.role.filter((r) => r.nextReview && r.nextReview < now).map((r) => ({ r, text: t('Review überfällig') })),
   ];
 
   const effectiveness = ['Wirksam', 'Eingeschränkt wirksam', 'Nicht wirksam', 'Nicht geprüft'].map((v) => ({
@@ -46,34 +47,34 @@ export function Dashboard() {
 
   return (
     <div className="dashboard">
-      <h2>Cockpit</h2>
+      <h2>{t('Cockpit')}</h2>
       <div className="stat-grid wide">
         <div className="stat clickable" onClick={() => go('processes')}>
           <div className="stat-num">{store.processes.length}</div>
-          <div className="stat-label">Prozesse · {steps.length} Aktivitäten</div>
+          <div className="stat-label">{t('Prozesse · {n} Aktivitäten', { n: steps.length })}</div>
         </div>
         {(['risk', 'opportunity', 'control', 'role', 'kpi', 'user'] as EntityKind[]).map((k) => (
           <div key={k} className="stat clickable" style={{ borderColor: modules[k].color }} onClick={() => go(k)}>
             <div className="stat-num">{store[k].length}</div>
-            <div className="stat-label">{modules[k].plural}</div>
+            <div className="stat-label">{t(modules[k].plural)}</div>
           </div>
         ))}
       </div>
 
       <div className="dash-grid">
         <div className="card">
-          <h3>Risikomatrix brutto</h3>
+          <h3>{t('Risikomatrix brutto')}</h3>
           <Heatmap risks={store.risk} mode="gross" onSelect={() => go('risk')} />
         </div>
         <div className="card">
-          <h3>Risikomatrix netto</h3>
+          <h3>{t('Risikomatrix netto')}</h3>
           <Heatmap risks={store.risk} mode="net" onSelect={() => go('risk')} />
         </div>
         <div className="card">
-          <h3>IKS – operative Wirksamkeit</h3>
+          <h3>{t('IKS – operative Wirksamkeit')}</h3>
           {effectiveness.map(({ v, n }) => (
             <div key={v} className="bar-row">
-              <span className="bar-label">{v}</span>
+              <span className="bar-label">{t(v)}</span>
               <span className="bar">
                 <span
                   className={`bar-fill eff-${v.replace(/\s/g, '-')}`}
@@ -83,9 +84,9 @@ export function Dashboard() {
               <span className="bar-num">{n}</span>
             </div>
           ))}
-          <h3 style={{ marginTop: 16 }}>Rollenabdeckung der Prozessschritte</h3>
+          <h3 style={{ marginTop: 16 }}>{t('Rollenabdeckung der Prozessschritte')}</h3>
           <div className="bar-row">
-            <span className="bar-label">mit verantw. Rolle (R)</span>
+            <span className="bar-label">{t('mit verantw. Rolle (R)')}</span>
             <span className="bar">
               <span className="bar-fill eff-Wirksam" style={{ width: `${coverage}%` }} />
             </span>
@@ -93,7 +94,7 @@ export function Dashboard() {
           </div>
         </div>
         <div className="card">
-          <h3>KPI-Ampel</h3>
+          <h3>{t('KPI-Ampel')}</h3>
           {store.kpi.map((k) => {
             const last = k.measurements.at(-1);
             return (
@@ -101,7 +102,7 @@ export function Dashboard() {
                 <TrafficLight status={kpiStatus(k)} />
                 <span className="grow">{k.title}</span>
                 <span className="mono small">
-                  {last ? `${last.value} ${k.unit}` : '—'} / Ziel {k.target}
+                  {last ? `${last.value} ${k.unit}` : '—'} / {t('Ziel')} {k.target}
                 </span>
               </div>
             );
@@ -109,7 +110,7 @@ export function Dashboard() {
         </div>
       </div>
 
-      <h3>Handlungsbedarf</h3>
+      <h3>{t('Handlungsbedarf')}</h3>
       <div className="dash-grid">
         <Finding title="Risiken ohne Kontrolle" count={risksWithoutControl.length}>
           {risksWithoutControl.map((r) => (
@@ -128,7 +129,7 @@ export function Dashboard() {
         <Finding title="Controls nicht (voll) wirksam / ungeprüft" count={weakControls.length}>
           {weakControls.map((c) => (
             <div key={c.id} className="link small" onClick={() => go('control', c.id)}>
-              {c.code} {c.title} – <span className="muted">{c.operatingEffectiveness}</span>
+              {c.code} {c.title} – <span className="muted">{t(c.operatingEffectiveness)}</span>
             </div>
           ))}
         </Finding>
@@ -162,10 +163,10 @@ function Finding({ title, count, children }: { title: string; count: number; chi
   return (
     <div className={`card finding ${count ? 'has' : 'none'}`}>
       <div className="row space">
-        <strong>{title}</strong>
+        <strong>{t(title)}</strong>
         <span className="count">{count}</span>
       </div>
-      <div className="finding-list">{count ? children : <span className="ok small">✓ nichts offen</span>}</div>
+      <div className="finding-list">{count ? children : <span className="ok small">✓ {t('nichts offen')}</span>}</div>
     </div>
   );
 }
