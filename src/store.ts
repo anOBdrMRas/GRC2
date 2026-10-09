@@ -116,7 +116,6 @@ export const useStore = create<State>()(
               .filter((r) => r.id !== id)
               .map((r) => ({
                 ...r,
-                deputyRoleId: r.deputyRoleId === id ? '' : r.deputyRoleId,
                 incompatibleRoleIds: r.incompatibleRoleIds.filter((x) => x !== id),
               }));
           }

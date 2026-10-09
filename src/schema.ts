@@ -18,7 +18,7 @@ export type FieldType =
   | 'measurements'
   | 'members' // persons holding a role
   | 'readonly' // shown, not editable (e.g. generated IDs)
-  | 'roleChecks' // checkbox list of the other roles
+  | 'roleList' // repeatable dropdowns with other roles
   | 'systemRoles'; // tool system roles of a user
 
 export interface FieldDef {
@@ -248,7 +248,7 @@ export const modules: Record<EntityKind, ModuleDef> = {
           {
             key: 'incompatibleRoleIds',
             label: 'Unvereinbare Rollen (SoD)',
-            type: 'roleChecks',
+            type: 'roleList',
             wide: true,
             hint: 'ISO 27001 A.5.3 · wird bei beiden Rollen eingetragen',
           },
@@ -263,14 +263,7 @@ export const modules: Record<EntityKind, ModuleDef> = {
           { key: 'appointmentDocument', label: 'Bestellungsdokument', type: 'text', hint: 'Dokumentenname, Ablageort oder Link' },
         ],
       },
-      {
-        title: 'Kritikalität & Vertretung',
-        fields: [
-          { key: 'criticality', label: 'Kritikalität', type: 'select', options: ['Normal', 'Hoch', 'Schlüsselposition'], hint: 'ISO 27001 A.5.29 / A.5.30' },
-          { key: 'deputyRoleId', label: 'Vertretung durch Rolle', type: 'ref', refKind: 'role' },
-          { key: 'continuityNote', label: 'Vertretungsregelung / Notfallvorsorge', type: 'textarea', wide: true },
-        ],
-      },
+      { title: 'Normbezug', fields: [{ key: 'isoRefs', label: 'Normreferenzen', type: 'iso', wide: true }] },
       {
         title: 'Gültigkeit & Review',
         fields: [
@@ -280,7 +273,6 @@ export const modules: Record<EntityKind, ModuleDef> = {
           { key: 'nextReview', label: 'Nächste Überprüfung', type: 'date' },
         ],
       },
-      { title: 'Normbezug', fields: [{ key: 'isoRefs', label: 'Normreferenzen', type: 'iso', wide: true }] },
     ],
   },
   kpi: {

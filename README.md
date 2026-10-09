@@ -27,9 +27,9 @@ BPMN-2.0-Prozessmodellierung und integrierten GRC-Modulen.
     Organisationseinheit (Generic, Technology, Operation, Marketing, Sales, Finance and Admin,
     Business Enablement, Other), Pflichtrolle (ja/nein), Stelleninhaber und Stellvertretungen aus der
     Benutzerverwaltung (inkl. „eingearbeitet“), Rollenverantwortlicher, fachliche und disziplinarische
-    Berichtslinie (auch „n/a“), unvereinbare Rollen per Mehrfachauswahl (wird bei beiden Rollen eingetragen)
-    mit Funktionstrennungsprüfung auf Prozess- und Personenebene, Bestellung/Ernennung, Kritikalität und
-    Vertretungsregelung, Version/Status/Review, abgeleitete Verantwortung und druckbare Rollenbeschreibung
+    Berichtslinie (auch „n/a“), unvereinbare Rollen als beliebig erweiterbare Liste („+“, wird bei beiden Rollen eingetragen)
+    mit Funktionstrennungsprüfung auf Prozess- und Personenebene, Bestellung/Ernennung, Normbezug,
+    Version/Status/Review, abgeleitete Verantwortung und druckbare Rollenbeschreibung
   - *Benutzerverwaltung*: Benutzer mit Systemrollen (Administrator, GRC-Manager, Prozessmodellierer,
     Risikomanager, IKS-Verantwortlicher, Compliance Officer, Organisationsverantwortlicher,
     KPI-Verantwortlicher, Auditor, Leser), Berechtigungsmatrix und simulierte Anmeldung („Angemeldet als“),

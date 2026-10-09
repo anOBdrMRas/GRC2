@@ -303,6 +303,8 @@ export const en: Record<string, string> = {
   'Person aus der Benutzerverwaltung hinzufügen…': 'Add a person from user management…',
   Funktionstrennung: 'Segregation of duties',
   'Unvereinbare Rollen (SoD)': 'Incompatible roles (SoD)',
+  '— Rolle wählen —': '— choose role —',
+  'Unvereinbare Rolle hinzufügen': 'Add incompatible role',
   'ISO 27001 A.5.3 · wird bei beiden Rollen eingetragen': 'ISO 27001 A.5.3 · recorded on both roles',
   'Bestellung / Ernennung': 'Appointment',
   'Formale Bestellung erforderlich': 'Formal appointment required',

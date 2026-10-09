@@ -128,7 +128,6 @@ export function blankEntity<K extends EntityKind>(kind: K, code: string, title =
       authorities: '',
       competencies: '',
       trainings: '',
-      deputyRoleId: '',
       incompatibleRoleIds: [],
       complianceRelevant: false,
       appointmentRequired: false,
@@ -137,8 +136,6 @@ export function blankEntity<K extends EntityKind>(kind: K, code: string, title =
       appointmentDocument: '',
       reportsToFunctionalRoleId: '',
       reportsToDisciplinaryRoleId: '',
-      criticality: 'Normal',
-      continuityNote: '',
       version: '0.1',
       status: 'Entwurf',
       lastReview: '',
@@ -278,12 +275,20 @@ const orgUnitMigration: Record<string, string> = {
   Marketing: 'Marketing',
 };
 
-type LegacyRole = Partial<Role> & { holders?: string; mandatoryBy?: string[]; systemPermissions?: unknown; directAccessToManagement?: boolean };
+type LegacyRole = Partial<Role> & {
+  holders?: string;
+  mandatoryBy?: string[];
+  systemPermissions?: unknown;
+  directAccessToManagement?: boolean;
+  criticality?: string;
+  deputyRoleId?: string;
+  continuityNote?: string;
+};
 
 /** Fills fields added in later versions so older stored data keeps working. */
 export function normalizeRole(r: LegacyRole): Role {
   const base = blankEntity('role', r.code ?? '', r.title ?? '');
-  const { holders, mandatoryBy, systemPermissions: _sp, directAccessToManagement: _dam, ...rest } = r;
+  const { holders, mandatoryBy, systemPermissions: _sp, directAccessToManagement: _dam, criticality: _c, deputyRoleId: _d, continuityNote: _n, ...rest } = r;
   const merged = { ...base, ...rest, id: r.id ?? base.id } as Role;
   if (holders && !r.members) merged.description = [merged.description, `Stelleninhaber (alt): ${holders}`].filter(Boolean).join('\n');
   if (r.mandatory === undefined) merged.mandatory = (mandatoryBy?.length ?? 0) > 0;
@@ -303,13 +308,9 @@ export function roleMembers(role: Role, users: User[]) {
     .filter((m): m is typeof m & { user: User } => !!m.user);
 }
 
-/** Key positions need at least one inducted deputy (ISO 27001 A.5.29). */
+/** Named deputies should be inducted (ISO 27001 A.5.29). */
 export function continuityGap(role: Role) {
-  if (role.criticality === 'Normal') return null;
-  const deputies = role.members.filter((m) => m.function === 'Stellvertretung');
-  if (deputies.length === 0 && !role.deputyRoleId) return 'Keine Stellvertretung benannt.';
-  if (deputies.length > 0 && !deputies.some((d) => d.inducted)) return 'Stellvertretung ist nicht eingearbeitet.';
-  return null;
+  return role.members.some((m) => m.function === 'Stellvertretung' && !m.inducted) ? 'Stellvertretung ist nicht eingearbeitet.' : null;
 }
 
 export interface PersonSodConflict {

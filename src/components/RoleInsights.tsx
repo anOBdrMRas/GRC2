@@ -22,7 +22,6 @@ function useRoleDerived(role: Role) {
     kpisEvaluated: s.kpi.filter((k) => k.evaluatorRoleId === role.id),
     processesOwned: s.processes.filter((p) => p.ownerRoleId === role.id),
     reportsFrom: s.role.filter((r) => r.reportsToFunctionalRoleId === role.id || r.reportsToDisciplinaryRoleId === role.id),
-    deputyFor: s.role.filter((r) => r.deputyRoleId === role.id),
     members: roleMembers(role, s.user),
     roleById: (id: string) => s.role.find((r) => r.id === id),
     userById: (id: string) => s.user.find((u) => u.id === id),
@@ -54,7 +53,7 @@ function findings(role: Role, d: ReturnType<typeof useRoleDerived>) {
   const out: string[] = [];
   if (!d.members.some((m) => m.function === 'Inhaber')) out.push(t('Rolle ist nicht besetzt.'));
   const gap = continuityGap(role);
-  if (gap) out.push(`${t(role.criticality)}: ${t(gap)}`);
+  if (gap) out.push(t(gap));
   if (role.appointmentRequired && (!role.appointedAt || !role.appointmentDocument))
     out.push(t('Formale Bestellung erforderlich, aber Datum oder Dokument fehlt.'));
   if (role.mandatory && !role.roleOwnerUserId) out.push(t('Pflichtrolle ohne Rollenverantwortlichen.'));
@@ -160,7 +159,6 @@ export function RoleInsights({ role, part }: { role: Role; part: 'warnings' | 'd
           {list('KPI gemessen', d.kpisMeasured, 'kpi')}
           {list('KPI ausgewertet', d.kpisEvaluated, 'kpi')}
           {list('Unterstellte Rollen', d.reportsFrom, 'role')}
-          {list('Vertritt Rollen', d.deputyFor, 'role')}
         </div>
       </div>
     </div>
@@ -252,9 +250,6 @@ export function RoleProfile({ role, onClose }: { role: Role; onClose: () => void
                 ),
               )}
               {d.members.length === 0 && row('Inhaber', t('unbesetzt'))}
-              {row('Vertretung durch Rolle', role.deputyRoleId ? name(role.deputyRoleId) : '')}
-              {row('Kritikalität', t(role.criticality))}
-              {row('Vertretungsregelung', role.continuityNote)}
             </tbody>
           </table>
           <h2>5. {t('Funktionstrennung')}</h2>

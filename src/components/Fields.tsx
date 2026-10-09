@@ -138,8 +138,8 @@ function FieldInput({ def, value, onChange, entityId }: { def: FieldDef; value: 
       return <Members value={(value as RoleMember[]) ?? []} onChange={onChange} />;
     case 'readonly':
       return <div className="readonly-value mono">{(value as string) || '–'}</div>;
-    case 'roleChecks':
-      return <RoleChecks value={(value as string[]) ?? []} selfId={entityId} onChange={onChange} />;
+    case 'roleList':
+      return <RoleList value={(value as string[]) ?? []} selfId={entityId} onChange={onChange} />;
     case 'systemRoles':
       return <SystemRolePicker value={(value as string[]) ?? []} onChange={onChange} />;
   }
@@ -276,16 +276,52 @@ function SystemRolePicker({ value, onChange }: { value: string[]; onChange: (v: 
   );
 }
 
-function RoleChecks({ value, selfId, onChange }: { value: string[]; selfId?: string; onChange: (v: string[]) => void }) {
+/** Repeatable dropdown rows: "+" adds another row, each row picks one of the other roles. */
+function RoleList({ value, selfId, onChange }: { value: string[]; selfId?: string; onChange: (v: string[]) => void }) {
   const roles = useStore((s) => s.role).filter((r) => r.id !== selfId);
+  // rows added with "+" but no role chosen yet
+  const [pending, setPending] = useState(0);
+  const available = (current: string) => roles.filter((r) => r.id === current || !value.includes(r.id));
+  const options = (current: string) =>
+    available(current).map((r) => (
+      <option key={r.id} value={r.id}>
+        {r.code} {r.title}
+      </option>
+    ));
+
   return (
-    <div className="role-checks">
-      {roles.map((r) => (
-        <label key={r.id} className={`checkbox role-check ${value.includes(r.id) ? 'on' : ''}`}>
-          <input type="checkbox" checked={value.includes(r.id)} onChange={(e) => onChange(e.target.checked ? [...value, r.id] : value.filter((x) => x !== r.id))} />
-          <span className="mono">{r.code}</span> {r.title}
-        </label>
+    <div className="role-list">
+      {value.map((id, i) => (
+        <div className="role-row" key={id}>
+          <select value={id} onChange={(e) => onChange(value.map((x, j) => (j === i ? e.target.value : x)))}>
+            {options(id)}
+          </select>
+          <button type="button" className="tag-x" title={t('Entfernen')} onClick={() => onChange(value.filter((_, j) => j !== i))}>
+            ×
+          </button>
+        </div>
       ))}
+      {Array.from({ length: pending }, (_, i) => (
+        <div className="role-row" key={`pending-${i}`}>
+          <select
+            value=""
+            onChange={(e) => {
+              if (!e.target.value) return;
+              setPending((n) => n - 1);
+              onChange([...value, e.target.value]);
+            }}
+          >
+            <option value="">{t('— Rolle wählen —')}</option>
+            {options('')}
+          </select>
+          <button type="button" className="tag-x" title={t('Entfernen')} onClick={() => setPending((n) => n - 1)}>
+            ×
+          </button>
+        </div>
+      ))}
+      <button type="button" className="add-row" disabled={value.length + pending >= roles.length} onClick={() => setPending((n) => n + 1)}>
+        + {t('Unvereinbare Rolle hinzufügen')}
+      </button>
     </div>
   );
 }

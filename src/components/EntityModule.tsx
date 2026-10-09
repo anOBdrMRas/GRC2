@@ -3,7 +3,7 @@ import type { AnyEntity, Control, EntityKind, Kpi, Opportunity, Risk, Role, User
 import { modules } from '../schema';
 import { useStore } from '../store';
 import { useUi } from '../ui';
-import { continuityGap, findUsages, roleMembers, kpiStatus, residualScore, riskLevel, riskScore } from '../logic';
+import { findUsages, roleMembers, kpiStatus, residualScore, riskLevel, riskScore } from '../logic';
 import { Field } from './Fields';
 import { ConfirmButton, Empty, LevelBadge, StatusPill, Tag, TrafficLight } from './common';
 import { useRights } from '../useRights';
@@ -87,19 +87,6 @@ function useColumns(kind: EntityKind): Column[] {
               .filter((m) => m.function === 'Inhaber')
               .map((m) => m.user.title)
               .join(', ') || <span className="warn">{t('unbesetzt')}</span>,
-        },
-        {
-          label: 'Kritikalität',
-          render: (e) => {
-            const r = e as Role;
-            const gap = continuityGap(r);
-            return (
-              <span className={gap ? 'warn' : undefined} title={gap ? t(gap) : undefined}>
-                {t(r.criticality)}
-                {gap && ' ⚠'}
-              </span>
-            );
-          },
         },
         { label: 'Pflicht', render: (e) => ((e as Role).mandatory ? '●' : '') },
         { label: 'Status', render: (e) => <StatusPill status={(e as Role).status} /> },
@@ -271,7 +258,7 @@ export function EntityModule({ kind }: { kind: EntityKind }) {
         </div>
       </div>
       <div className="module-detail">
-        {selected ? <EntityEditor kind={kind} entity={selected} /> : <Empty>{t('Eintrag auswählen oder neu anlegen.')}</Empty>}
+        {selected ? <EntityEditor key={selected.id} kind={kind} entity={selected} /> : <Empty>{t('Eintrag auswählen oder neu anlegen.')}</Empty>}
       </div>
     </div>
   );

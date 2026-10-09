@@ -98,7 +98,6 @@ export interface Role extends BaseEntity {
   authorities: string;
   competencies: string;
   trainings: string;
-  deputyRoleId: string;
   incompatibleRoleIds: string[];
   complianceRelevant: boolean;
   // appointment (ISO 37301 5.3.2, ISO 27001 5.3)
@@ -109,9 +108,6 @@ export interface Role extends BaseEntity {
   // reporting lines (role id, '' = not set, 'n/a' = not applicable)
   reportsToFunctionalRoleId: string;
   reportsToDisciplinaryRoleId: string;
-  // criticality & continuity (ISO 27001 A.5.29 / A.5.30)
-  criticality: 'Normal' | 'Hoch' | 'Schlüsselposition';
-  continuityNote: string;
   // validity & review
   version: string;
   status: string;

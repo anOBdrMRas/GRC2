@@ -63,10 +63,7 @@ export function seedData() {
       roleOwnerUserId: 'U-002',
       reportsToFunctionalRoleId: 'RO-004',
       reportsToDisciplinaryRoleId: 'RO-004',
-      deputyRoleId: 'RO-004',
       complianceRelevant: true,
-      criticality: 'Hoch',
-      continuityNote: 'Vertretung wechselseitig im Team; bei Ausfall beider Einkäufer übernimmt die Leitung Einkauf.',
       incompatibleRoleIds: ['RO-002', 'RO-005'],
       isoRefs: ['9001:5.3', '37301:5.3', '27001:A.5.3'],
     }),
@@ -80,8 +77,6 @@ export function seedData() {
       roleOwnerUserId: 'U-010',
       reportsToFunctionalRoleId: 'RO-010',
       reportsToDisciplinaryRoleId: 'RO-010',
-      criticality: 'Schlüsselposition',
-      continuityNote: 'M. Huber ist als Vertretung eingearbeitet und hat Freigaberechte bis 50 TEUR.',
       isoRefs: ['9001:5.3', '9001:8.4'],
     }),
     make('role', 'RO-005', 'Kreditorenbuchhaltung', {
@@ -110,8 +105,6 @@ export function seedData() {
       appointmentDocument: 'Bestellungsschreiben CO 2020-07 (DMS: COMP-ORG-001)',
       reportsToFunctionalRoleId: 'RO-010',
       reportsToDisciplinaryRoleId: 'RO-010',
-      criticality: 'Schlüsselposition',
-      continuityNote: 'Externe Kanzlei als Vertretung beauftragt (Rahmenvertrag).',
       isoRefs: ['37301:5.3', '37301:5.1'],
     }),
     make('role', 'RO-007', 'Informationssicherheitsbeauftragter (ISB)', {
@@ -129,7 +122,6 @@ export function seedData() {
       appointmentDocument: 'Bestellung ISB (DMS: ISMS-ORG-002)',
       reportsToFunctionalRoleId: 'RO-010',
       reportsToDisciplinaryRoleId: 'RO-010',
-      criticality: 'Schlüsselposition',
       incompatibleRoleIds: ['RO-009'],
       isoRefs: ['27001:5.3', '27001:A.5.2'],
     }),
@@ -148,7 +140,6 @@ export function seedData() {
       members: [holder('U-001', '2015-10-01')],
       roleOwnerUserId: 'U-008',
       complianceRelevant: true,
-      criticality: 'Hoch',
       isoRefs: ['27001:A.8.2'],
     }),
     make('role', 'RO-010', 'Geschäftsführung', {
@@ -160,7 +151,6 @@ export function seedData() {
       reportsToDisciplinaryRoleId: 'n/a',
       responsibilities: 'Oberste Leitung: Verantwortung für die Managementsysteme, Politik, Ressourcen, Managementbewertung.',
       members: [holder('U-010', '2014-01-01')],
-      criticality: 'Schlüsselposition',
       isoRefs: ['9001:5.1', '27001:5.1', '37301:5.1'],
     }),
     make('role', 'RO-011', 'Qualitätsmanagementbeauftragter (QMB)', {
@@ -208,7 +198,6 @@ export function seedData() {
       appointmentDocument: 'Benennung gegenüber BAFA (DMS: EXP-ORG-001)',
       reportsToFunctionalRoleId: 'n/a',
       reportsToDisciplinaryRoleId: 'n/a',
-      criticality: 'Hoch',
       isoRefs: ['37301:4.5'],
     }),
     make('role', 'RO-014', 'Compliance-Komitee', {
