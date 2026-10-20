@@ -24,8 +24,8 @@ BPMN-2.0-Prozessmodellierung und integrierten GRC-Modulen.
     Nachweis, adressierte Risiken, Statement of Applicability (alle 93 Annex-A-Controls),
     Design- und operative Wirksamkeit, Prüfmethode, Prüftermine
   - *Rollen*: automatisch vergebene ID, Rollentyp, Organisationseinheit, Pflichtrolle, Rollenverantwortlicher,
-    Verantwortung & Kompetenz, zugeordnete Stellen und Personen (abgeleitet aus dem Stellenmodul) plus direkt
-    zugeordnete Ausnahmen (z. B. Beauftragte, Externe, Stellvertretungen), unvereinbare Rollen („+“-Liste,
+    Verantwortung & Kompetenz, zugeordnete Stellen und Personen (abgeleitet aus dem Stellenmodul),
+    unvereinbare Rollen („+“-Liste,
     wird bei beiden Rollen eingetragen) mit Funktionstrennungsprüfung auf Prozess-, Stellen- und Personenebene,
     Bestellung/Ernennung, Normbezug, Version/Status/Review, abgeleitete Verantwortung, druckbare Rollenbeschreibung
   - *Stellen*: Stellenbeschreibung (Zweck, Aufgaben, Befugnisse), Anforderungen (Qualifikation, Erfahrung,

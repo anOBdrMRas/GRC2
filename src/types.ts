@@ -77,22 +77,12 @@ export interface Control extends BaseEntity {
 
 export type RoleType = 'Führungsrolle' | 'Fachrolle' | 'Gremium' | 'Beauftragter';
 
-/** A person holding a role (as holder or deputy). */
-export interface RoleMember {
-  userId: string;
-  function: 'Inhaber' | 'Stellvertretung';
-  since: string;
-  /** deputy has been trained / inducted (ISO 27001 A.5.29) */
-  inducted: boolean;
-}
-
 /** ISO 9001 5.3 / 7.2 · ISO/IEC 27001 5.2 / 5.3 (A) · ISO 37301 5.3 */
 export interface Role extends BaseEntity {
   roleType: RoleType;
   /** required by a standard, law or regulation (e.g. ISB, DPO, export control officer) */
   mandatory: boolean;
   orgUnit: string;
-  members: RoleMember[];
   roleOwnerUserId: string;
   responsibilities: string;
   authorities: string;

@@ -107,7 +107,6 @@ export const useStore = create<State>()(
               user: s.user.filter((u) => u.id !== id),
               role: s.role.map((r) => ({
                 ...r,
-                members: r.members.filter((m) => m.userId !== id),
                 roleOwnerUserId: r.roleOwnerUserId === id ? '' : r.roleOwnerUserId,
                 appointedByUserId: r.appointedByUserId === id ? '' : r.appointedByUserId,
               })),

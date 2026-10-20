@@ -122,7 +122,6 @@ export function blankEntity<K extends EntityKind>(kind: K, code: string, title =
       roleType: 'Fachrolle',
       mandatory: false,
       orgUnit: 'Generic',
-      members: [],
       roleOwnerUserId: '',
       responsibilities: '',
       authorities: '',
@@ -331,6 +330,7 @@ const orgUnitMigration: Record<string, string> = {
 };
 
 type LegacyRole = Partial<Role> & {
+  members?: unknown;
   holders?: string;
   mandatoryBy?: string[];
   systemPermissions?: unknown;
@@ -355,10 +355,11 @@ export function normalizeRole(r: LegacyRole): Role {
     continuityNote: _n,
     reportsToFunctionalRoleId: _rf,
     reportsToDisciplinaryRoleId: _rd,
+    members: _m,
     ...rest
   } = r;
   const merged = { ...base, ...rest, id: r.id ?? base.id } as Role;
-  if (holders && !r.members) merged.description = [merged.description, `Stelleninhaber (alt): ${holders}`].filter(Boolean).join('\n');
+  if (holders) merged.description = [merged.description, `Stelleninhaber (alt): ${holders}`].filter(Boolean).join('\n');
   if (r.mandatory === undefined) merged.mandatory = (mandatoryBy?.length ?? 0) > 0;
   if (!orgUnits.includes(merged.orgUnit)) merged.orgUnit = merged.orgUnit ? (orgUnitMigration[merged.orgUnit] ?? 'Other') : 'Generic';
   return merged;
@@ -385,45 +386,24 @@ export interface OrgData {
 
 export interface RoleHolder {
   user: User;
-  function: 'Inhaber' | 'Stellvertretung';
-  /** 'Stelle' = via the person's position, 'direkt' = assigned to the role directly */
-  via: 'Stelle' | 'direkt';
-  position?: Position;
+  position: Position;
   since: string;
-  inducted: boolean;
 }
 
-/**
- * Persons holding a role: holders of every position the role is assigned to, plus persons assigned
- * directly (exceptions such as appointed officers, external parties or deputies).
- */
+/** Persons holding a role: the holders of every position the role is assigned to. */
 export function roleHolders(role: Role, org: Pick<OrgData, 'position' | 'user'>): RoleHolder[] {
-  const out: RoleHolder[] = [];
-  for (const pos of org.position.filter((p) => p.roles.some((r) => r.roleId === role.id))) {
-    for (const user of org.user.filter((u) => u.positionId === pos.id)) {
-      out.push({ user, function: 'Inhaber', via: 'Stelle', position: pos, since: user.positionSince, inducted: true });
-    }
-  }
-  for (const m of role.members) {
-    if (out.some((h) => h.user.id === m.userId)) continue;
-    const user = org.user.find((u) => u.id === m.userId);
-    if (user) out.push({ user, function: m.function, via: 'direkt', since: m.since, inducted: m.inducted });
-  }
-  return out;
+  return org.position
+    .filter((p) => p.roles.some((r) => r.roleId === role.id))
+    .flatMap((position) => org.user.filter((u) => u.positionId === position.id).map((user) => ({ user, position, since: user.positionSince })));
 }
 
-/** Roles a person holds (via position or directly). */
+/** Roles a person holds via their position. */
 export function rolesOfUser(userId: string, org: OrgData) {
   return org.role.flatMap((role) => roleHolders(role, org).filter((h) => h.user.id === userId).map((h) => ({ role, holder: h })));
 }
 
 export function positionHolders(position: Position, users: User[]) {
   return users.filter((u) => u.positionId === position.id);
-}
-
-/** Named deputies should be inducted (ISO 27001 A.5.29). */
-export function continuityGap(role: Role) {
-  return role.members.some((m) => m.function === 'Stellvertretung' && !m.inducted) ? 'Stellvertretung ist nicht eingearbeitet.' : null;
 }
 
 export interface PersonSodConflict {

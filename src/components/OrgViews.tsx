@@ -3,7 +3,7 @@ import type { Position, PositionRole, Role } from '../types';
 import { useStore } from '../store';
 import { useUi } from '../ui';
 import { modules } from '../schema';
-import { findUsages, orgUnits, positionHolders, positionSodConflicts, roleHolders, subordinatePositions, today } from '../logic';
+import { findUsages, orgUnits, positionHolders, positionSodConflicts, subordinatePositions, today } from '../logic';
 import { isoLabel } from '../iso';
 import { t } from '../i18n';
 import { Empty, Picker, StatusPill, Tag, download } from './common';
@@ -139,7 +139,6 @@ export function RoleRelations({ roleId }: { roleId: string }) {
   const r = role.find((x) => x.id === roleId);
   if (!r) return null;
   const withRole = position.filter((p) => p.roles.some((pr) => pr.roleId === roleId));
-  const direct = roleHolders(r, { position, user }).filter((h) => h.via === 'direkt');
   return (
     <div>
       {withRole.length === 0 && <div className="muted small">{t('Keiner Stelle zugeordnet.')}</div>}
@@ -170,11 +169,6 @@ export function RoleRelations({ roleId }: { roleId: string }) {
             ))}
           </tbody>
         </table>
-      )}
-      {direct.length > 0 && (
-        <div className="small muted" style={{ marginTop: 4 }}>
-          {t('Zusätzlich direkt zugeordnet')}: {direct.map((h) => `${h.user.title} (${t(h.function)})`).join(', ')}
-        </div>
       )}
     </div>
   );

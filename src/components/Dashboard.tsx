@@ -2,7 +2,7 @@ import type { EntityKind } from '../types';
 import { useStore } from '../store';
 import { useUi } from '../ui';
 import { modules } from '../schema';
-import { activityTypes, allFindings, auditDate, continuityGap, isOpenFinding, isOverdueFinding, kpiStatus, parseElements, personSodConflicts, positionHolders, positionSodConflicts, residualScore, riskLevel, roleHolders, today } from '../logic';
+import { activityTypes, allFindings, auditDate, isOpenFinding, isOverdueFinding, kpiStatus, parseElements, personSodConflicts, positionHolders, positionSodConflicts, residualScore, riskLevel, roleHolders, today } from '../logic';
 import { Heatmap } from './Heatmap';
 import { FindingLine, auditTypeColor } from './AuditViews';
 import { findingTypes } from '../schema';
@@ -35,9 +35,8 @@ export function Dashboard() {
 
   const roleIssues = [
     ...store.role
-      .filter((r) => r.mandatory && !roleHolders(r, store).some((m) => m.function === 'Inhaber'))
+      .filter((r) => r.mandatory && roleHolders(r, store).length === 0)
       .map((r) => ({ r, text: t('Pflichtrolle unbesetzt') })),
-    ...store.role.filter((r) => continuityGap(r)).map((r) => ({ r, text: t(continuityGap(r)!) })),
     ...personSodConflicts(store).map((c) => ({ r: c.role, text: t('{user}: unvereinbar mit „{role}“', { user: c.user.title, role: c.other.title }) })),
     ...store.role.filter((r) => r.nextReview && r.nextReview < now).map((r) => ({ r, text: t('Review überfällig') })),
   ];

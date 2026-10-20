@@ -22,11 +22,9 @@ export function seedData() {
     make('user', 'U-011', 'Claudia Hoffmann', { email: 'c.hoffmann@example.com', department: 'Vertrieb', jobTitle: 'Bereichsleiterin Vertrieb', systemRoles: ['reader'], positionId: 'ST-010', positionSince: '2021-04-01' }),
     make('user', 'U-012', 'Ralf Krüger', { email: 'r.krueger@example.com', department: 'Interne Revision', jobTitle: 'Interner Revisor', systemRoles: ['auditor'], positionId: 'ST-011', positionSince: '2020-01-01' }),
     make('user', 'U-013', 'Miriam Lang', { email: 'm.lang@example.com', department: 'Qualitätsmanagement', jobTitle: 'Qualitätsmanagerin', systemRoles: ['grc-manager'], positionId: 'ST-012', positionSince: '2021-01-01' }),
-    make('user', 'U-014', 'Extern: Datenschutz GmbH', { email: 'dsb@datenschutz-gmbh.example', department: 'extern', jobTitle: 'Externer DSB', systemRoles: ['reader'], validUntil: '2027-12-31' }),
+    make('user', 'U-014', 'Extern: Datenschutz GmbH', { email: 'dsb@datenschutz-gmbh.example', department: 'extern', jobTitle: 'Externer DSB', systemRoles: ['reader'], validUntil: '2027-12-31', positionId: 'ST-013', positionSince: '2024-01-01' }),
   ];
 
-  const holder = (userId: string, since: string) => ({ userId, function: 'Inhaber' as const, since, inducted: true });
-  const deputy = (userId: string, since: string, inducted: boolean) => ({ userId, function: 'Stellvertretung' as const, since, inducted });
   const reviewed = { version: '1.0', status: 'Freigegeben', lastReview: '2026-01-15', nextReview: '2027-01-15' };
 
   const role: Role[] = [
@@ -55,7 +53,6 @@ export function seedData() {
       authorities: 'Bestellungen im genehmigten Rahmen',
       competencies: 'Vertragsrecht, Verhandlungsführung',
       trainings: 'Anti-Korruption (jährlich), IS-Awareness',
-      members: [deputy('U-006', '2025-02-01', false)],
       roleOwnerUserId: 'U-002',
       complianceRelevant: true,
       incompatibleRoleIds: ['RO-002', 'RO-005'],
@@ -67,7 +64,6 @@ export function seedData() {
       orgUnit: 'Operation',
       responsibilities: 'Prozessverantwortung Beschaffung, Lieferantenmanagement.',
       authorities: 'Vergabeentscheidungen > 25.000 EUR',
-      members: [deputy('U-003', '2020-01-01', true)],
       roleOwnerUserId: 'U-010',
       isoRefs: ['9001:5.3', '9001:8.4'],
     }),
@@ -100,7 +96,6 @@ export function seedData() {
       mandatory: true,
       orgUnit: 'Technology',
       responsibilities: 'Steuert das ISMS, bewertet IS-Risiken, berichtet an die Geschäftsleitung.',
-      members: [deputy('U-001', '2023-01-01', true)],
       roleOwnerUserId: 'U-010',
       complianceRelevant: true,
       appointmentRequired: true,
@@ -153,7 +148,6 @@ export function seedData() {
       mandatory: true,
       orgUnit: 'Other',
       responsibilities: 'Aufgaben nach Art. 39 DSGVO; Beratung und Überwachung der Einhaltung des Datenschutzes.',
-      members: [holder('U-014', '2024-01-01')],
       roleOwnerUserId: 'U-007',
       appointmentRequired: true,
       appointedByUserId: 'U-010',
@@ -166,7 +160,6 @@ export function seedData() {
       orgUnit: 'Business Enablement',
       description: 'Pflichtrolle nach Außenwirtschaftsrecht (Mitglied der Geschäftsleitung, gegenüber dem BAFA benannt).',
       responsibilities: 'Verantwortet die Einhaltung des Exportkontrollrechts (AWG/AWV, EU-Dual-Use-VO), Sanktionslistenprüfung.',
-      members: [deputy('U-007', '2021-03-01', true)],
       roleOwnerUserId: 'U-007',
       appointmentRequired: true,
       appointedAt: '2019-01-01',
@@ -304,7 +297,7 @@ export function seedData() {
       screeningRequired: true,
       reportsToDisciplinaryId: 'ST-001',
       reportsToFunctionalId: 'ST-007',
-      roles: [pr('RO-009')],
+      roles: [pr('RO-009'), pr('RO-007', 'Stellvertretung des ISB')],
     }),
     make('position', 'ST-009', 'Leitung Wareneingang', {
       ...reviewed,
@@ -345,6 +338,18 @@ export function seedData() {
       reportsToDisciplinaryId: 'ST-001',
       reportsToFunctionalId: 'ST-001',
       roles: [pr('RO-011', 'Bestellung durch GF'), pr('RO-014', 'Mitglied')],
+    }),
+    make('position', 'ST-013', 'Datenschutzbeauftragte/r (extern)', {
+      version: '0.9',
+      status: 'In Prüfung',
+      nextReview: '2026-11-30',
+      orgUnit: 'Other',
+      purpose: 'Externe Wahrnehmung der Aufgaben nach Art. 39 DSGVO (Dienstleistungsvertrag).',
+      tasks: 'Beratung und Überwachung der Einhaltung des Datenschutzes, Schulungen, Ansprechpartner der Aufsichtsbehörde.',
+      reportsToDisciplinaryId: 'n/a',
+      reportsToFunctionalId: 'ST-001',
+      roles: [pr('RO-012', 'externer Dienstleister, Vertrag bis 12/2027')],
+      isoRefs: ['27001:A.5.34'],
     }),
   ];
 

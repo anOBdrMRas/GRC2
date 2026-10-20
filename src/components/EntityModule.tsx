@@ -86,7 +86,6 @@ function useColumns(kind: EntityKind): Column[] {
           label: 'Inhaber',
           render: (e) =>
             roleHolders(e as Role, org)
-              .filter((m) => m.function === 'Inhaber')
               .map((m) => m.user.title)
               .join(', ') || <span className="warn">{t('unbesetzt')}</span>,
         },

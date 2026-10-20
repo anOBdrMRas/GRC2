@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import type { FieldDef } from '../schema';
 import { modules } from '../schema';
-import type { AnyEntity, AuditFinding, Measurement, PositionRole, RoleMember } from '../types';
+import type { AnyEntity, AuditFinding, Measurement, PositionRole } from '../types';
 import { PositionHolders, PositionRoles, RoleRelations } from './OrgViews';
 import { FindingsEditor, ProcessRefs } from './AuditViews';
 import { systemRoleConflicts, systemRoles } from '../permissions';
@@ -136,8 +136,6 @@ function FieldInput({ def, value, onChange, entityId }: { def: FieldDef; value: 
     }
     case 'measurements':
       return <Measurements value={(value as Measurement[]) ?? []} onChange={onChange} />;
-    case 'members':
-      return <Members value={(value as RoleMember[]) ?? []} onChange={onChange} />;
     case 'readonly':
       return <div className="readonly-value mono">{(value as string) || '–'}</div>;
     case 'positionRoles':
@@ -199,67 +197,6 @@ function Measurements({ value, onChange }: { value: Measurement[]; onChange: (v:
           {t('Messwert erfassen')}
         </button>
       </div>
-    </div>
-  );
-}
-
-function Members({ value, onChange }: { value: RoleMember[]; onChange: (v: RoleMember[]) => void }) {
-  const users = useStore((s) => s.user);
-  const go = useUi((s) => s.go);
-  const set = (i: number, patch: Partial<RoleMember>) => onChange(value.map((m, j) => (j === i ? { ...m, ...patch } : m)));
-  return (
-    <div>
-      {value.length > 0 && (
-        <table className="mini wide-table">
-          <thead>
-            <tr>
-              <th>{t('Person')}</th>
-              <th>{t('Funktion')}</th>
-              <th>{t('seit')}</th>
-              <th title={t('Stellvertretung ist eingearbeitet (ISO 27001 A.5.29)')}>{t('eingearbeitet')}</th>
-              <th />
-            </tr>
-          </thead>
-          <tbody>
-            {value.map((m, i) => {
-              const u = users.find((x) => x.id === m.userId);
-              return (
-                <tr key={m.userId + m.function}>
-                  <td>
-                    <span className="link" onClick={() => go('user', m.userId)}>
-                      {u?.title ?? m.userId}
-                    </span>
-                    {u && u.status !== 'Aktiv' && <span className="warn small"> ({t(u.status)})</span>}
-                  </td>
-                  <td>
-                    <select value={m.function} onChange={(e) => set(i, { function: e.target.value as RoleMember['function'] })}>
-                      <option value="Inhaber">{t('Inhaber')}</option>
-                      <option value="Stellvertretung">{t('Stellvertretung')}</option>
-                    </select>
-                  </td>
-                  <td>
-                    <input type="date" value={m.since} onChange={(e) => set(i, { since: e.target.value })} />
-                  </td>
-                  <td>
-                    <input type="checkbox" checked={m.inducted} onChange={(e) => set(i, { inducted: e.target.checked })} />
-                  </td>
-                  <td>
-                    <button type="button" className="tag-x" title={t('Entfernen')} onClick={() => onChange(value.filter((_, j) => j !== i))}>
-                      ×
-                    </button>
-                  </td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
-      )}
-      <Picker
-        options={users.map((u) => ({ id: u.id, label: u.title, sub: [u.jobTitle, u.department].filter(Boolean).join(' · ') }))}
-        exclude={value.map((m) => m.userId)}
-        placeholder={t('Person aus der Benutzerverwaltung hinzufügen…')}
-        onPick={(userId) => onChange([...value, { userId, function: 'Inhaber', since: today(), inducted: true }])}
-      />
     </div>
   );
 }

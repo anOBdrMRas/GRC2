@@ -3,7 +3,7 @@ import type { Role } from '../types';
 import { useStore } from '../store';
 import { useUi } from '../ui';
 import { modules } from '../schema';
-import { allFindings, continuityGap, elementNames, findUsages, isOpenFinding, personSodConflicts, residualScore, riskLevel, roleHolders, today } from '../logic';
+import { allFindings, elementNames, findUsages, isOpenFinding, personSodConflicts, residualScore, riskLevel, roleHolders, today } from '../logic';
 import { isoLabel } from '../iso';
 import { LevelBadge, StatusPill, Tag, download } from './common';
 import { FindingLine } from './AuditViews';
@@ -53,9 +53,7 @@ function useRoleDerived(role: Role) {
 
 function findings(role: Role, d: ReturnType<typeof useRoleDerived>) {
   const out: string[] = [];
-  if (!d.members.some((m) => m.function === 'Inhaber')) out.push(t('Rolle ist nicht besetzt.'));
-  const gap = continuityGap(role);
-  if (gap) out.push(t(gap));
+  if (d.members.length === 0) out.push(t('Rolle ist nicht besetzt.'));
   if (role.appointmentRequired && (!role.appointedAt || !role.appointmentDocument))
     out.push(t('Formale Bestellung erforderlich, aber Datum oder Dokument fehlt.'));
   if (role.mandatory && !role.roleOwnerUserId) out.push(t('Pflichtrolle ohne Rollenverantwortlichen.'));
@@ -253,13 +251,7 @@ export function RoleProfile({ role, onClose }: { role: Role; onClose: () => void
           <h2>4. {t('Stelleninhaber und Vertretung')}</h2>
           <table className="profile-table">
             <tbody>
-              {d.members.map((m) =>
-                row(
-                  m.function,
-                  `${m.user.title}${m.position ? ` – ${t('über Stelle')} ${m.position.title}` : ` – ${t('direkt zugeordnet')}`} (${t('seit')} ${m.since || '–'}${m.function === 'Stellvertretung' ? `, ${m.inducted ? t('eingearbeitet') : t('nicht eingearbeitet')}` : ''})`,
-                  m.user.id,
-                ),
-              )}
+              {d.members.map((m) => row('Inhaber', `${m.user.title} – ${t('über Stelle')} ${m.position.title} (${t('seit')} ${m.since || '–'})`, m.user.id))}
               {d.members.length === 0 && row('Inhaber', t('unbesetzt'))}
             </tbody>
           </table>

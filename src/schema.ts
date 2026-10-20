@@ -21,7 +21,6 @@ export type FieldType =
   | 'iso' // ISO clause references
   | 'annexA'
   | 'measurements'
-  | 'members' // persons holding a role
   | 'readonly' // shown, not editable (e.g. generated IDs)
   | 'roleList' // repeatable dropdowns with other roles
   | 'processRefs' // multiple processes
@@ -246,18 +245,6 @@ export const modules: Record<EntityKind, ModuleDef> = {
       {
         title: 'Stellen & Personen',
         fields: [{ key: 'id', label: 'Stellen mit dieser Rolle und ihre Inhaber', type: 'roleRelations', wide: true, hint: 'Pflege im Modul Stellen' }],
-      },
-      {
-        title: 'Direkt zugeordnete Personen',
-        fields: [
-          {
-            key: 'members',
-            label: 'Ausnahmen ohne Stelle',
-            type: 'members',
-            wide: true,
-            hint: 'z. B. bestellte Beauftragte, Externe, Stellvertretungen',
-          },
-        ],
       },
       {
         title: 'Funktionstrennung',

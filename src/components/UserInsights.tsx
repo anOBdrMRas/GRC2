@@ -53,7 +53,7 @@ export function UserInsights({ user }: { user: User }) {
           {memberships.length === 0 && <span className="muted small">{t('Keiner Rolle zugeordnet.')}</span>}
           {memberships.map(({ role, m }) => (
             <Tag key={role.id} color={modules.role.color} onClick={() => go('role', role.id)}>
-              {role.code} {role.title} · {m.via === 'Stelle' ? t('über Stelle') : t(m.function)}
+              {role.code} {role.title} · {t('über Stelle')} {m.position.title}
             </Tag>
           ))}
         </div>
