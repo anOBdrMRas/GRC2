@@ -1378,3 +1378,190 @@ table.program tbody tr:hover {
 .finding-line .mono {
   flex: none;
 }
+
+/* ---------- positions & org chart ---------- */
+.relation-table td {
+  vertical-align: top;
+}
+.orgchart {
+  height: 100%;
+  overflow: auto;
+}
+.tree-wrap {
+  overflow: auto;
+  padding: 8px 0 24px;
+}
+/* classic CSS org chart: connectors drawn with borders on list items */
+.tree,
+.tree ul {
+  display: flex;
+  justify-content: center;
+  padding-top: 18px;
+  position: relative;
+  margin: 0;
+  padding-left: 0;
+}
+.tree {
+  padding-top: 0;
+  min-width: max-content;
+}
+.tree li {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  position: relative;
+  padding: 18px 6px 0;
+}
+.tree > li {
+  padding-top: 0;
+}
+.tree li::before,
+.tree li::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  right: 50%;
+  width: 50%;
+  height: 18px;
+  border-top: 1px solid #adb5bd;
+}
+.tree li::after {
+  right: auto;
+  left: 50%;
+  border-left: 1px solid #adb5bd;
+}
+.tree li:only-child::before,
+.tree li:only-child::after,
+.tree > li::before,
+.tree > li::after {
+  display: none;
+}
+.tree li:only-child {
+  padding-top: 18px;
+}
+.tree > li:only-child {
+  padding-top: 0;
+}
+.tree li:only-child::after {
+  display: block;
+  border-top: none;
+  width: 0;
+}
+.tree li:first-child::before,
+.tree li:last-child::after {
+  border: 0 none;
+}
+.tree li:last-child::before {
+  border-right: 1px solid #adb5bd;
+  border-radius: 0 5px 0 0;
+}
+.tree li:first-child::after {
+  border-radius: 5px 0 0 0;
+}
+.tree ul::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 50%;
+  height: 18px;
+  border-left: 1px solid #adb5bd;
+}
+.pos-card {
+  width: 190px;
+  background: #fff;
+  border: 1px solid var(--border);
+  border-top: 4px solid;
+  border-radius: 8px;
+  padding: 7px 9px;
+  cursor: pointer;
+  text-align: left;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+}
+.pos-card:hover {
+  box-shadow: 0 3px 12px rgba(0, 0, 0, 0.12);
+}
+.pos-card.manager {
+  background: #f8f9fc;
+}
+.pos-title {
+  font-weight: 600;
+  font-size: 13px;
+  line-height: 1.25;
+}
+.pos-meta {
+  font-size: 11px;
+  color: var(--muted);
+  margin: 2px 0 4px;
+}
+.pos-holders {
+  font-size: 12px;
+}
+.pos-roles {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 3px;
+  margin-top: 5px;
+}
+.pos-role {
+  font-size: 10px;
+  background: #f3f0ff;
+  color: #5f3dc4;
+  border-radius: 4px;
+  padding: 0 4px;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.pos-warn {
+  margin-top: 4px;
+  font-size: 11px;
+  color: var(--warn);
+}
+.tree-separate {
+  margin-top: 18px;
+  padding-top: 12px;
+  border-top: 1px dashed var(--border);
+}
+.unit-columns {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 12px;
+  align-items: start;
+}
+.unit-column {
+  background: #f1f3f5;
+  border-radius: 8px;
+  border-top: 4px solid;
+  padding: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.unit-column .pos-card {
+  width: auto;
+}
+.unit-title {
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--muted);
+}
+.role-matrix th.vertical {
+  height: 150px;
+  vertical-align: bottom;
+  padding: 4px 2px;
+}
+.role-matrix th.vertical span {
+  writing-mode: vertical-rl;
+  transform: rotate(180deg);
+  white-space: nowrap;
+  font-size: 11px;
+}
+.role-matrix .matrix-cell {
+  text-align: center;
+  color: var(--accent);
+  font-weight: 700;
+}

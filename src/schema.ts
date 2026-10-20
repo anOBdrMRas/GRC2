@@ -25,6 +25,9 @@ export type FieldType =
   | 'readonly' // shown, not editable (e.g. generated IDs)
   | 'roleList' // repeatable dropdowns with other roles
   | 'processRefs' // multiple processes
+  | 'positionRoles' // roles of a position with comment
+  | 'positionHolders' // persons holding a position (stored on the user)
+  | 'roleRelations' // read-only: positions and persons holding a role
   | 'findings' // audit findings table
   | 'systemRoles'; // tool system roles of a user
 
@@ -241,15 +244,20 @@ export const modules: Record<EntityKind, ModuleDef> = {
         ],
       },
       {
-        title: 'Berichtslinien',
-        fields: [
-          { key: 'reportsToFunctionalRoleId', label: 'Berichtet fachlich an', type: 'ref', refKind: 'role', allowNA: true },
-          { key: 'reportsToDisciplinaryRoleId', label: 'Berichtet disziplinarisch an', type: 'ref', refKind: 'role', allowNA: true },
-        ],
+        title: 'Stellen & Personen',
+        fields: [{ key: 'id', label: 'Stellen mit dieser Rolle und ihre Inhaber', type: 'roleRelations', wide: true, hint: 'Pflege im Modul Stellen' }],
       },
       {
-        title: 'Zugeordnete Personen',
-        fields: [{ key: 'members', label: 'Stelleninhaber & Stellvertretungen', type: 'members', wide: true, hint: 'aus der Benutzerverwaltung' }],
+        title: 'Direkt zugeordnete Personen',
+        fields: [
+          {
+            key: 'members',
+            label: 'Ausnahmen ohne Stelle',
+            type: 'members',
+            wide: true,
+            hint: 'z. B. bestellte Beauftragte, Externe, Stellvertretungen',
+          },
+        ],
       },
       {
         title: 'Funktionstrennung',
@@ -271,6 +279,72 @@ export const modules: Record<EntityKind, ModuleDef> = {
           { key: 'appointedByUserId', label: 'Bestellt durch', type: 'ref', refKind: 'user' },
           { key: 'appointmentDocument', label: 'Bestellungsdokument', type: 'text', hint: 'Dokumentenname, Ablageort oder Link' },
         ],
+      },
+      { title: 'Normbezug', fields: [{ key: 'isoRefs', label: 'Normreferenzen', type: 'iso', wide: true }] },
+      {
+        title: 'Gültigkeit & Review',
+        fields: [
+          { key: 'version', label: 'Version', type: 'text' },
+          { key: 'status', label: 'Status', type: 'select', options: ['Entwurf', 'In Prüfung', 'Freigegeben', 'Archiviert'] },
+          { key: 'lastReview', label: 'Letzte Überprüfung', type: 'date' },
+          { key: 'nextReview', label: 'Nächste Überprüfung', type: 'date' },
+        ],
+      },
+    ],
+  },
+  position: {
+    kind: 'position',
+    label: 'Stelle',
+    plural: 'Stellen',
+    codePrefix: 'ST',
+    color: '#ae3ec9',
+    sections: [
+      {
+        ...base,
+        fields: [
+          { key: 'code', label: 'ID', type: 'readonly', hint: 'wird automatisch vergeben' },
+          ...base.fields.filter((f) => f.key !== 'code'),
+          { key: 'orgUnit', label: 'Organisationseinheit', type: 'select', options: orgUnits },
+          { key: 'isManager', label: 'Führungsstelle', type: 'bool', hint: 'mit disziplinarischer Personalverantwortung' },
+          { key: 'headcount', label: 'Planstellen (Anzahl)', type: 'number' },
+          { key: 'location', label: 'Standort', type: 'text' },
+        ],
+      },
+      {
+        title: 'Stellenbeschreibung',
+        fields: [
+          { key: 'purpose', label: 'Ziel / Zweck der Stelle', type: 'textarea', wide: true },
+          { key: 'tasks', label: 'Hauptaufgaben', type: 'textarea', wide: true, hint: 'ISO 9001 5.3' },
+          { key: 'authorities', label: 'Befugnisse / Vollmachten', type: 'textarea', wide: true, hint: 'z. B. Unterschriftsregelung' },
+        ],
+      },
+      {
+        title: 'Anforderungen & Kompetenz',
+        fields: [
+          { key: 'qualification', label: 'Ausbildung / Qualifikation', type: 'textarea', hint: 'ISO 9001 7.2' },
+          { key: 'experience', label: 'Berufserfahrung', type: 'textarea' },
+          { key: 'competencies', label: 'Fachliche & persönliche Kompetenzen', type: 'textarea', wide: true, hint: 'ISO 9001 7.2 · ISO 37301 7.2' },
+          { key: 'trainings', label: 'Pflichtschulungen / Awareness', type: 'textarea', wide: true, hint: 'ISO 27001 A.6.3 · ISO 37301 7.3' },
+          { key: 'screeningRequired', label: 'Sicherheitsüberprüfung erforderlich', type: 'bool', hint: 'ISO 27001 A.6.1 · ISO 37301 7.2.2' },
+          { key: 'ndaRequired', label: 'Vertraulichkeitsvereinbarung erforderlich', type: 'bool', hint: 'ISO 27001 A.6.6' },
+        ],
+      },
+      {
+        title: 'Hierarchie & Berichtslinien',
+        fields: [
+          { key: 'reportsToDisciplinaryId', label: 'Berichtet disziplinarisch an', type: 'ref', refKind: 'position', allowNA: true },
+          { key: 'reportsToFunctionalId', label: 'Berichtet fachlich an', type: 'ref', refKind: 'position', allowNA: true },
+          { key: 'deputyPositionId', label: 'Vertretung durch Stelle', type: 'ref', refKind: 'position' },
+          { key: 'deputyInducted', label: 'Vertretung eingearbeitet', type: 'bool', hint: 'ISO 27001 A.5.29' },
+        ],
+      },
+      {
+        title: 'Stelleninhaber',
+        fields: [{ key: 'id', label: 'Personen auf dieser Stelle', type: 'positionHolders', wide: true, hint: 'wird beim Benutzer gespeichert' }],
+      },
+      {
+        title: 'Zugeordnete Rollen',
+        fields: [{ key: 'roles', label: 'Rollen dieser Stelle mit Kommentar', type: 'positionRoles', wide: true, hint: 'Inhaber der Stelle übernehmen diese Rollen' }],
       },
       { title: 'Normbezug', fields: [{ key: 'isoRefs', label: 'Normreferenzen', type: 'iso', wide: true }] },
       {
@@ -335,6 +409,8 @@ export const modules: Record<EntityKind, ModuleDef> = {
           { key: 'status', label: 'Status', type: 'select', options: ['Aktiv', 'Inaktiv', 'Gesperrt'] },
           { key: 'department', label: 'Abteilung', type: 'text' },
           { key: 'jobTitle', label: 'Stellenbezeichnung', type: 'text' },
+          { key: 'positionId', label: 'Stelle', type: 'ref', refKind: 'position' },
+          { key: 'positionSince', label: 'Stelle seit', type: 'date' },
           { key: 'validUntil', label: 'Zugang gültig bis', type: 'date', hint: 'leer = unbefristet' },
           { key: 'description', label: 'Bemerkung', type: 'textarea', wide: true },
         ],
@@ -426,4 +502,4 @@ export const modules: Record<EntityKind, ModuleDef> = {
   },
 };
 
-export const kindOrder: EntityKind[] = ['risk', 'opportunity', 'control', 'role', 'kpi', 'audit', 'user'];
+export const kindOrder: EntityKind[] = ['risk', 'opportunity', 'control', 'role', 'position', 'kpi', 'audit', 'user'];

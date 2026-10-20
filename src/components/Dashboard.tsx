@@ -2,7 +2,7 @@ import type { EntityKind } from '../types';
 import { useStore } from '../store';
 import { useUi } from '../ui';
 import { modules } from '../schema';
-import { activityTypes, allFindings, auditDate, continuityGap, isOpenFinding, isOverdueFinding, kpiStatus, parseElements, personSodConflicts, residualScore, riskLevel, today } from '../logic';
+import { activityTypes, allFindings, auditDate, continuityGap, isOpenFinding, isOverdueFinding, kpiStatus, parseElements, personSodConflicts, positionHolders, positionSodConflicts, residualScore, riskLevel, roleHolders, today } from '../logic';
 import { Heatmap } from './Heatmap';
 import { FindingLine, auditTypeColor } from './AuditViews';
 import { findingTypes } from '../schema';
@@ -35,10 +35,10 @@ export function Dashboard() {
 
   const roleIssues = [
     ...store.role
-      .filter((r) => r.mandatory && !r.members.some((m) => m.function === 'Inhaber'))
+      .filter((r) => r.mandatory && !roleHolders(r, store).some((m) => m.function === 'Inhaber'))
       .map((r) => ({ r, text: t('Pflichtrolle unbesetzt') })),
     ...store.role.filter((r) => continuityGap(r)).map((r) => ({ r, text: t(continuityGap(r)!) })),
-    ...personSodConflicts(store.role, store.user).map((c) => ({ r: c.role, text: t('{user}: unvereinbar mit „{role}“', { user: c.user.title, role: c.other.title }) })),
+    ...personSodConflicts(store).map((c) => ({ r: c.role, text: t('{user}: unvereinbar mit „{role}“', { user: c.user.title, role: c.other.title }) })),
     ...store.role.filter((r) => r.nextReview && r.nextReview < now).map((r) => ({ r, text: t('Review überfällig') })),
   ];
 
@@ -58,6 +58,14 @@ export function Dashboard() {
       !certs.some((b) => b !== a && b.certificateValidUntil > a.certificateValidUntil && b.standards.some((s) => a.standards.includes(s))),
   );
 
+  const positionIssues = [
+    ...store.position.filter((p) => positionHolders(p, store.user).length === 0).map((p) => ({ p, text: t('Stelle ist nicht besetzt.') })),
+    ...store.position.flatMap((p) =>
+      positionSodConflicts(p, store.role).map(([a, b]) => ({ p, text: t('unvereinbare Rollen „{a}“ und „{b}“', { a: a.title, b: b.title }) })),
+    ),
+    ...store.position.filter((p) => p.deputyPositionId && !p.deputyInducted).map((p) => ({ p, text: t('Vertretung ist nicht eingearbeitet.') })),
+  ];
+
   const effectiveness = ['Wirksam', 'Eingeschränkt wirksam', 'Nicht wirksam', 'Nicht geprüft'].map((v) => ({
     v,
     n: store.control.filter((c) => c.operatingEffectiveness === v).length,
@@ -71,7 +79,7 @@ export function Dashboard() {
           <div className="stat-num">{store.processes.length}</div>
           <div className="stat-label">{t('Prozesse · {n} Aktivitäten', { n: steps.length })}</div>
         </div>
-        {(['risk', 'opportunity', 'control', 'role', 'kpi', 'audit', 'user'] as EntityKind[]).map((k) => (
+        {(['risk', 'opportunity', 'control', 'role', 'position', 'kpi', 'audit', 'user'] as EntityKind[]).map((k) => (
           <div key={k} className="stat clickable" style={{ borderColor: modules[k].color }} onClick={() => go(k)}>
             <div className="stat-num">{store[k].length}</div>
             <div className="stat-label">{t(modules[k].plural)}</div>
@@ -182,6 +190,13 @@ export function Dashboard() {
           {roleIssues.map(({ r, text }, i) => (
             <div key={i} className="link small" onClick={() => go('role', r.id)}>
               {r.code} {r.title} – <span className="muted">{text}</span>
+            </div>
+          ))}
+        </Finding>
+        <Finding title="Stellen: Besetzung, Vertretung & Funktionstrennung" count={positionIssues.length}>
+          {positionIssues.map(({ p, text }, i) => (
+            <div key={i} className="link small" onClick={() => go('position', p.id)}>
+              {p.code} {p.title} – <span className="muted">{text}</span>
             </div>
           ))}
         </Finding>

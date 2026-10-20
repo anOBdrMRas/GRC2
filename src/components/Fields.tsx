@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import type { FieldDef } from '../schema';
 import { modules } from '../schema';
-import type { AnyEntity, AuditFinding, Measurement, RoleMember } from '../types';
+import type { AnyEntity, AuditFinding, Measurement, PositionRole, RoleMember } from '../types';
+import { PositionHolders, PositionRoles, RoleRelations } from './OrgViews';
 import { FindingsEditor, ProcessRefs } from './AuditViews';
 import { systemRoleConflicts, systemRoles } from '../permissions';
 import { annexA, isoById, isoCatalog, isoLabel } from '../iso';
@@ -139,6 +140,12 @@ function FieldInput({ def, value, onChange, entityId }: { def: FieldDef; value: 
       return <Members value={(value as RoleMember[]) ?? []} onChange={onChange} />;
     case 'readonly':
       return <div className="readonly-value mono">{(value as string) || '–'}</div>;
+    case 'positionRoles':
+      return <PositionRoles value={(value as PositionRole[]) ?? []} onChange={onChange} />;
+    case 'positionHolders':
+      return <PositionHolders positionId={entityId ?? ''} />;
+    case 'roleRelations':
+      return <RoleRelations roleId={entityId ?? ''} />;
     case 'processRefs':
       return <ProcessRefs value={(value as string[]) ?? []} onChange={onChange} />;
     case 'findings':

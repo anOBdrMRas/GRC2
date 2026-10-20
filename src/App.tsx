@@ -5,6 +5,7 @@ import { modules, kindOrder } from './schema';
 import { Dashboard } from './components/Dashboard';
 import { ProcessView } from './components/ProcessView';
 import { EntityModule } from './components/EntityModule';
+import { OrgChart } from './components/OrgViews';
 import { ConfirmButton, Empty, ExportDialog, Notice, download } from './components/common';
 import { useRights } from './useRights';
 import { t, useLang } from './i18n';
@@ -13,13 +14,20 @@ import { systemRoleById, type ModuleKey } from './permissions';
 const nav: { view: View; label: string; icon: string; color?: string }[] = [
   { view: 'dashboard', label: 'Cockpit', icon: '◧' },
   { view: 'processes', label: 'Prozesse (BPMN)', icon: '⇄' },
-  ...kindOrder.map((k) => ({
-    view: k as View,
-    label: modules[k].plural,
-    icon: { risk: '⚠', opportunity: '✦', control: '✔', role: '👤', kpi: '📈', audit: '🔍', user: '⚙' }[k],
-    color: modules[k].color,
-  })),
+  ...kindOrder.flatMap((k) => {
+    const item = {
+      view: k as View,
+      label: modules[k].plural,
+      icon: { risk: '⚠', opportunity: '✦', control: '✔', role: '👤', position: '▤', kpi: '📈', audit: '🔍', user: '⚙' }[k],
+      color: modules[k].color,
+    };
+    // the org chart sits right below the positions it visualises
+    return k === 'position' ? [item, { view: 'orgchart' as View, label: 'Organigramm', icon: '⊞', color: modules.position.color }] : [item];
+  }),
 ];
+
+/** Rights module that governs a navigation entry. */
+const moduleOf = (v: View): ModuleKey => (v === 'orgchart' ? 'position' : (v as ModuleKey));
 
 export default function App() {
   const view = useUi((s) => s.view);
@@ -34,11 +42,15 @@ export default function App() {
   const isAdmin = canEdit('user');
   const lang = useLang((s) => s.lang);
   const setLang = useLang((s) => s.setLang);
-  const visibleNav = nav.filter((n) => n.view === 'dashboard' || canRead(n.view as ModuleKey));
+  const visibleNav = nav.filter((n) => n.view === 'dashboard' || canRead(moduleOf(n.view)));
 
   const exportAll = () => {
-    const { risk, opportunity, control, role, kpi, audit, user, processes } = useStore.getState();
-    download(`grc-export-${new Date().toISOString().slice(0, 10)}.json`, JSON.stringify({ risk, opportunity, control, role, kpi, audit, user, processes }, null, 2), 'application/json');
+    const { risk, opportunity, control, role, position, kpi, audit, user, processes } = useStore.getState();
+    download(
+      `grc-export-${new Date().toISOString().slice(0, 10)}.json`,
+      JSON.stringify({ risk, opportunity, control, role, position, kpi, audit, user, processes }, null, 2),
+      'application/json',
+    );
   };
 
   return (
@@ -107,7 +119,8 @@ export default function App() {
       <main className="main">
         {view === 'dashboard' && <Dashboard />}
         {view === 'processes' && canRead('processes') && <ProcessView />}
-        {view !== 'dashboard' && !canRead(view as ModuleKey) && <Empty>{t('Ihre Systemrollen erlauben keinen Zugriff auf diesen Bereich.')}</Empty>}
+        {view === 'orgchart' && canRead('position') && <OrgChart />}
+        {view !== 'dashboard' && !canRead(moduleOf(view)) && <Empty>{t('Ihre Systemrollen erlauben keinen Zugriff auf diesen Bereich.')}</Empty>}
         {kindOrder.includes(view as never) && canRead(view as ModuleKey) && <EntityModule key={view} kind={view as (typeof kindOrder)[number]} />}
       </main>
       <ExportDialog />

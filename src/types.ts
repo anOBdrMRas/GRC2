@@ -1,9 +1,9 @@
 // Domain model of the GRC prototype.
 // Metadata fields are aligned with ISO 9001:2015, ISO/IEC 27001:2022 and ISO 37301:2021.
 
-export type EntityKind = 'risk' | 'opportunity' | 'control' | 'role' | 'kpi' | 'user' | 'audit';
+export type EntityKind = 'risk' | 'opportunity' | 'control' | 'role' | 'position' | 'kpi' | 'user' | 'audit';
 /** Kinds that can be assigned to process steps. */
-export type AssignableKind = Exclude<EntityKind, 'user' | 'audit'>;
+export type AssignableKind = Exclude<EntityKind, 'user' | 'audit' | 'position'>;
 
 export interface BaseEntity {
   id: string;
@@ -105,9 +105,42 @@ export interface Role extends BaseEntity {
   appointedAt: string;
   appointedByUserId: string;
   appointmentDocument: string;
-  // reporting lines (role id, '' = not set, 'n/a' = not applicable)
-  reportsToFunctionalRoleId: string;
-  reportsToDisciplinaryRoleId: string;
+  // validity & review
+  version: string;
+  status: string;
+  lastReview: string;
+  nextReview: string;
+  isoRefs: string[];
+}
+
+/** Role held by a position, with a comment on how the position fulfils it. */
+export interface PositionRole {
+  roleId: string;
+  comment: string;
+}
+
+/** Position / job (Stelle): the organisational layer between people and roles (ISO 9001 5.3 / 7.2). */
+export interface Position extends BaseEntity {
+  orgUnit: string;
+  isManager: boolean;
+  headcount: number;
+  location: string;
+  // job description
+  purpose: string;
+  tasks: string;
+  authorities: string;
+  qualification: string;
+  experience: string;
+  competencies: string;
+  trainings: string;
+  screeningRequired: boolean;
+  ndaRequired: boolean;
+  // hierarchy (position id, '' = not set, 'n/a' = not applicable)
+  reportsToDisciplinaryId: string;
+  reportsToFunctionalId: string;
+  deputyPositionId: string;
+  deputyInducted: boolean;
+  roles: PositionRole[];
   // validity & review
   version: string;
   status: string;
@@ -124,6 +157,9 @@ export interface User extends BaseEntity {
   status: 'Aktiv' | 'Inaktiv' | 'Gesperrt';
   systemRoles: string[];
   validUntil: string;
+  /** position (Stelle) the person holds */
+  positionId: string;
+  positionSince: string;
 }
 
 export type FindingType = 'Hauptabweichung' | 'Nebenabweichung' | 'Beobachtung' | 'Verbesserungspotenzial' | 'Positive Feststellung';
@@ -244,6 +280,7 @@ export interface EntityMap {
   opportunity: Opportunity;
   control: Control;
   role: Role;
+  position: Position;
   kpi: Kpi;
   user: User;
   audit: Audit;

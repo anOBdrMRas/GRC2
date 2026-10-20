@@ -322,9 +322,9 @@ function FindingForm({ finding: f, onChange, onDelete }: { finding: AuditFinding
 // ---- warnings shown above the audit form ------------------------------------
 
 export function AuditInsights({ audit }: { audit: Audit }) {
-  const { role, user, processes } = useStore();
+  const { role, user, position, processes } = useStore();
   const now = today();
-  const conflicts = independenceConflicts(audit, role, user, processes);
+  const conflicts = independenceConflicts(audit, { role, user, position }, processes);
   const overdue = audit.findings.filter((f) => isOverdueFinding(f, now));
   const open = audit.findings.filter(isOpenFinding);
   const issues: string[] = [];

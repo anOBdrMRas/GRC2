@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import type { AssignableKind, Audit, EntityKind, EntityMap, ProcessModel, Raci, Role, StepAssignment, User } from './types';
-import { assignmentKey, blankEntity, emptyAssignment, normalizeAudit, normalizeRole, normalizeUser, now, uid } from './logic';
+import type { AssignableKind, Audit, EntityKind, EntityMap, Position, ProcessModel, Raci, Role, StepAssignment, User } from './types';
+import { assignmentKey, blankEntity, emptyAssignment, normalizeAudit, normalizePosition, normalizeRole, normalizeUser, now, uid } from './logic';
 import { modules } from './schema';
 import { seedData } from './seed';
 import { emptyDiagram } from './bpmn/templates';
@@ -86,6 +86,20 @@ export const useStore = create<State>()(
       deleteEntity: (kind, id) =>
         set((s) => {
           if (kind === 'audit') return { audit: s.audit.filter((a) => a.id !== id) };
+          if (kind === 'position') {
+            const clear = (x: string) => (x === id ? '' : x);
+            return {
+              position: s.position
+                .filter((p) => p.id !== id)
+                .map((p) => ({
+                  ...p,
+                  reportsToDisciplinaryId: clear(p.reportsToDisciplinaryId),
+                  reportsToFunctionalId: clear(p.reportsToFunctionalId),
+                  deputyPositionId: clear(p.deputyPositionId),
+                })),
+              user: s.user.map((u) => (u.positionId === id ? { ...u, positionId: '', positionSince: '' } : u)),
+            };
+          }
           const audit = scrubAudits(s.audit, kind, id);
           if (kind === 'user') {
             return {
@@ -115,6 +129,7 @@ export const useStore = create<State>()(
             patch.control = s.control.map((c) => ({ ...c, mitigatesRiskIds: c.mitigatesRiskIds.filter((x) => x !== id) }));
           }
           if (kind === 'role') {
+            patch.position = s.position.map((p) => ({ ...p, roles: p.roles.filter((r) => r.roleId !== id) }));
             patch.role = s.role
               .filter((r) => r.id !== id)
               .map((r) => ({
@@ -206,7 +221,7 @@ export const useStore = create<State>()(
     }),
     {
       name: 'grc-prototype-v1',
-      version: 3,
+      version: 4,
       // v1 had no users and free-text role holders
       migrate: (persisted) => normalizeData(persisted as Partial<State>),
     },
@@ -216,11 +231,15 @@ export const useStore = create<State>()(
 /** Brings imported or previously stored data to the current shape. */
 function normalizeData(data: Partial<State>): Partial<State> {
   const seed = seedData();
-  const users = (data.user?.length ? data.user : seed.user).map((u: Partial<User>) => normalizeUser(u));
+  const users = (data.user?.length ? data.user : seed.user).map((u: Partial<User>) =>
+    normalizeUser(!data.position && u.positionId === undefined ? { ...u, ...pick(seed.user.find((x) => x.id === u.id)) } : u),
+  );
   return {
     ...data,
     user: users,
     role: (data.role ?? []).map((r: Partial<Role>) => normalizeRole(r)),
+    // v4 added positions: older data gets the demo positions and the demo persons' assignments
+    position: (data.position ?? seed.position).map((p: Partial<Position>) => normalizePosition(p)),
     // v3 added audits: older data gets the demo audits
     audit: (data.audit ?? seed.audit).map((a: Partial<Audit>) => normalizeAudit(a)),
     currentUserId: data.currentUserId && users.some((u) => u.id === data.currentUserId) ? data.currentUserId : users[0]?.id ?? '',
@@ -257,4 +276,9 @@ function scrubAudits(audits: Audit[], kind: EntityKind | 'process', id: string):
         return a;
     }
   });
+}
+
+/** Position assignment of a demo person (used when migrating data from before positions existed). */
+function pick(u: User | undefined): Partial<User> {
+  return u ? { positionId: u.positionId, positionSince: u.positionSince } : {};
 }

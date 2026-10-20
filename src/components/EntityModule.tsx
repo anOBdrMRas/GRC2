@@ -1,9 +1,10 @@
 import { useMemo, useState, type ReactNode } from 'react';
-import type { AnyEntity, Audit, Control, EntityKind, Kpi, Opportunity, Risk, Role, User } from '../types';
+import type { AnyEntity, Audit, Control, EntityKind, Kpi, Opportunity, Position, Risk, Role, User } from '../types';
+import { PositionInsights, PositionProfile } from './OrgViews';
 import { auditTypes, modules } from '../schema';
 import { useStore } from '../store';
 import { useUi } from '../ui';
-import { allFindings, auditDate, findUsages, isOpenFinding, isOverdueFinding, roleMembers, kpiStatus, residualScore, riskLevel, riskScore } from '../logic';
+import { allFindings, auditDate, findUsages, isOpenFinding, isOverdueFinding, kpiStatus, positionHolders, residualScore, riskLevel, riskScore, roleHolders } from '../logic';
 import { Field } from './Fields';
 import { ConfirmButton, Empty, LevelBadge, StatusPill, Tag, TrafficLight } from './common';
 import { useRights } from '../useRights';
@@ -23,7 +24,7 @@ interface Column {
 
 function useColumns(kind: EntityKind): Column[] {
   const roles = useStore((s) => s.role);
-  const users = useStore((s) => s.user);
+  const org = useStore();
   const controls = useStore((s) => s.control);
   const roleName = (id: string) => roles.find((r) => r.id === id)?.title ?? '—';
 
@@ -84,7 +85,7 @@ function useColumns(kind: EntityKind): Column[] {
         {
           label: 'Inhaber',
           render: (e) =>
-            roleMembers(e as Role, users)
+            roleHolders(e as Role, org)
               .filter((m) => m.function === 'Inhaber')
               .map((m) => m.user.title)
               .join(', ') || <span className="warn">{t('unbesetzt')}</span>,
@@ -92,9 +93,30 @@ function useColumns(kind: EntityKind): Column[] {
         { label: 'Pflicht', render: (e) => ((e as Role).mandatory ? '●' : '') },
         { label: 'Status', render: (e) => <StatusPill status={(e as Role).status} /> },
       ];
+    case 'position':
+      return [
+        { label: 'Org.-Einheit', render: (e) => t((e as Position).orgUnit), sort: (e) => (e as Position).orgUnit },
+        {
+          label: 'Inhaber',
+          render: (e) => {
+            const p = e as Position;
+            const h = positionHolders(p, org.user);
+            return h.map((u) => u.title).join(', ') || <span className="warn">{t('unbesetzt')}</span>;
+          },
+        },
+        {
+          label: 'Berichtet an',
+          render: (e) => {
+            const id = (e as Position).reportsToDisciplinaryId;
+            return id === 'n/a' ? 'n/a' : (org.position.find((p) => p.id === id)?.title ?? '–');
+          },
+        },
+        { label: 'Rollen', render: (e) => (e as Position).roles.length, sort: (e) => -(e as Position).roles.length },
+        { label: 'Status', render: (e) => <StatusPill status={(e as Position).status} /> },
+      ];
     case 'user':
       return [
-        { label: 'Abteilung', render: (e) => (e as User).department, sort: (e) => (e as User).department },
+        { label: 'Stelle', render: (e) => org.position.find((p) => p.id === (e as User).positionId)?.title ?? '–', sort: (e) => (e as User).positionId },
         { label: 'Systemrollen', render: (e) => (e as User).systemRoles.map((id) => t(systemRoleById.get(id)?.name ?? id)).join(', ') },
         { label: 'Status', render: (e) => <StatusPill status={(e as User).status} /> },
       ];
@@ -352,6 +374,7 @@ function EntityEditor({ kind, entity }: { kind: EntityKind; entity: AnyEntity })
         </div>
         <div className="row gap">
           {kind === 'role' && <button onClick={() => setShowProfile(true)}>{t('Rollenbeschreibung')}</button>}
+          {kind === 'position' && <button onClick={() => setShowProfile(true)}>{t('Stellenbeschreibung')}</button>}
           {editable && (
             <ConfirmButton
               label={t('Löschen')}
@@ -365,12 +388,15 @@ function EntityEditor({ kind, entity }: { kind: EntityKind; entity: AnyEntity })
         </div>
       </div>
       {kind === 'role' && showProfile && <RoleProfile role={entity as Role} onClose={() => setShowProfile(false)} />}
+      {kind === 'position' && showProfile && <PositionProfile position={entity as Position} onClose={() => setShowProfile(false)} />}
       {kind === 'role' ? (
         <RoleInsights role={entity as Role} part="warnings" />
       ) : kind === 'user' ? (
         <UserInsights user={entity as User} />
       ) : kind === 'audit' ? (
         <AuditInsights audit={entity as Audit} />
+      ) : kind === 'position' ? (
+        <PositionInsights position={entity as Position} part="warnings" />
       ) : (
         <Insights kind={kind} entity={entity} />
       )}
@@ -387,6 +413,7 @@ function EntityEditor({ kind, entity }: { kind: EntityKind; entity: AnyEntity })
         ))}
       </fieldset>
       {kind === 'role' && <RoleInsights role={entity as Role} part="derived" />}
+      {kind === 'position' && <PositionInsights position={entity as Position} part="derived" />}
       <div className="muted small">
         {t('Angelegt')} {new Date(entity.createdAt).toLocaleString(dateLocale())} · {t('zuletzt geändert')} {new Date(entity.updatedAt).toLocaleString(dateLocale())}
       </div>

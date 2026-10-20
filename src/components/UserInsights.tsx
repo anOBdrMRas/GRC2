@@ -3,19 +3,20 @@ import { useStore } from '../store';
 import { useUi } from '../ui';
 import { modules } from '../schema';
 import { effectiveRights, moduleKeys, moduleLabels, rightLabel, systemRoleConflicts, systemRoles, userSystemRoleConflicts } from '../permissions';
-import { personSodConflicts } from '../logic';
+import { personSodConflicts, rolesOfUser } from '../logic';
 import { Tag } from './common';
 import { t } from '../i18n';
 
 export function UserInsights({ user }: { user: User }) {
-  const roles = useStore((s) => s.role);
-  const users = useStore((s) => s.user);
+  const org = useStore();
+  const roles = org.role;
   const go = useUi((s) => s.go);
-  const memberships = roles.flatMap((r) => r.members.filter((m) => m.userId === user.id).map((m) => ({ role: r, m })));
+  const memberships = rolesOfUser(user.id, org).map(({ role, holder }) => ({ role, m: holder }));
+  const position = org.position.find((p) => p.id === user.positionId);
   const owned = roles.filter((r) => r.roleOwnerUserId === user.id);
   const rights = effectiveRights(user);
   const sysConflicts = userSystemRoleConflicts(user);
-  const sod = personSodConflicts(roles, users).filter((c) => c.user.id === user.id);
+  const sod = personSodConflicts(org).filter((c) => c.user.id === user.id);
   const expired = user.validUntil && user.validUntil < new Date().toISOString().slice(0, 10);
 
   return (
@@ -37,12 +38,22 @@ export function UserInsights({ user }: { user: User }) {
         </div>
       )}
       <div className="insight">
-        <div className="insight-title">Organisatorische Rollen ({memberships.length})</div>
+        <div className="insight-title">{t('Stelle')}</div>
+        {position ? (
+          <Tag color={modules.position.color} onClick={() => go('position', position.id)}>
+            {position.code} {position.title}
+          </Tag>
+        ) : (
+          <span className="muted small">{t('Keiner Stelle zugeordnet.')}</span>
+        )}
+      </div>
+      <div className="insight">
+        <div className="insight-title">{t('Organisatorische Rollen ({n})', { n: memberships.length })}</div>
         <div className="tags">
           {memberships.length === 0 && <span className="muted small">{t('Keiner Rolle zugeordnet.')}</span>}
           {memberships.map(({ role, m }) => (
             <Tag key={role.id} color={modules.role.color} onClick={() => go('role', role.id)}>
-              {role.code} {role.title} · {t(m.function)}
+              {role.code} {role.title} · {m.via === 'Stelle' ? t('über Stelle') : t(m.function)}
             </Tag>
           ))}
         </div>

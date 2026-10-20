@@ -1,4 +1,4 @@
-import type { AnyEntity, AssignableKind, Audit, AuditFinding, EntityKind, EntityMap, Kpi, ProcessModel, Risk, Role, StepAssignment, User } from './types';
+import type { AnyEntity, AssignableKind, Audit, AuditFinding, EntityKind, EntityMap, Kpi, Position, ProcessModel, Risk, Role, StepAssignment, User } from './types';
 
 export const uid = () => Math.random().toString(36).slice(2, 10);
 export const now = () => new Date().toISOString();
@@ -134,8 +134,6 @@ export function blankEntity<K extends EntityKind>(kind: K, code: string, title =
       appointedAt: '',
       appointedByUserId: '',
       appointmentDocument: '',
-      reportsToFunctionalRoleId: '',
-      reportsToDisciplinaryRoleId: '',
       version: '0.1',
       status: 'Entwurf',
       lastReview: '',
@@ -150,6 +148,34 @@ export function blankEntity<K extends EntityKind>(kind: K, code: string, title =
       status: 'Aktiv',
       systemRoles: ['reader'],
       validUntil: '',
+      positionId: '',
+      positionSince: '',
+    },
+    position: {
+      ...common,
+      orgUnit: 'Generic',
+      isManager: false,
+      headcount: 1,
+      location: '',
+      purpose: '',
+      tasks: '',
+      authorities: '',
+      qualification: '',
+      experience: '',
+      competencies: '',
+      trainings: '',
+      screeningRequired: false,
+      ndaRequired: true,
+      reportsToDisciplinaryId: '',
+      reportsToFunctionalId: '',
+      deputyPositionId: '',
+      deputyInducted: false,
+      roles: [],
+      version: '0.1',
+      status: 'Entwurf',
+      lastReview: '',
+      nextReview: '',
+      isoRefs: ['9001:5.3', '9001:7.2'],
     },
     audit: {
       ...common,
@@ -262,7 +288,7 @@ export function elementNames(xml: string): Record<string, string> {
 /** Finds all process steps an entity is assigned to. */
 export function findUsages(processes: ProcessModel[], kind: EntityKind, id: string): Usage[] {
   const out: Usage[] = [];
-  if (kind === 'user' || kind === 'audit') return out;
+  if (kind === 'user' || kind === 'audit' || kind === 'position') return out;
   for (const p of processes) {
     const names = elementNames(p.xml);
     for (const [elementId, a] of Object.entries(p.assignments)) {
@@ -309,6 +335,8 @@ type LegacyRole = Partial<Role> & {
   mandatoryBy?: string[];
   systemPermissions?: unknown;
   directAccessToManagement?: boolean;
+  reportsToFunctionalRoleId?: string;
+  reportsToDisciplinaryRoleId?: string;
   criticality?: string;
   deputyRoleId?: string;
   continuityNote?: string;
@@ -317,7 +345,18 @@ type LegacyRole = Partial<Role> & {
 /** Fills fields added in later versions so older stored data keeps working. */
 export function normalizeRole(r: LegacyRole): Role {
   const base = blankEntity('role', r.code ?? '', r.title ?? '');
-  const { holders, mandatoryBy, systemPermissions: _sp, directAccessToManagement: _dam, criticality: _c, deputyRoleId: _d, continuityNote: _n, ...rest } = r;
+  const {
+    holders,
+    mandatoryBy,
+    systemPermissions: _sp,
+    directAccessToManagement: _dam,
+    criticality: _c,
+    deputyRoleId: _d,
+    continuityNote: _n,
+    reportsToFunctionalRoleId: _rf,
+    reportsToDisciplinaryRoleId: _rd,
+    ...rest
+  } = r;
   const merged = { ...base, ...rest, id: r.id ?? base.id } as Role;
   if (holders && !r.members) merged.description = [merged.description, `Stelleninhaber (alt): ${holders}`].filter(Boolean).join('\n');
   if (r.mandatory === undefined) merged.mandatory = (mandatoryBy?.length ?? 0) > 0;
@@ -330,11 +369,56 @@ export function normalizeUser(u: Partial<User>): User {
   return { ...base, ...u, id: u.id ?? base.id } as User;
 }
 
-/** Persons assigned to a role, resolved to users. */
-export function roleMembers(role: Role, users: User[]) {
-  return role.members
-    .map((m) => ({ ...m, user: users.find((u) => u.id === m.userId) }))
-    .filter((m): m is typeof m & { user: User } => !!m.user);
+export function normalizePosition(p: Partial<Position>): Position {
+  const base = blankEntity('position', p.code ?? '', p.title ?? '');
+  return { ...base, ...p, id: p.id ?? base.id } as Position;
+}
+
+// ---- Who holds a role --------------------------------------------------------
+
+/** Organisation data needed to resolve role holders. */
+export interface OrgData {
+  role: Role[];
+  position: Position[];
+  user: User[];
+}
+
+export interface RoleHolder {
+  user: User;
+  function: 'Inhaber' | 'Stellvertretung';
+  /** 'Stelle' = via the person's position, 'direkt' = assigned to the role directly */
+  via: 'Stelle' | 'direkt';
+  position?: Position;
+  since: string;
+  inducted: boolean;
+}
+
+/**
+ * Persons holding a role: holders of every position the role is assigned to, plus persons assigned
+ * directly (exceptions such as appointed officers, external parties or deputies).
+ */
+export function roleHolders(role: Role, org: Pick<OrgData, 'position' | 'user'>): RoleHolder[] {
+  const out: RoleHolder[] = [];
+  for (const pos of org.position.filter((p) => p.roles.some((r) => r.roleId === role.id))) {
+    for (const user of org.user.filter((u) => u.positionId === pos.id)) {
+      out.push({ user, function: 'Inhaber', via: 'Stelle', position: pos, since: user.positionSince, inducted: true });
+    }
+  }
+  for (const m of role.members) {
+    if (out.some((h) => h.user.id === m.userId)) continue;
+    const user = org.user.find((u) => u.id === m.userId);
+    if (user) out.push({ user, function: m.function, via: 'direkt', since: m.since, inducted: m.inducted });
+  }
+  return out;
+}
+
+/** Roles a person holds (via position or directly). */
+export function rolesOfUser(userId: string, org: OrgData) {
+  return org.role.flatMap((role) => roleHolders(role, org).filter((h) => h.user.id === userId).map((h) => ({ role, holder: h })));
+}
+
+export function positionHolders(position: Position, users: User[]) {
+  return users.filter((u) => u.positionId === position.id);
 }
 
 /** Named deputies should be inducted (ISO 27001 A.5.29). */
@@ -348,22 +432,37 @@ export interface PersonSodConflict {
   other: Role;
 }
 
+const incompatible = (a: Role, b: Role) => a.incompatibleRoleIds.includes(b.id) || b.incompatibleRoleIds.includes(a.id);
+
 /** Persons who hold two roles that are declared incompatible (SoD check on person level). */
-export function personSodConflicts(roles: Role[], users: User[]): PersonSodConflict[] {
+export function personSodConflicts(org: OrgData): PersonSodConflict[] {
   const out: PersonSodConflict[] = [];
-  for (const role of roles) {
-    for (const other of roles) {
+  const holders = new Map(org.role.map((r) => [r.id, roleHolders(r, org).map((h) => h.user.id)]));
+  for (const role of org.role) {
+    for (const other of org.role) {
       // each pair once, declared on either side
-      if (role.id >= other.id) continue;
-      if (!role.incompatibleRoleIds.includes(other.id) && !other.incompatibleRoleIds.includes(role.id)) continue;
-      for (const m of role.members) {
-        if (!other.members.some((o) => o.userId === m.userId)) continue;
-        const user = users.find((u) => u.id === m.userId);
+      if (role.id >= other.id || !incompatible(role, other)) continue;
+      for (const userId of holders.get(role.id)!) {
+        if (!holders.get(other.id)!.includes(userId)) continue;
+        const user = org.user.find((u) => u.id === userId);
         if (user) out.push({ user, role, other });
       }
     }
   }
   return out;
+}
+
+/** Incompatible role pairs bundled in the same position. */
+export function positionSodConflicts(position: Position, roles: Role[]) {
+  const held = position.roles.map((pr) => roles.find((r) => r.id === pr.roleId)).filter((r): r is Role => !!r);
+  const out: [Role, Role][] = [];
+  for (const a of held) for (const b of held) if (a.id < b.id && incompatible(a, b)) out.push([a, b]);
+  return out;
+}
+
+/** Positions that report to the given one (disciplinary or functional). */
+export function subordinatePositions(position: Position, positions: Position[], line: 'disciplinary' | 'functional') {
+  return positions.filter((p) => (line === 'disciplinary' ? p.reportsToDisciplinaryId : p.reportsToFunctionalId) === position.id);
 }
 
 // ---- Audits ----------------------------------------------------------------
@@ -430,13 +529,14 @@ export interface IndependenceConflict {
  * ISO 19011 4 e) / 7.2: auditors should not audit their own work.
  * Conflict if a lead auditor or team member holds a role that owns an audited process or is R/A in one of its steps.
  */
-export function independenceConflicts(audit: Audit, roles: Role[], users: User[], processes: ProcessModel[]): IndependenceConflict[] {
+export function independenceConflicts(audit: Audit, org: OrgData, processes: ProcessModel[]): IndependenceConflict[] {
+  const users = org.user;
   const out: IndependenceConflict[] = [];
   const auditors = [audit.leadAuditorUserId, ...audit.teamUserIds].filter(Boolean);
   for (const userId of new Set(auditors)) {
     const user = users.find((u) => u.id === userId);
     if (!user) continue;
-    const held = roles.filter((r) => r.members.some((m) => m.userId === userId));
+    const held = rolesOfUser(userId, org).map((x) => x.role);
     for (const p of processes.filter((x) => audit.processIds.includes(x.id))) {
       const owner = held.find((r) => r.id === p.ownerRoleId);
       if (owner) {

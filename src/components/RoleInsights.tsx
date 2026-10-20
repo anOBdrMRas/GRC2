@@ -3,7 +3,7 @@ import type { Role } from '../types';
 import { useStore } from '../store';
 import { useUi } from '../ui';
 import { modules } from '../schema';
-import { allFindings, continuityGap, elementNames, findUsages, isOpenFinding, personSodConflicts, residualScore, riskLevel, roleMembers, today } from '../logic';
+import { allFindings, continuityGap, elementNames, findUsages, isOpenFinding, personSodConflicts, residualScore, riskLevel, roleHolders, today } from '../logic';
 import { isoLabel } from '../iso';
 import { LevelBadge, StatusPill, Tag, download } from './common';
 import { FindingLine } from './AuditViews';
@@ -23,11 +23,11 @@ function useRoleDerived(role: Role) {
     kpisEvaluated: s.kpi.filter((k) => k.evaluatorRoleId === role.id),
     findings: allFindings(s.audit).filter(({ finding: f }) => f.responsibleRoleId === role.id && isOpenFinding(f)),
     processesOwned: s.processes.filter((p) => p.ownerRoleId === role.id),
-    reportsFrom: s.role.filter((r) => r.reportsToFunctionalRoleId === role.id || r.reportsToDisciplinaryRoleId === role.id),
-    members: roleMembers(role, s.user),
+    positions: s.position.filter((p) => p.roles.some((pr) => pr.roleId === role.id)),
+    members: roleHolders(role, s),
     roleById: (id: string) => s.role.find((r) => r.id === id),
     userById: (id: string) => s.user.find((u) => u.id === id),
-    personConflicts: personSodConflicts(s.role, s.user).filter((c) => c.role.id === role.id || c.other.id === role.id),
+    personConflicts: personSodConflicts(s).filter((c) => c.role.id === role.id || c.other.id === role.id),
     processConflicts: s.processes.flatMap((p) => {
       const names = elementNames(p.xml);
       const isRa = (raci: string) => raci === 'R' || raci === 'A';
@@ -160,7 +160,7 @@ export function RoleInsights({ role, part }: { role: Role; part: 'warnings' | 'd
           {list('Controls durchgeführt', d.controlsExecuted, 'control')}
           {list('KPI gemessen', d.kpisMeasured, 'kpi')}
           {list('KPI ausgewertet', d.kpisEvaluated, 'kpi')}
-          {list('Unterstellte Rollen', d.reportsFrom, 'role')}
+          {list('Stellen', d.positions, 'position')}
           <div className="derived-row">
             <span className="derived-label">{t('Offene Audit-Feststellungen')}</span>
             <span className="derived-findings">
@@ -191,9 +191,10 @@ export function RoleProfile({ role, onClose }: { role: Role; onClose: () => void
     download(`${t('Rollenbeschreibung')}_${role.code}.html`, html, 'text/html');
   };
 
-  const row = (label: string, value: ReactNode, key: string = label) => (
+  // dynamic labels (position names) are passed with translate = false
+  const row = (label: string, value: ReactNode, key: string = label, translate = true) => (
     <tr key={key}>
-      <th>{t(label)}</th>
+      <th>{translate ? t(label) : label}</th>
       <td>{value || '–'}</td>
     </tr>
   );
@@ -242,12 +243,11 @@ export function RoleProfile({ role, onClose }: { role: Role; onClose: () => void
               {row('Pflichtschulungen', role.trainings)}
             </tbody>
           </table>
-          <h2>3. {t('Berichtslinien')}</h2>
+          <h2>3. {t('Zugeordnete Stellen')}</h2>
           <table className="profile-table">
             <tbody>
-              {row('Berichtet fachlich an', role.reportsToFunctionalRoleId ? name(role.reportsToFunctionalRoleId) : '')}
-              {row('Berichtet disziplinarisch an', role.reportsToDisciplinaryRoleId ? name(role.reportsToDisciplinaryRoleId) : '')}
-              {row('Unterstellte Rollen', items(d.reportsFrom))}
+              {d.positions.map((p) => row(`${p.code} ${p.title}`, p.roles.find((pr) => pr.roleId === role.id)?.comment || '', p.id, false))}
+              {d.positions.length === 0 && row('Stellen', '')}
             </tbody>
           </table>
           <h2>4. {t('Stelleninhaber und Vertretung')}</h2>
@@ -256,8 +256,8 @@ export function RoleProfile({ role, onClose }: { role: Role; onClose: () => void
               {d.members.map((m) =>
                 row(
                   m.function,
-                  `${m.user.title}${m.user.jobTitle ? `, ${m.user.jobTitle}` : ''} (${t('seit')} ${m.since || '–'}${m.function === 'Stellvertretung' ? `, ${m.inducted ? t('eingearbeitet') : t('nicht eingearbeitet')}` : ''})`,
-                  m.userId,
+                  `${m.user.title}${m.position ? ` – ${t('über Stelle')} ${m.position.title}` : ` – ${t('direkt zugeordnet')}`} (${t('seit')} ${m.since || '–'}${m.function === 'Stellvertretung' ? `, ${m.inducted ? t('eingearbeitet') : t('nicht eingearbeitet')}` : ''})`,
+                  m.user.id,
                 ),
               )}
               {d.members.length === 0 && row('Inhaber', t('unbesetzt'))}

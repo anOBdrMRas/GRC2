@@ -1,7 +1,7 @@
 // System roles of the tool itself (not to be confused with organisational roles in the role module).
 import type { User } from './types';
 
-export type ModuleKey = 'processes' | 'risk' | 'opportunity' | 'control' | 'role' | 'kpi' | 'audit' | 'user';
+export type ModuleKey = 'processes' | 'risk' | 'opportunity' | 'control' | 'role' | 'position' | 'kpi' | 'audit' | 'user';
 export type Right = 'none' | 'read' | 'edit';
 
 export const moduleLabels: Record<ModuleKey, string> = {
@@ -10,6 +10,7 @@ export const moduleLabels: Record<ModuleKey, string> = {
   opportunity: 'Chancen',
   control: 'Controls (IKS)',
   role: 'Rollen',
+  position: 'Stellen',
   kpi: 'KPI',
   audit: 'Audits',
   user: 'Benutzerverwaltung',
@@ -30,6 +31,7 @@ const all = (r: Right, overrides: Partial<Record<ModuleKey, Right>> = {}): Recor
   opportunity: r,
   control: r,
   role: r,
+  position: r,
   kpi: r,
   audit: r,
   user: r,
@@ -76,8 +78,8 @@ export const systemRoles: SystemRole[] = [
   {
     id: 'org-manager',
     name: 'Organisationsverantwortlicher',
-    description: 'Pflegt Rollenbeschreibungen, Stelleninhaber und Berichtslinien.',
-    rights: all('read', { role: 'edit', user: 'read' }),
+    description: 'Pflegt Stellen, Stellenbeschreibungen, Berichtslinien, Rollen und Stelleninhaber.',
+    rights: all('read', { role: 'edit', position: 'edit', user: 'read' }),
   },
   {
     id: 'kpi-owner',

@@ -23,13 +23,17 @@ BPMN-2.0-Prozessmodellierung und integrierten GRC-Modulen.
   - *Controls (IKS)*: Kontrollziel, Art, Automatisierung, Frequenz, Key Control, Verantwortliche,
     Nachweis, adressierte Risiken, Statement of Applicability (alle 93 Annex-A-Controls),
     Design- und operative Wirksamkeit, Prüfmethode, Prüftermine
-  - *Rollen*: automatisch vergebene ID, Rollentyp (Führungsrolle, Fachrolle, Gremium, Beauftragter),
-    Organisationseinheit (Generic, Technology, Operation, Marketing, Sales, Finance and Admin,
-    Business Enablement, Other), Pflichtrolle (ja/nein), Stelleninhaber und Stellvertretungen aus der
-    Benutzerverwaltung (inkl. „eingearbeitet“), Rollenverantwortlicher, fachliche und disziplinarische
-    Berichtslinie (auch „n/a“), unvereinbare Rollen als beliebig erweiterbare Liste („+“, wird bei beiden Rollen eingetragen)
-    mit Funktionstrennungsprüfung auf Prozess- und Personenebene, Bestellung/Ernennung, Normbezug,
-    Version/Status/Review, abgeleitete Verantwortung und druckbare Rollenbeschreibung
+  - *Rollen*: automatisch vergebene ID, Rollentyp, Organisationseinheit, Pflichtrolle, Rollenverantwortlicher,
+    Verantwortung & Kompetenz, zugeordnete Stellen und Personen (abgeleitet aus dem Stellenmodul) plus direkt
+    zugeordnete Ausnahmen (z. B. Beauftragte, Externe, Stellvertretungen), unvereinbare Rollen („+“-Liste,
+    wird bei beiden Rollen eingetragen) mit Funktionstrennungsprüfung auf Prozess-, Stellen- und Personenebene,
+    Bestellung/Ernennung, Normbezug, Version/Status/Review, abgeleitete Verantwortung, druckbare Rollenbeschreibung
+  - *Stellen*: Stellenbeschreibung (Zweck, Aufgaben, Befugnisse), Anforderungen (Qualifikation, Erfahrung,
+    Kompetenzen, Pflichtschulungen, Sicherheitsüberprüfung, Vertraulichkeit), Hierarchie (disziplinarisch und
+    fachlich, auch „n/a“), Vertretung, Stelleninhaber (Zuweisung Person → Stelle), Rollen mit Kommentar,
+    abgeleitete Prozessbeteiligung, druckbare Stellenbeschreibung
+  - *Organigramm*: disziplinarische und fachliche Hierarchie als Baum, Funktionen nach Organisationseinheit,
+    Rollenzuordnungsmatrix Stelle × Rolle
   - *Audits* (ISO 19011, ISO 9001/27001/37301 9.2, ISO/IEC 17021-1): interne Audits, Zertifizierungs-,
     System-, Kunden- und Lieferantenaudits mit Umfang, Kriterien, Team, Terminen und Ergebnis;
     Feststellungen (Haupt-/Nebenabweichung, Beobachtung, Verbesserungspotenzial, positiv) mit Prozessschritt,
