@@ -1,6 +1,6 @@
 // Demo data so the prototype is explorable right away.
-import type { Control, EntityKind, EntityMap, Kpi, Opportunity, ProcessModel, Risk, Role, User } from './types';
-import { blankEntity, emptyAssignment, now } from './logic';
+import type { Audit, AuditFinding, Control, EntityKind, EntityMap, Kpi, Opportunity, ProcessModel, Risk, Role, User } from './types';
+import { blankEntity, blankFinding, emptyAssignment, now } from './logic';
 import { accessManagementXml, purchaseToPayXml } from './bpmn/templates';
 
 function make<K extends EntityKind>(kind: K, code: string, title: string, patch: Partial<EntityMap[K]>): EntityMap[K] {
@@ -480,6 +480,163 @@ export function seedData() {
     }),
   ];
 
+
+  const finding = (code: string, patch: Partial<AuditFinding>): AuditFinding => ({ ...blankFinding(code), id: code, ...patch });
+
+  const audit: Audit[] = [
+    make('audit', 'AU-001', 'Internes Audit Beschaffung 2026', {
+      auditType: 'Internes Audit',
+      programYear: '2026',
+      status: 'Maßnahmen offen',
+      standards: ['ISO 9001', 'ISO 37301'],
+      objective: 'Wirksamkeit des Beschaffungsprozesses inkl. Lieferantenauswahl und Vergabe (Anti-Korruption).',
+      criteria: ['9001:8.4', '37301:8.2', '37301:4.6'],
+      processIds: ['P-001'],
+      auditedRoleIds: ['RO-003', 'RO-004'],
+      sites: 'Hauptsitz',
+      leadAuditorUserId: 'U-012',
+      teamUserIds: ['U-013'],
+      auditeeContactUserId: 'U-002',
+      plannedDate: '2026-03-10',
+      startDate: '2026-03-10',
+      endDate: '2026-03-11',
+      reportDate: '2026-03-20',
+      reportDocument: 'Auditbericht IA-2026-03 (DMS: AUD-2026-003)',
+      nextAuditDue: '2027-03-15',
+      verdict: 'Konform mit Feststellungen',
+      summary: 'Prozess grundsätzlich wirksam; Vier-Augen-Prinzip bei Vergaben nicht durchgängig dokumentiert.',
+      strengths: 'Systemseitige Freigabe von Bedarfsanforderungen, automatisierter 3-Way-Match.',
+      findings: [
+        finding('F-001', {
+          type: 'Nebenabweichung',
+          clause: '37301:8.2',
+          description: 'Vier-Augen-Prinzip bei Vergaben > 25 TEUR in 2 von 25 Stichproben nicht dokumentiert.',
+          evidence: 'Stichprobe Vergabevermerke Q4/2025',
+          processId: 'P-001',
+          elementId: 'Task_Vergabe',
+          riskIds: ['R-002'],
+          controlIds: ['K-002'],
+          responsibleRoleId: 'RO-004',
+          responsibleUserId: 'U-002',
+          rootCause: 'Vergabevermerk-Vorlage ohne Pflichtfeld für die Zweitunterschrift.',
+          correctiveAction: 'Vorlage um Pflichtfeld ergänzen, Einkäufer schulen, monatliche Stichprobe durch Leitung Einkauf.',
+          dueDate: '2026-11-30',
+          status: 'Umgesetzt',
+        }),
+        finding('F-002', {
+          type: 'Verbesserungspotenzial',
+          clause: '9001:8.4',
+          description: 'Lieferantenbewertung um Kriterien zur Informationssicherheit erweitern.',
+          processId: 'P-001',
+          elementId: 'Task_LiefPruefung',
+          controlIds: ['K-004'],
+          responsibleRoleId: 'RO-007',
+          responsibleUserId: 'U-008',
+          dueDate: '2026-12-31',
+          status: 'In Bearbeitung',
+        }),
+        finding('F-003', {
+          type: 'Positive Feststellung',
+          clause: '9001:8.4',
+          description: '3-Way-Match vollständig automatisiert, keine Doppelzahlungen im Prüfzeitraum.',
+          processId: 'P-001',
+          elementId: 'Task_Rechnung',
+          controlIds: ['K-005'],
+          status: 'Geschlossen',
+        }),
+      ],
+    }),
+    make('audit', 'AU-002', 'ISO 27001 Überwachungsaudit 2026', {
+      auditType: 'Zertifizierungsaudit',
+      certStage: 'Überwachungsaudit',
+      programYear: '2026',
+      status: 'Maßnahmen offen',
+      standards: ['ISO 27001'],
+      objective: '1. Überwachungsaudit des ISMS (Geltungsbereich: Hauptsitz, IT-Betrieb, Einkauf).',
+      criteria: ['27001:9.2', '27001:A.5.15', '27001:A.5.18', '27001:A.8.2'],
+      processIds: ['P-002'],
+      externalLeadAuditor: 'Leitender Auditor der Zertifizierungsstelle',
+      externalOrg: 'Zertifizierungsstelle (akkreditiert)',
+      auditeeContactUserId: 'U-008',
+      plannedDate: '2026-06-15',
+      startDate: '2026-06-15',
+      endDate: '2026-06-17',
+      reportDate: '2026-06-30',
+      reportDocument: 'Auditbericht ÜA1 ISO 27001',
+      certificateValidUntil: '2027-03-31',
+      nextAuditDue: '2027-01-20',
+      verdict: 'Konform mit Feststellungen',
+      summary: 'Zertifikat bleibt bestehen; eine Nebenabweichung im Berechtigungsmanagement.',
+      findings: [
+        finding('F-004', {
+          type: 'Nebenabweichung',
+          clause: '27001:A.5.18',
+          description: 'Halbjährliche Rezertifizierung der Berechtigungen für Q1 nur zu 88 % abgeschlossen.',
+          evidence: 'Rezertifizierungsreport IAM, Stand 31.03.2026',
+          processId: 'P-002',
+          elementId: 'IAM_Rezert',
+          riskIds: ['R-006'],
+          controlIds: ['K-007'],
+          responsibleRoleId: 'RO-007',
+          responsibleUserId: 'U-008',
+          rootCause: 'Keine Eskalation bei überfälligen Rezertifizierungen durch Führungskräfte.',
+          correctiveAction: 'Automatische Erinnerung und Eskalation an die Bereichsleitung nach 14 Tagen.',
+          dueDate: '2026-09-30',
+          status: 'In Bearbeitung',
+        }),
+        finding('F-005', {
+          type: 'Beobachtung',
+          clause: '27001:A.8.2',
+          description: 'Privilegierte Konten werden nicht in einem separaten Verzeichnis geführt.',
+          processId: 'P-002',
+          elementId: 'IAM_Einrichten',
+          responsibleRoleId: 'RO-009',
+          responsibleUserId: 'U-001',
+          dueDate: '2027-01-15',
+          status: 'Offen',
+        }),
+      ],
+    }),
+    make('audit', 'AU-003', 'Lieferantenaudit Präzisionsteile', {
+      auditType: 'Lieferantenaudit',
+      programYear: '2026',
+      status: 'Geplant',
+      standards: ['ISO 9001', 'Lieferantenanforderung'],
+      objective: 'Qualitätsfähigkeit und Informationssicherheit eines kritischen Lieferanten für Präzisionsteile.',
+      criteria: ['9001:8.4', '9001:8.5', '27001:A.5.19'],
+      leadAuditorUserId: 'U-013',
+      teamUserIds: ['U-003'],
+      externalOrg: 'Lieferant A (Präzisionsteile)',
+      plannedDate: '2026-12-01',
+    }),
+    make('audit', 'AU-004', 'Kundenaudit Automotive', {
+      auditType: 'Kundenaudit',
+      programYear: '2026',
+      status: 'In Vorbereitung',
+      standards: ['ISO 9001', 'Kundenanforderung'],
+      objective: 'Prozessaudit des Kunden zu Beschaffung und Wareneingang.',
+      criteria: ['9001:8.4', '9001:8.6'],
+      processIds: ['P-001'],
+      externalOrg: 'Kunde B (Automotive)',
+      externalLeadAuditor: 'Lieferantenentwicklung des Kunden',
+      auditeeContactUserId: 'U-013',
+      plannedDate: '2026-11-12',
+    }),
+    make('audit', 'AU-005', 'Systemaudit Compliance-Managementsystem', {
+      auditType: 'Systemaudit',
+      programYear: '2027',
+      status: 'Geplant',
+      standards: ['ISO 37301'],
+      objective: 'Systemaudit des CMS nach ISO 37301 inkl. Compliance-Risikobeurteilung im Einkauf.',
+      criteria: ['37301:4.6', '37301:5.3', '37301:8.2', '37301:8.3'],
+      processIds: ['P-001'],
+      leadAuditorUserId: 'U-012',
+      teamUserIds: ['U-002'],
+      auditeeContactUserId: 'U-007',
+      plannedDate: '2027-02-15',
+    }),
+  ];
+
   const a = (patch: Partial<ReturnType<typeof emptyAssignment>>) => ({ ...emptyAssignment(), ...patch });
 
   const processes: ProcessModel[] = [
@@ -573,5 +730,5 @@ export function seedData() {
     },
   ];
 
-  return { user, role, risk, opportunity, control, kpi, processes, currentUserId: 'U-001' };
+  return { user, role, risk, opportunity, control, kpi, audit, processes, currentUserId: 'U-001' };
 }

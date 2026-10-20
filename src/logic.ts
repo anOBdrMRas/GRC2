@@ -1,4 +1,4 @@
-import type { AnyEntity, AssignableKind, EntityKind, EntityMap, Kpi, ProcessModel, Risk, Role, StepAssignment, User } from './types';
+import type { AnyEntity, AssignableKind, Audit, AuditFinding, EntityKind, EntityMap, Kpi, ProcessModel, Risk, Role, StepAssignment, User } from './types';
 
 export const uid = () => Math.random().toString(36).slice(2, 10);
 export const now = () => new Date().toISOString();
@@ -151,6 +151,35 @@ export function blankEntity<K extends EntityKind>(kind: K, code: string, title =
       systemRoles: ['reader'],
       validUntil: '',
     },
+    audit: {
+      ...common,
+      auditType: 'Internes Audit',
+      certStage: '',
+      programYear: today().slice(0, 4),
+      status: 'Geplant',
+      standards: [],
+      criteria: [],
+      processIds: [],
+      auditedRoleIds: [],
+      sites: '',
+      objective: '',
+      leadAuditorUserId: '',
+      externalLeadAuditor: '',
+      teamUserIds: [],
+      externalOrg: '',
+      auditeeContactUserId: '',
+      plannedDate: '',
+      startDate: '',
+      endDate: '',
+      reportDate: '',
+      reportDocument: '',
+      certificateValidUntil: '',
+      nextAuditDue: '',
+      verdict: '',
+      summary: '',
+      strengths: '',
+      findings: [],
+    },
     kpi: {
       ...common,
       objective: '',
@@ -233,7 +262,7 @@ export function elementNames(xml: string): Record<string, string> {
 /** Finds all process steps an entity is assigned to. */
 export function findUsages(processes: ProcessModel[], kind: EntityKind, id: string): Usage[] {
   const out: Usage[] = [];
-  if (kind === 'user') return out;
+  if (kind === 'user' || kind === 'audit') return out;
   for (const p of processes) {
     const names = elementNames(p.xml);
     for (const [elementId, a] of Object.entries(p.assignments)) {
@@ -335,4 +364,100 @@ export function personSodConflicts(roles: Role[], users: User[]): PersonSodConfl
     }
   }
   return out;
+}
+
+// ---- Audits ----------------------------------------------------------------
+
+export function blankFinding(code: string): AuditFinding {
+  return {
+    id: uid(),
+    code,
+    type: 'Nebenabweichung',
+    clause: '',
+    description: '',
+    evidence: '',
+    processId: '',
+    elementId: '',
+    riskIds: [],
+    controlIds: [],
+    responsibleRoleId: '',
+    responsibleUserId: '',
+    rootCause: '',
+    correctiveAction: '',
+    dueDate: '',
+    status: 'Offen',
+    verifiedAt: '',
+    verifiedByUserId: '',
+    verificationResult: '',
+  };
+}
+
+export function nextFindingCode(audits: Audit[]) {
+  const max = audits.flatMap((a) => a.findings).reduce((m, f) => Math.max(m, parseInt(f.code.replace(/\D+/g, ''), 10) || 0), 0);
+  return `F-${String(max + 1).padStart(3, '0')}`;
+}
+
+/** Positive findings need no action; everything else is open until closed. */
+export function isOpenFinding(f: AuditFinding) {
+  return f.type !== 'Positive Feststellung' && f.status !== 'Geschlossen';
+}
+
+export function isOverdueFinding(f: AuditFinding, now = today()) {
+  return isOpenFinding(f) && !!f.dueDate && f.dueDate < now;
+}
+
+export interface FindingRef {
+  audit: Audit;
+  finding: AuditFinding;
+}
+
+export function allFindings(audits: Audit[]): FindingRef[] {
+  return audits.flatMap((audit) => audit.findings.map((finding) => ({ audit, finding })));
+}
+
+/** Date that places an audit on the calendar (actual start, else planned). */
+export function auditDate(a: Audit) {
+  return a.startDate || a.plannedDate;
+}
+
+export interface IndependenceConflict {
+  user: User;
+  process: ProcessModel;
+  reason: string;
+}
+
+/**
+ * ISO 19011 4 e) / 7.2: auditors should not audit their own work.
+ * Conflict if a lead auditor or team member holds a role that owns an audited process or is R/A in one of its steps.
+ */
+export function independenceConflicts(audit: Audit, roles: Role[], users: User[], processes: ProcessModel[]): IndependenceConflict[] {
+  const out: IndependenceConflict[] = [];
+  const auditors = [audit.leadAuditorUserId, ...audit.teamUserIds].filter(Boolean);
+  for (const userId of new Set(auditors)) {
+    const user = users.find((u) => u.id === userId);
+    if (!user) continue;
+    const held = roles.filter((r) => r.members.some((m) => m.userId === userId));
+    for (const p of processes.filter((x) => audit.processIds.includes(x.id))) {
+      const owner = held.find((r) => r.id === p.ownerRoleId);
+      if (owner) {
+        out.push({ user, process: p, reason: owner.title });
+        continue;
+      }
+      const ra = held.find((r) => Object.values(p.assignments).some((a) => a.roles.some((x) => x.roleId === r.id && (x.raci === 'R' || x.raci === 'A'))));
+      if (ra) out.push({ user, process: p, reason: ra.title });
+    }
+  }
+  return out;
+}
+
+type LegacyAudit = Partial<Audit>;
+
+export function normalizeAudit(a: LegacyAudit): Audit {
+  const base = blankEntity('audit', a.code ?? '', a.title ?? '');
+  return {
+    ...base,
+    ...a,
+    id: a.id ?? base.id,
+    findings: (a.findings ?? []).map((f) => ({ ...blankFinding(f.code ?? ''), ...f })),
+  } as Audit;
 }

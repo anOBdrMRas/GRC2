@@ -1,7 +1,7 @@
 // System roles of the tool itself (not to be confused with organisational roles in the role module).
 import type { User } from './types';
 
-export type ModuleKey = 'processes' | 'risk' | 'opportunity' | 'control' | 'role' | 'kpi' | 'user';
+export type ModuleKey = 'processes' | 'risk' | 'opportunity' | 'control' | 'role' | 'kpi' | 'audit' | 'user';
 export type Right = 'none' | 'read' | 'edit';
 
 export const moduleLabels: Record<ModuleKey, string> = {
@@ -11,6 +11,7 @@ export const moduleLabels: Record<ModuleKey, string> = {
   control: 'Controls (IKS)',
   role: 'Rollen',
   kpi: 'KPI',
+  audit: 'Audits',
   user: 'Benutzerverwaltung',
 };
 
@@ -30,6 +31,7 @@ const all = (r: Right, overrides: Partial<Record<ModuleKey, Right>> = {}): Recor
   control: r,
   role: r,
   kpi: r,
+  audit: r,
   user: r,
   ...overrides,
 });
@@ -84,10 +86,16 @@ export const systemRoles: SystemRole[] = [
     rights: all('read', { kpi: 'edit', user: 'none' }),
   },
   {
+    id: 'audit-manager',
+    name: 'Auditmanager',
+    description: 'Plant das Auditprogramm, pflegt Audits und verfolgt Feststellungen nach.',
+    rights: all('read', { audit: 'edit', user: 'none' }),
+  },
+  {
     id: 'auditor',
     name: 'Auditor',
-    description: 'Lesezugriff auf alle Inhalte inkl. Benutzer und Berechtigungen (interne/externe Audits).',
-    rights: all('read'),
+    description: 'Lesezugriff auf alle Inhalte inkl. Benutzer und Berechtigungen; dokumentiert Audits und Feststellungen.',
+    rights: all('read', { audit: 'edit' }),
   },
   {
     id: 'reader',

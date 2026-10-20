@@ -1,9 +1,9 @@
 // Domain model of the GRC prototype.
 // Metadata fields are aligned with ISO 9001:2015, ISO/IEC 27001:2022 and ISO 37301:2021.
 
-export type EntityKind = 'risk' | 'opportunity' | 'control' | 'role' | 'kpi' | 'user';
+export type EntityKind = 'risk' | 'opportunity' | 'control' | 'role' | 'kpi' | 'user' | 'audit';
 /** Kinds that can be assigned to process steps. */
-export type AssignableKind = Exclude<EntityKind, 'user'>;
+export type AssignableKind = Exclude<EntityKind, 'user' | 'audit'>;
 
 export interface BaseEntity {
   id: string;
@@ -126,6 +126,62 @@ export interface User extends BaseEntity {
   validUntil: string;
 }
 
+export type FindingType = 'Hauptabweichung' | 'Nebenabweichung' | 'Beobachtung' | 'Verbesserungspotenzial' | 'Positive Feststellung';
+export type FindingStatus = 'Offen' | 'In Bearbeitung' | 'Umgesetzt' | 'Wirksamkeit geprüft' | 'Geschlossen';
+
+/** Audit finding incl. corrective action (ISO 9001 10.2, ISO 19011 6.4.8). */
+export interface AuditFinding {
+  id: string;
+  code: string;
+  type: FindingType;
+  clause: string; // ISO reference id, e.g. '9001:8.4'
+  description: string;
+  evidence: string;
+  processId: string;
+  elementId: string;
+  riskIds: string[];
+  controlIds: string[];
+  responsibleRoleId: string;
+  responsibleUserId: string;
+  rootCause: string;
+  correctiveAction: string;
+  dueDate: string;
+  status: FindingStatus;
+  verifiedAt: string;
+  verifiedByUserId: string;
+  verificationResult: string;
+}
+
+/** Audit (ISO 19011, ISO 9001 / 27001 / 37301 9.2, ISO/IEC 17021-1). */
+export interface Audit extends BaseEntity {
+  auditType: string;
+  certStage: string;
+  programYear: string;
+  status: string;
+  standards: string[];
+  criteria: string[];
+  processIds: string[];
+  auditedRoleIds: string[];
+  sites: string;
+  objective: string;
+  leadAuditorUserId: string;
+  externalLeadAuditor: string;
+  teamUserIds: string[];
+  externalOrg: string;
+  auditeeContactUserId: string;
+  plannedDate: string;
+  startDate: string;
+  endDate: string;
+  reportDate: string;
+  reportDocument: string;
+  certificateValidUntil: string;
+  nextAuditDue: string;
+  verdict: string;
+  summary: string;
+  strengths: string;
+  findings: AuditFinding[];
+}
+
 export interface Measurement {
   date: string;
   value: number;
@@ -190,6 +246,7 @@ export interface EntityMap {
   role: Role;
   kpi: Kpi;
   user: User;
+  audit: Audit;
 }
 
 export type AnyEntity = EntityMap[EntityKind];

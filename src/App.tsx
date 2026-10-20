@@ -16,7 +16,7 @@ const nav: { view: View; label: string; icon: string; color?: string }[] = [
   ...kindOrder.map((k) => ({
     view: k as View,
     label: modules[k].plural,
-    icon: { risk: '⚠', opportunity: '✦', control: '✔', role: '👤', kpi: '📈', user: '⚙' }[k],
+    icon: { risk: '⚠', opportunity: '✦', control: '✔', role: '👤', kpi: '📈', audit: '🔍', user: '⚙' }[k],
     color: modules[k].color,
   })),
 ];
@@ -37,8 +37,8 @@ export default function App() {
   const visibleNav = nav.filter((n) => n.view === 'dashboard' || canRead(n.view as ModuleKey));
 
   const exportAll = () => {
-    const { risk, opportunity, control, role, kpi, user, processes } = useStore.getState();
-    download(`grc-export-${new Date().toISOString().slice(0, 10)}.json`, JSON.stringify({ risk, opportunity, control, role, kpi, user, processes }, null, 2), 'application/json');
+    const { risk, opportunity, control, role, kpi, audit, user, processes } = useStore.getState();
+    download(`grc-export-${new Date().toISOString().slice(0, 10)}.json`, JSON.stringify({ risk, opportunity, control, role, kpi, audit, user, processes }, null, 2), 'application/json');
   };
 
   return (

@@ -2,8 +2,10 @@ import type { EntityKind } from '../types';
 import { useStore } from '../store';
 import { useUi } from '../ui';
 import { modules } from '../schema';
-import { activityTypes, continuityGap, kpiStatus, personSodConflicts, parseElements, residualScore, riskLevel, today } from '../logic';
+import { activityTypes, allFindings, auditDate, continuityGap, isOpenFinding, isOverdueFinding, kpiStatus, parseElements, personSodConflicts, residualScore, riskLevel, today } from '../logic';
 import { Heatmap } from './Heatmap';
+import { FindingLine, auditTypeColor } from './AuditViews';
+import { findingTypes } from '../schema';
 import { t } from '../i18n';
 import { LevelBadge, TrafficLight } from './common';
 
@@ -40,6 +42,22 @@ export function Dashboard() {
     ...store.role.filter((r) => r.nextReview && r.nextReview < now).map((r) => ({ r, text: t('Review überfällig') })),
   ];
 
+  // Audits
+  const in90 = new Date(Date.parse(now) + 90 * 86_400_000).toISOString().slice(0, 10);
+  const in180 = new Date(Date.parse(now) + 180 * 86_400_000).toISOString().slice(0, 10);
+  const upcomingAudits = store.audit
+    .filter((a) => !['Abgeschlossen', 'Abgesagt'].includes(a.status) && auditDate(a) >= now && auditDate(a) <= in90)
+    .sort((a, b) => auditDate(a).localeCompare(auditDate(b)));
+  const openFindings = allFindings(store.audit).filter(({ finding }) => isOpenFinding(finding));
+  const overdueFindings = openFindings.filter(({ finding }) => isOverdueFinding(finding, now));
+  const certs = store.audit.filter((a) => a.auditType === 'Zertifizierungsaudit' && a.certificateValidUntil);
+  // only the most recent certificate per standard counts
+  const expiringCerts = certs.filter(
+    (a) =>
+      a.certificateValidUntil <= in180 &&
+      !certs.some((b) => b !== a && b.certificateValidUntil > a.certificateValidUntil && b.standards.some((s) => a.standards.includes(s))),
+  );
+
   const effectiveness = ['Wirksam', 'Eingeschränkt wirksam', 'Nicht wirksam', 'Nicht geprüft'].map((v) => ({
     v,
     n: store.control.filter((c) => c.operatingEffectiveness === v).length,
@@ -53,7 +71,7 @@ export function Dashboard() {
           <div className="stat-num">{store.processes.length}</div>
           <div className="stat-label">{t('Prozesse · {n} Aktivitäten', { n: steps.length })}</div>
         </div>
-        {(['risk', 'opportunity', 'control', 'role', 'kpi', 'user'] as EntityKind[]).map((k) => (
+        {(['risk', 'opportunity', 'control', 'role', 'kpi', 'audit', 'user'] as EntityKind[]).map((k) => (
           <div key={k} className="stat clickable" style={{ borderColor: modules[k].color }} onClick={() => go(k)}>
             <div className="stat-num">{store[k].length}</div>
             <div className="stat-label">{t(modules[k].plural)}</div>
@@ -108,6 +126,26 @@ export function Dashboard() {
             );
           })}
         </div>
+        <div className="card">
+          <h3>{t('Offene Audit-Feststellungen nach Typ')}</h3>
+          {findingTypes
+            .filter((ft) => ft !== 'Positive Feststellung')
+            .map((ft) => {
+              const n = openFindings.filter(({ finding }) => finding.type === ft).length;
+              return (
+                <div key={ft} className="bar-row">
+                  <span className="bar-label">{t(ft)}</span>
+                  <span className="bar">
+                    <span className={`bar-fill ftype-bar-${ft.replace(/\s/g, '-')}`} style={{ width: `${openFindings.length ? (n / openFindings.length) * 100 : 0}%` }} />
+                  </span>
+                  <span className="bar-num">{n}</span>
+                </div>
+              );
+            })}
+          <div className="small muted" style={{ marginTop: 8 }}>
+            {t('{n} offen', { n: openFindings.length })} · {t('{n} überfällig', { n: overdueFindings.length })}
+          </div>
+        </div>
       </div>
 
       <h3>{t('Handlungsbedarf')}</h3>
@@ -144,6 +182,26 @@ export function Dashboard() {
           {roleIssues.map(({ r, text }, i) => (
             <div key={i} className="link small" onClick={() => go('role', r.id)}>
               {r.code} {r.title} – <span className="muted">{text}</span>
+            </div>
+          ))}
+        </Finding>
+        <Finding title="Anstehende Audits (90 Tage)" count={upcomingAudits.length}>
+          {upcomingAudits.map((a) => (
+            <div key={a.id} className="link small row gap-s" onClick={() => go('audit', a.id)}>
+              <span className="swatch" style={{ background: auditTypeColor[a.auditType] }} />
+              {auditDate(a)} · {a.code} {a.title} – <span className="muted">{t(a.status)}</span>
+            </div>
+          ))}
+        </Finding>
+        <Finding title="Überfällige Audit-Feststellungen" count={overdueFindings.length}>
+          {overdueFindings.map(({ audit, finding }) => (
+            <FindingLine key={finding.id} audit={audit} finding={finding} />
+          ))}
+        </Finding>
+        <Finding title="Zertifikate laufen ab (< 180 Tage)" count={expiringCerts.length}>
+          {expiringCerts.map((a) => (
+            <div key={a.id} className="link small" onClick={() => go('audit', a.id)}>
+              {a.certificateValidUntil} · {a.standards.join(', ')} – <span className="muted">{a.code} {a.title}</span>
             </div>
           ))}
         </Finding>

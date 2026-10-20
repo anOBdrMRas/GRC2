@@ -19,6 +19,10 @@ interface UiState {
   openStep: (processId: string, elementId: string) => void;
   select: (view: View, id: string | undefined) => void;
   clearFocus: () => void;
+  /** audit finding to expand when the audit module opens */
+  focusFindingId: string | null;
+  openFinding: (auditId: string, findingId: string) => void;
+  clearFindingFocus: () => void;
   /** file offered in the export dialog (downloads may be blocked, e.g. when embedded) */
   exportFile: ExportFile | null;
   setExportFile: (f: ExportFile | null) => void;
@@ -35,6 +39,9 @@ export const useUi = create<UiState>()((set) => ({
     set((s) => ({ view: 'processes', selected: { ...s.selected, processes: processId }, focusElementId: elementId })),
   select: (view, id) => set((s) => ({ selected: { ...s.selected, [view]: id } })),
   clearFocus: () => set({ focusElementId: null }),
+  focusFindingId: null,
+  openFinding: (auditId, findingId) => set((s) => ({ view: 'audit', selected: { ...s.selected, audit: auditId }, focusFindingId: findingId })),
+  clearFindingFocus: () => set({ focusFindingId: null }),
   exportFile: null,
   setExportFile: (exportFile) => set({ exportFile }),
   notice: null,

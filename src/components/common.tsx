@@ -216,6 +216,20 @@ const statusTone: Record<string, string> = {
   Inaktiv: 'neutral',
   Archiviert: 'neutral',
   Gesperrt: 'bad',
+  // audits
+  Geplant: 'neutral',
+  'In Vorbereitung': 'warn',
+  Durchgeführt: 'warn',
+  'Bericht erstellt': 'warn',
+  'Maßnahmen offen': 'warn',
+  Abgeschlossen: 'ok',
+  Abgesagt: 'neutral',
+  // findings
+  Offen: 'bad',
+  'In Bearbeitung': 'warn',
+  Umgesetzt: 'warn',
+  'Wirksamkeit geprüft': 'ok',
+  Geschlossen: 'ok',
 };
 
 export function StatusPill({ status }: { status: string }) {

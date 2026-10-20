@@ -29,8 +29,13 @@ export interface BpmnEditorHandle {
   fit: () => void;
 }
 
+/** Extra badge for open audit findings per element. */
+export const auditBadge = { label: 'A', color: modules.audit.color, title: 'Offene Audit-Feststellungen' };
+
 interface Props {
   process: ProcessModel;
+  /** open audit findings per BPMN element id */
+  findingCounts?: Record<string, number>;
   /** show the diagram without editing tools (no edit rights) */
   readOnly?: boolean;
   focusElementId: string | null;
@@ -60,13 +65,15 @@ function describe(element: Svc): SelectedElement {
 }
 
 export const BpmnEditor = forwardRef<BpmnEditorHandle, Props>(function BpmnEditor(
-  { process, readOnly = false, focusElementId, onFocused, onSelect, onXmlChange },
+  { process, findingCounts, readOnly = false, focusElementId, onFocused, onSelect, onXmlChange },
   ref,
 ) {
   const container = useRef<HTMLDivElement>(null);
   const modelerRef = useRef<Svc>(null);
   const assignments = useRef(process.assignments);
   assignments.current = process.assignments;
+  const findings = useRef(findingCounts);
+  findings.current = findingCounts;
   const callbacks = useRef({ onSelect, onXmlChange, onFocused });
   callbacks.current = { onSelect, onXmlChange, onFocused };
   const focusRef = useRef(focusElementId);
@@ -78,13 +85,17 @@ export const BpmnEditor = forwardRef<BpmnEditorHandle, Props>(function BpmnEdito
     const overlays = modeler.get('overlays');
     const registry = modeler.get('elementRegistry');
     overlays.remove({ type: 'grc' });
-    for (const [id, a] of Object.entries(assignments.current)) {
+    const ids = new Set([...Object.keys(assignments.current), ...Object.keys(findings.current ?? {})]);
+    for (const id of ids) {
       const el = registry.get(id);
       if (!el || el.waypoints) continue;
-      const html = badgeDefs
-        .filter((b) => a[b.key].length > 0)
-        .map((b) => `<span class="grc-badge" style="background:${b.color}" title="${t(b.title)}">${t(b.label)} ${a[b.key].length}</span>`)
-        .join('');
+      const a = assignments.current[id];
+      const badge = (color: string, title: string, label: string, n: number) =>
+        `<span class="grc-badge" style="background:${color}" title="${t(title)}">${t(label)} ${n}</span>`;
+      const open = findings.current?.[id] ?? 0;
+      const html =
+        (a ? badgeDefs.filter((b) => a[b.key].length > 0).map((b) => badge(b.color, b.title, b.label, a[b.key].length)) : []).join('') +
+        (open > 0 ? badge(auditBadge.color, auditBadge.title, auditBadge.label, open) : '');
       if (!html) continue;
       overlays.add(id, 'grc', { position: { bottom: 4, left: 0 }, html: `<div class="grc-badges">${html}</div>` });
     }
@@ -163,7 +174,7 @@ export const BpmnEditor = forwardRef<BpmnEditorHandle, Props>(function BpmnEdito
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [process.id, readOnly]);
 
-  useEffect(renderOverlays, [process.assignments]);
+  useEffect(renderOverlays, [process.assignments, findingCounts]);
 
   useEffect(() => {
     if (focusElementId && modelerRef.current?.get('elementRegistry').get(focusElementId)) {

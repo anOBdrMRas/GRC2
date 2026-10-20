@@ -3,9 +3,10 @@ import type { Role } from '../types';
 import { useStore } from '../store';
 import { useUi } from '../ui';
 import { modules } from '../schema';
-import { continuityGap, elementNames, findUsages, personSodConflicts, residualScore, riskLevel, roleMembers, today } from '../logic';
+import { allFindings, continuityGap, elementNames, findUsages, isOpenFinding, personSodConflicts, residualScore, riskLevel, roleMembers, today } from '../logic';
 import { isoLabel } from '../iso';
 import { LevelBadge, StatusPill, Tag, download } from './common';
+import { FindingLine } from './AuditViews';
 import { t } from '../i18n';
 
 /** Everything the role is responsible for, derived from the other modules (not edited here). */
@@ -20,6 +21,7 @@ function useRoleDerived(role: Role) {
     controlsExecuted: s.control.filter((c) => c.executorRoleId === role.id),
     kpisMeasured: s.kpi.filter((k) => k.ownerRoleId === role.id),
     kpisEvaluated: s.kpi.filter((k) => k.evaluatorRoleId === role.id),
+    findings: allFindings(s.audit).filter(({ finding: f }) => f.responsibleRoleId === role.id && isOpenFinding(f)),
     processesOwned: s.processes.filter((p) => p.ownerRoleId === role.id),
     reportsFrom: s.role.filter((r) => r.reportsToFunctionalRoleId === role.id || r.reportsToDisciplinaryRoleId === role.id),
     members: roleMembers(role, s.user),
@@ -159,6 +161,15 @@ export function RoleInsights({ role, part }: { role: Role; part: 'warnings' | 'd
           {list('KPI gemessen', d.kpisMeasured, 'kpi')}
           {list('KPI ausgewertet', d.kpisEvaluated, 'kpi')}
           {list('Unterstellte Rollen', d.reportsFrom, 'role')}
+          <div className="derived-row">
+            <span className="derived-label">{t('Offene Audit-Feststellungen')}</span>
+            <span className="derived-findings">
+              {d.findings.length === 0 && <span className="muted small">–</span>}
+              {d.findings.map(({ audit, finding }) => (
+                <FindingLine key={finding.id} audit={audit} finding={finding} />
+              ))}
+            </span>
+          </div>
         </div>
       </div>
     </div>
@@ -278,6 +289,7 @@ export function RoleProfile({ role, onClose }: { role: Role; onClose: () => void
               {row('Controls (Durchführung)', items(d.controlsExecuted))}
               {row('KPI (Messung)', items(d.kpisMeasured))}
               {row('KPI (Auswertung)', items(d.kpisEvaluated))}
+              {row('Offene Audit-Feststellungen', d.findings.map(({ finding: f }) => `${f.code} ${f.description}`).join('; ') || '–')}
             </tbody>
           </table>
           <h2>8. {t('Beteiligung an Prozessschritten (abgeleitet)')}</h2>

@@ -1,9 +1,9 @@
 import { useMemo, useState, type ReactNode } from 'react';
-import type { AnyEntity, Control, EntityKind, Kpi, Opportunity, Risk, Role, User } from '../types';
-import { modules } from '../schema';
+import type { AnyEntity, Audit, Control, EntityKind, Kpi, Opportunity, Risk, Role, User } from '../types';
+import { auditTypes, modules } from '../schema';
 import { useStore } from '../store';
 import { useUi } from '../ui';
-import { findUsages, roleMembers, kpiStatus, residualScore, riskLevel, riskScore } from '../logic';
+import { allFindings, auditDate, findUsages, isOpenFinding, isOverdueFinding, roleMembers, kpiStatus, residualScore, riskLevel, riskScore } from '../logic';
 import { Field } from './Fields';
 import { ConfirmButton, Empty, LevelBadge, StatusPill, Tag, TrafficLight } from './common';
 import { useRights } from '../useRights';
@@ -12,6 +12,7 @@ import { systemRoleById } from '../permissions';
 import { RoleInsights, RoleProfile } from './RoleInsights';
 import { SystemRoleMatrix, UserInsights } from './UserInsights';
 import { Heatmap } from './Heatmap';
+import { AuditFindingsList, AuditInsights, AuditProgram, FindingLine, auditTypeColor } from './AuditViews';
 import { Sparkline } from './Sparkline';
 
 interface Column {
@@ -116,6 +117,39 @@ function useColumns(kind: EntityKind): Column[] {
         { label: 'Frequenz', render: (e) => t((e as Kpi).frequency) },
         { label: 'Verantwortlich', render: (e) => roleName((e as Kpi).ownerRoleId) },
       ];
+    case 'audit':
+      return [
+        {
+          label: 'Typ',
+          render: (e) => {
+            const a = e as Audit;
+            return (
+              <span className="row gap-s">
+                <span className="swatch" style={{ background: auditTypeColor[a.auditType] }} />
+                {t(a.auditType)}
+                {a.certStage && <span className="muted small">· {t(a.certStage)}</span>}
+              </span>
+            );
+          },
+          sort: (e) => (e as Audit).auditType,
+        },
+        { label: 'Termin', render: (e) => auditDate(e as Audit) || '–', sort: (e) => auditDate(e as Audit) || '9999' },
+        { label: 'Status', render: (e) => <StatusPill status={(e as Audit).status} /> },
+        {
+          label: 'Feststellungen',
+          render: (e) => {
+            const fs = (e as Audit).findings;
+            const open = fs.filter(isOpenFinding).length;
+            const overdue = fs.filter((f) => isOverdueFinding(f)).length;
+            return (
+              <span className="small">
+                {t('{n} offen', { n: open })}
+                {overdue > 0 && <span className="warn"> · {t('{n} überfällig', { n: overdue })}</span>}
+              </span>
+            );
+          },
+        },
+      ];
   }
 }
 
@@ -133,6 +167,11 @@ export function EntityModule({ kind }: { kind: EntityKind }) {
   const [roleType, setRoleType] = useState<string>('');
   const [mandatoryOnly, setMandatoryOnly] = useState(false);
   const [userTab, setUserTab] = useState<'users' | 'matrix'>('users');
+  const [auditTab, setAuditTab] = useState<'audits' | 'findings' | 'program'>('audits');
+  const [auditType, setAuditType] = useState('');
+  const focusFindingId = useUi((s) => s.focusFindingId);
+  // Opening a finding from elsewhere always shows the audit form.
+  if (kind === 'audit' && focusFindingId && auditTab !== 'audits') setAuditTab('audits');
   const { canRead, canEdit } = useRights();
 
   const filtered = useMemo(() => {
@@ -145,13 +184,14 @@ export function EntityModule({ kind }: { kind: EntityKind }) {
         return key === heatCell;
       });
     }
+    if (kind === 'audit' && auditType) list = list.filter((e) => (e as Audit).auditType === auditType);
     if (kind === 'role') {
       list = list.filter((e) => (!roleType || (e as Role).roleType === roleType) && (!mandatoryOnly || (e as Role).mandatory));
     }
     const sorter = sortCol !== null ? columns[sortCol].sort : undefined;
     if (sorter) list = [...list].sort((a, b) => (sorter(a) < sorter(b) ? -1 : sorter(a) > sorter(b) ? 1 : 0));
     return list;
-  }, [items, q, kind, heatCell, heatMode, sortCol, columns, roleType, mandatoryOnly]);
+  }, [items, q, kind, heatCell, heatMode, sortCol, columns, roleType, mandatoryOnly, auditType]);
 
   const selected = items.find((e) => e.id === selectedId);
   if (!canRead(kind)) return <Empty>{t('Ihre Systemrollen erlauben keinen Zugriff auf {name}.', { name: t(def.plural) })}</Empty>;
@@ -170,8 +210,17 @@ export function EntityModule({ kind }: { kind: EntityKind }) {
             </button>
           </div>
         )}
+        {kind === 'audit' && (
+          <div className="seg">
+            {(['audits', 'findings', 'program'] as const).map((k) => (
+              <button key={k} className={auditTab === k ? 'active' : ''} onClick={() => setAuditTab(k)}>
+                {t({ audits: 'Audits', findings: 'Feststellungen', program: 'Auditprogramm' }[k])}
+              </button>
+            ))}
+          </div>
+        )}
         {!canEdit(kind) && <span className="badge readonly">{t('Nur Lesen')}</span>}
-        {canEdit(kind) && !(kind === 'user' && userTab === 'matrix') && (
+        {canEdit(kind) && !(kind === 'user' && userTab === 'matrix') && !(kind === 'audit' && auditTab !== 'audits') && (
           <button
             className="primary"
             onClick={() => {
@@ -186,6 +235,15 @@ export function EntityModule({ kind }: { kind: EntityKind }) {
     </div>
   );
 
+  if (kind === 'audit' && auditTab !== 'audits') {
+    return (
+      <div className="module-full-wrap">
+        <div className="module-full-head">{head}</div>
+        {auditTab === 'findings' ? <AuditFindingsList /> : <AuditProgram />}
+      </div>
+    );
+  }
+
   if (kind === 'user' && userTab === 'matrix') {
     return (
       <div className="module-full">
@@ -199,6 +257,15 @@ export function EntityModule({ kind }: { kind: EntityKind }) {
     <div className="module">
       <div className="module-list">
         {head}
+        {kind === 'audit' && (
+          <div className="filter-bar">
+            {['', ...auditTypes].map((at) => (
+              <button key={at || 'all'} className={`chip ${auditType === at ? 'active' : ''}`} onClick={() => setAuditType(at)}>
+                {at ? t(at) : t('Alle Typen')}
+              </button>
+            ))}
+          </div>
+        )}
         {kind === 'role' && (
           <div className="filter-bar">
             {['', 'Führungsrolle', 'Fachrolle', 'Gremium', 'Beauftragter'].map((rt) => (
@@ -298,13 +365,21 @@ function EntityEditor({ kind, entity }: { kind: EntityKind; entity: AnyEntity })
         </div>
       </div>
       {kind === 'role' && showProfile && <RoleProfile role={entity as Role} onClose={() => setShowProfile(false)} />}
-      {kind === 'role' ? <RoleInsights role={entity as Role} part="warnings" /> : kind === 'user' ? <UserInsights user={entity as User} /> : <Insights kind={kind} entity={entity} />}
+      {kind === 'role' ? (
+        <RoleInsights role={entity as Role} part="warnings" />
+      ) : kind === 'user' ? (
+        <UserInsights user={entity as User} />
+      ) : kind === 'audit' ? (
+        <AuditInsights audit={entity as Audit} />
+      ) : (
+        <Insights kind={kind} entity={entity} />
+      )}
       <fieldset className="plain" disabled={!editable}>
         {def.sections.map((sec) => (
           <fieldset key={sec.title}>
             <legend>{t(sec.title)}</legend>
             <div className="grid">
-              {sec.fields.map((f) => (
+              {sec.fields.filter((f) => !f.showIf || f.showIf(values)).map((f) => (
                 <Field key={f.key} def={f} value={values[f.key]} entityId={entity.id} onChange={(v) => update(kind, entity.id, { [f.key]: v })} />
               ))}
             </div>
@@ -326,6 +401,11 @@ function Insights({ kind, entity }: { kind: EntityKind; entity: AnyEntity }) {
   const openStep = useUi((s) => s.openStep);
   const go = useUi((s) => s.go);
   const usages = findUsages(processes, kind, entity.id);
+  const audits = useStore((s) => s.audit);
+  const related = allFindings(audits).filter(
+    ({ finding: f }) => (kind === 'control' && f.controlIds.includes(entity.id)) || (kind === 'risk' && f.riskIds.includes(entity.id)),
+  );
+  const openDeviation = related.some(({ finding: f }) => isOpenFinding(f) && (f.type === 'Hauptabweichung' || f.type === 'Nebenabweichung'));
 
   return (
     <div className="insights">
@@ -354,6 +434,15 @@ function Insights({ kind, entity }: { kind: EntityKind; entity: AnyEntity }) {
               ))}
           </div>
           {!controls.some((c) => c.mitigatesRiskIds.includes(entity.id)) && <div className="warn small">{t('Keine Kontrolle zugeordnet.')}</div>}
+        </div>
+      )}
+      {(kind === 'control' || kind === 'risk') && related.length > 0 && (
+        <div className={`insight ${openDeviation && kind === 'control' ? 'warn-box' : ''}`}>
+          <div className="insight-title">{t('Audit-Feststellungen ({n})', { n: related.length })}</div>
+          {openDeviation && kind === 'control' && <div className="small warn">{t('Offene Abweichung – operative Wirksamkeit überprüfen.')}</div>}
+          {related.map(({ audit, finding }) => (
+            <FindingLine key={finding.id} audit={audit} finding={finding} />
+          ))}
         </div>
       )}
       {kind === 'kpi' && (

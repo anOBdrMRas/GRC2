@@ -1,12 +1,13 @@
-import { useRef, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import type { AssignableKind, ProcessModel } from '../types';
 import { useStore } from '../store';
 import { useUi } from '../ui';
 import { modules } from '../schema';
-import { activityTypes, assignedIds, emptyAssignment, parseElements } from '../logic';
+import { activityTypes, allFindings, assignedIds, auditDate, emptyAssignment, isOpenFinding, parseElements } from '../logic';
 import { BpmnEditor, type BpmnEditorHandle, type SelectedElement } from '../bpmn/BpmnEditor';
 import { StepPanel } from './StepPanel';
-import { ConfirmButton, Empty, download } from './common';
+import { ConfirmButton, Empty, StatusPill, download } from './common';
+import { openFindingsByElement } from './AuditViews';
 import { useRights } from '../useRights';
 import { t } from '../i18n';
 
@@ -111,6 +112,8 @@ function ProcessWorkspace({ process }: { process: ProcessModel }) {
   const openStep = useUi((s) => s.openStep);
   const select = useUi((s) => s.select);
   const editable = useRights().canEdit('processes');
+  const audits = useStore((s) => s.audit);
+  const findingCounts = useMemo(() => openFindingsByElement(audits, process.id), [audits, process.id]);
 
   // A focus request coming from a module switches back to the model tab.
   if (focusElementId && tab !== 'model') setTab('model');
@@ -164,6 +167,7 @@ function ProcessWorkspace({ process }: { process: ProcessModel }) {
           <BpmnEditor
             ref={editor}
             process={process}
+            findingCounts={findingCounts}
             readOnly={!editable}
             focusElementId={focusElementId}
             onFocused={clearFocus}
@@ -178,6 +182,7 @@ function ProcessWorkspace({ process }: { process: ProcessModel }) {
           <ProcessProfile process={process} />
         </fieldset>
       )}
+      {tab === 'profile' && <ProcessAudits process={process} />}
       {tab === 'matrix' && <StepMatrix process={process} onOpen={(el) => openStep(process.id, el)} />}
     </section>
   );
@@ -286,9 +291,15 @@ function StepMatrix({ process, onOpen }: { process: ProcessModel; onOpen: (eleme
       .join(', ');
   };
 
+  const stepFindings = (elementId: string) =>
+    allFindings(store.audit)
+      .filter(({ finding: f }) => f.processId === process.id && f.elementId === elementId)
+      .map(({ finding: f }) => `${f.code}${isOpenFinding(f) ? '' : ' ✓'}`)
+      .join(', ');
+
   const exportCsv = () => {
-    const head = [t('Schritt-ID'), t('Schritt'), t('Typ'), ...matrixKinds.map((k) => t(modules[k].plural))];
-    const rows = steps.map((s) => [s.id, s.name, s.type, ...matrixKinds.map((k) => cell(k, s.id))]);
+    const head = [t('Schritt-ID'), t('Schritt'), t('Typ'), ...matrixKinds.map((k) => t(modules[k].plural)), t('Audit-Feststellungen')];
+    const rows = steps.map((s) => [s.id, s.name, s.type, ...matrixKinds.map((k) => cell(k, s.id)), stepFindings(s.id)]);
     const csv = [head, ...rows].map((r) => r.map((v) => `"${v.replace(/"/g, '""')}"`).join(';')).join('\n');
     download(`${process.code}_${t('Schrittmatrix')}.csv`, '﻿' + csv, 'text/csv');
   };
@@ -308,6 +319,7 @@ function StepMatrix({ process, onOpen }: { process: ProcessModel; onOpen: (eleme
                 {t(modules[k].plural)}
               </th>
             ))}
+            <th style={{ color: modules.audit.color }}>{t('Audit-Feststellungen')}</th>
           </tr>
         </thead>
         <tbody>
@@ -323,10 +335,42 @@ function StepMatrix({ process, onOpen }: { process: ProcessModel; onOpen: (eleme
                   {cell(k, s.id) || <span className="muted">–</span>}
                 </td>
               ))}
+              <td className="small">{stepFindings(s.id) || <span className="muted">–</span>}</td>
             </tr>
           ))}
         </tbody>
       </table>
+    </div>
+  );
+}
+
+/** Audits that cover this process (shown below the process profile). */
+function ProcessAudits({ process }: { process: ProcessModel }) {
+  const audits = useStore((s) => s.audit);
+  const go = useUi((s) => s.go);
+  const related = audits
+    .filter((a) => a.processIds.includes(process.id) || a.findings.some((f) => f.processId === process.id))
+    .sort((a, b) => auditDate(b).localeCompare(auditDate(a)));
+  return (
+    <div className="profile">
+      <fieldset>
+        <legend>{t('Audits zu diesem Prozess')}</legend>
+        {related.length === 0 && <div className="muted small">{t('Dieser Prozess wurde noch nicht auditiert.')}</div>}
+        {related.map((a) => {
+          const open = a.findings.filter((f) => f.processId === process.id && isOpenFinding(f)).length;
+          return (
+            <div key={a.id} className="row gap audit-line link" onClick={() => go('audit', a.id)}>
+              <span className="mono">{a.code}</span>
+              <span className="grow">{a.title}</span>
+              <span className="small muted">
+                {t(a.auditType)} · {auditDate(a) || '–'}
+              </span>
+              <StatusPill status={a.status} />
+              <span className="small">{t('{n} offen', { n: open })}</span>
+            </div>
+          );
+        })}
+      </fieldset>
     </div>
   );
 }

@@ -2,6 +2,11 @@
 import type { EntityKind } from './types';
 import { orgUnits } from './logic';
 
+export const auditTypes = ['Internes Audit', 'Zertifizierungsaudit', 'Systemaudit', 'Kundenaudit', 'Lieferantenaudit'];
+export const auditStatuses = ['Geplant', 'In Vorbereitung', 'Durchgeführt', 'Bericht erstellt', 'Maßnahmen offen', 'Abgeschlossen', 'Abgesagt'];
+export const findingTypes = ['Hauptabweichung', 'Nebenabweichung', 'Beobachtung', 'Verbesserungspotenzial', 'Positive Feststellung'];
+export const findingStatuses = ['Offen', 'In Bearbeitung', 'Umgesetzt', 'Wirksamkeit geprüft', 'Geschlossen'];
+
 export type FieldType =
   | 'text'
   | 'textarea'
@@ -19,6 +24,8 @@ export type FieldType =
   | 'members' // persons holding a role
   | 'readonly' // shown, not editable (e.g. generated IDs)
   | 'roleList' // repeatable dropdowns with other roles
+  | 'processRefs' // multiple processes
+  | 'findings' // audit findings table
   | 'systemRoles'; // tool system roles of a user
 
 export interface FieldDef {
@@ -29,6 +36,8 @@ export interface FieldDef {
   refKind?: EntityKind;
   /** ref fields: offer an explicit "n/a" (not applicable) choice */
   allowNA?: boolean;
+  /** show the field only when this returns true for the entity's values */
+  showIf?: (values: Record<string, unknown>) => boolean;
   hint?: string;
   wide?: boolean;
 }
@@ -336,6 +345,85 @@ export const modules: Record<EntityKind, ModuleDef> = {
       },
     ],
   },
+  audit: {
+    kind: 'audit',
+    label: 'Audit',
+    plural: 'Audits',
+    codePrefix: 'AU',
+    color: '#0c8599',
+    sections: [
+      {
+        ...base,
+        fields: [
+          { key: 'code', label: 'ID', type: 'readonly', hint: 'wird automatisch vergeben' },
+          ...base.fields.filter((f) => f.key !== 'code'),
+          { key: 'auditType', label: 'Audittyp', type: 'select', options: auditTypes },
+          {
+            key: 'certStage',
+            label: 'Auditart',
+            type: 'select',
+            options: ['', 'Erstzertifizierung Stufe 1', 'Erstzertifizierung Stufe 2', 'Überwachungsaudit', 'Rezertifizierung', 'Sonderaudit'],
+            hint: 'ISO/IEC 17021-1',
+            showIf: (v) => v.auditType === 'Zertifizierungsaudit',
+          },
+          { key: 'programYear', label: 'Auditprogramm (Jahr)', type: 'text' },
+          { key: 'status', label: 'Status', type: 'select', options: auditStatuses },
+        ],
+      },
+      {
+        title: 'Umfang & Kriterien',
+        fields: [
+          {
+            key: 'standards',
+            label: 'Normen / Regelwerke',
+            type: 'multiselect',
+            options: ['ISO 9001', 'ISO 27001', 'ISO 37301', 'Kundenanforderung', 'Lieferantenanforderung', 'Sonstiges'],
+          },
+          { key: 'objective', label: 'Auditziel & Geltungsbereich', type: 'textarea', wide: true, hint: 'ISO 19011 5.2 / 6.2' },
+          { key: 'criteria', label: 'Auditkriterien (Normkapitel)', type: 'iso', wide: true },
+          { key: 'processIds', label: 'Auditierte Prozesse', type: 'processRefs', wide: true },
+          { key: 'auditedRoleIds', label: 'Auditierte Rollen', type: 'refs', refKind: 'role', wide: true },
+          { key: 'sites', label: 'Standorte', type: 'text' },
+        ],
+      },
+      {
+        title: 'Beteiligte',
+        fields: [
+          { key: 'leadAuditorUserId', label: 'Leitender Auditor', type: 'ref', refKind: 'user' },
+          { key: 'externalLeadAuditor', label: 'Leitender Auditor (extern)', type: 'text', hint: 'bei Zertifizierungs-, Kunden- oder Lieferantenaudits' },
+          { key: 'teamUserIds', label: 'Auditteam', type: 'refs', refKind: 'user', wide: true },
+          { key: 'externalOrg', label: 'Externe Organisation', type: 'text', hint: 'Zertifizierungsstelle, Kunde oder Lieferant' },
+          { key: 'auditeeContactUserId', label: 'Ansprechpartner auditierte Seite', type: 'ref', refKind: 'user' },
+        ],
+      },
+      {
+        title: 'Termine',
+        fields: [
+          { key: 'plannedDate', label: 'Geplant am', type: 'date' },
+          { key: 'startDate', label: 'Durchgeführt von', type: 'date' },
+          { key: 'endDate', label: 'Durchgeführt bis', type: 'date' },
+          { key: 'reportDate', label: 'Berichtsdatum', type: 'date' },
+          { key: 'reportDocument', label: 'Auditbericht', type: 'text', hint: 'Dokumentenname, Ablageort oder Link' },
+          {
+            key: 'certificateValidUntil',
+            label: 'Zertifikat gültig bis',
+            type: 'date',
+            showIf: (v) => v.auditType === 'Zertifizierungsaudit',
+          },
+          { key: 'nextAuditDue', label: 'Nächstes Audit fällig', type: 'date' },
+        ],
+      },
+      {
+        title: 'Ergebnis',
+        fields: [
+          { key: 'verdict', label: 'Gesamturteil', type: 'select', options: ['', 'Konform', 'Konform mit Feststellungen', 'Nicht konform'] },
+          { key: 'summary', label: 'Zusammenfassung', type: 'textarea', wide: true },
+          { key: 'strengths', label: 'Stärken', type: 'textarea', wide: true },
+        ],
+      },
+      { title: 'Feststellungen', fields: [{ key: 'findings', label: 'Feststellungen & Korrekturmaßnahmen', type: 'findings', wide: true, hint: 'ISO 9001 10.2' }] },
+    ],
+  },
 };
 
-export const kindOrder: EntityKind[] = ['risk', 'opportunity', 'control', 'role', 'kpi', 'user'];
+export const kindOrder: EntityKind[] = ['risk', 'opportunity', 'control', 'role', 'kpi', 'audit', 'user'];

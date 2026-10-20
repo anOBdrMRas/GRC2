@@ -4,11 +4,12 @@ import type { SelectedElement } from '../bpmn/BpmnEditor';
 import { useStore } from '../store';
 import { useUi } from '../ui';
 import { modules } from '../schema';
-import { assignedIds, emptyAssignment, kpiStatus, residualScore, riskLevel, riskScore } from '../logic';
+import { allFindings, assignedIds, emptyAssignment, isOpenFinding, kpiStatus, residualScore, riskLevel, riskScore } from '../logic';
 import { LevelBadge, Picker, TrafficLight } from './common';
 import { useRights } from '../useRights';
 import { t } from '../i18n';
-import { badgeDefs } from '../bpmn/BpmnEditor';
+import { auditBadge, badgeDefs } from '../bpmn/BpmnEditor';
+import { FindingLine } from './AuditViews';
 
 const typeLabels: Record<string, string> = {
   task: 'Aufgabe',
@@ -206,6 +207,8 @@ function ActivityPanel({ process, element, onOpenSubProcess }: { process: Proces
         );
       })}
 
+      <StepFindings processId={process.id} elementId={element.id} />
+
       <div className="assign-section">
         <div className="assign-title">{t('Notiz / Arbeitsanweisung')}</div>
         <textarea rows={3} value={a.note} onChange={(e) => store.setStepNote(process.id, element.id, e.target.value)} />
@@ -277,7 +280,7 @@ function ProcessSummary({ process }: { process: ProcessModel }) {
           <b>{t('Badges im Diagramm')}:</b>
         </div>
         <div>
-          {badgeDefs.map((b) => (
+          {[...badgeDefs, { key: 'audit', ...auditBadge, title: 'Audit-Feststellungen' }].map((b) => (
             <span key={b.key} className="legend-item">
               <span className="grc-badge" style={{ background: b.color }}>
                 {t(b.label)}
@@ -288,6 +291,25 @@ function ProcessSummary({ process }: { process: ProcessModel }) {
         </div>
         <div className="muted">{t('Subprozess anlegen: Aufgabe auswählen → Schraubenschlüssel (Typ ändern) → „Sub-Process (collapsed)“. Hineinnavigieren über „⤵ Subprozess öffnen“ oder das blaue Symbol am Element; zurück über die Brotkrumen-Navigation oben links.')}</div>
       </div>
+    </div>
+  );
+}
+
+/** Audit findings recorded for this step (read-only; edited in the audit module). */
+function StepFindings({ processId, elementId }: { processId: string; elementId: string }) {
+  const audits = useStore((s) => s.audit);
+  const refs = allFindings(audits)
+    .filter(({ finding: f }) => f.processId === processId && f.elementId === elementId)
+    .sort((a, b) => Number(isOpenFinding(b.finding)) - Number(isOpenFinding(a.finding)));
+  if (refs.length === 0) return null;
+  return (
+    <div className="assign-section">
+      <div className="assign-title" style={{ color: modules.audit.color }}>
+        {t('Audit-Feststellungen')} <span className="count">{refs.filter((r) => isOpenFinding(r.finding)).length}</span>
+      </div>
+      {refs.map(({ audit, finding }) => (
+        <FindingLine key={finding.id} audit={audit} finding={finding} />
+      ))}
     </div>
   );
 }

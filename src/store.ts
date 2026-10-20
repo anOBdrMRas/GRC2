@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import type { AssignableKind, EntityKind, EntityMap, ProcessModel, Raci, Role, StepAssignment, User } from './types';
-import { assignmentKey, blankEntity, emptyAssignment, normalizeRole, normalizeUser, now, uid } from './logic';
+import type { AssignableKind, Audit, EntityKind, EntityMap, ProcessModel, Raci, Role, StepAssignment, User } from './types';
+import { assignmentKey, blankEntity, emptyAssignment, normalizeAudit, normalizeRole, normalizeUser, now, uid } from './logic';
 import { modules } from './schema';
 import { seedData } from './seed';
 import { emptyDiagram } from './bpmn/templates';
@@ -85,8 +85,11 @@ export const useStore = create<State>()(
 
       deleteEntity: (kind, id) =>
         set((s) => {
+          if (kind === 'audit') return { audit: s.audit.filter((a) => a.id !== id) };
+          const audit = scrubAudits(s.audit, kind, id);
           if (kind === 'user') {
             return {
+              audit,
               user: s.user.filter((u) => u.id !== id),
               role: s.role.map((r) => ({
                 ...r,
@@ -107,7 +110,7 @@ export const useStore = create<State>()(
             }
             return { ...p, assignments };
           });
-          const patch: Partial<State> = { processes, [kind]: (s[kind] as { id: string }[]).filter((e) => e.id !== id) };
+          const patch: Partial<State> = { processes, audit, [kind]: (s[kind] as { id: string }[]).filter((e) => e.id !== id) };
           if (kind === 'risk') {
             patch.control = s.control.map((c) => ({ ...c, mitigatesRiskIds: c.mitigatesRiskIds.filter((x) => x !== id) }));
           }
@@ -152,6 +155,7 @@ export const useStore = create<State>()(
           processes: s.processes
             .filter((p) => p.id !== id)
             .map((p) => ({ ...p, callLinks: Object.fromEntries(Object.entries(p.callLinks).filter(([, v]) => v !== id)) })),
+          audit: scrubAudits(s.audit, 'process', id),
         })),
 
       assign: (processId, elementId, kind, entityId) =>
@@ -202,7 +206,7 @@ export const useStore = create<State>()(
     }),
     {
       name: 'grc-prototype-v1',
-      version: 2,
+      version: 3,
       // v1 had no users and free-text role holders
       migrate: (persisted) => normalizeData(persisted as Partial<State>),
     },
@@ -217,6 +221,40 @@ function normalizeData(data: Partial<State>): Partial<State> {
     ...data,
     user: users,
     role: (data.role ?? []).map((r: Partial<Role>) => normalizeRole(r)),
+    // v3 added audits: older data gets the demo audits
+    audit: (data.audit ?? seed.audit).map((a: Partial<Audit>) => normalizeAudit(a)),
     currentUserId: data.currentUserId && users.some((u) => u.id === data.currentUserId) ? data.currentUserId : users[0]?.id ?? '',
   };
+}
+
+/** Removes references to a deleted entity (or process) from audits and their findings. */
+function scrubAudits(audits: Audit[], kind: EntityKind | 'process', id: string): Audit[] {
+  const drop = (xs: string[]) => xs.filter((x) => x !== id);
+  const clear = (x: string) => (x === id ? '' : x);
+  return audits.map((a) => {
+    switch (kind) {
+      case 'process':
+        return {
+          ...a,
+          processIds: drop(a.processIds),
+          findings: a.findings.map((f) => (f.processId === id ? { ...f, processId: '', elementId: '' } : f)),
+        };
+      case 'role':
+        return { ...a, auditedRoleIds: drop(a.auditedRoleIds), findings: a.findings.map((f) => ({ ...f, responsibleRoleId: clear(f.responsibleRoleId) })) };
+      case 'user':
+        return {
+          ...a,
+          leadAuditorUserId: clear(a.leadAuditorUserId),
+          auditeeContactUserId: clear(a.auditeeContactUserId),
+          teamUserIds: drop(a.teamUserIds),
+          findings: a.findings.map((f) => ({ ...f, responsibleUserId: clear(f.responsibleUserId), verifiedByUserId: clear(f.verifiedByUserId) })),
+        };
+      case 'risk':
+        return { ...a, findings: a.findings.map((f) => ({ ...f, riskIds: drop(f.riskIds) })) };
+      case 'control':
+        return { ...a, findings: a.findings.map((f) => ({ ...f, controlIds: drop(f.controlIds) })) };
+      default:
+        return a;
+    }
+  });
 }
