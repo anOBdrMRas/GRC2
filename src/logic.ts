@@ -1,4 +1,20 @@
-import type { AnyEntity, AssignableKind, Audit, AuditFinding, EntityKind, EntityMap, Kpi, Position, ProcessModel, Risk, Role, StepAssignment, User } from './types';
+import type {
+  AnyEntity,
+  AssignableKind,
+  Audit,
+  AuditFinding,
+  EntityKind,
+  EntityMap,
+  Kpi,
+  Mandate,
+  Position,
+  ProcessModel,
+  Risk,
+  Role,
+  StepAssignment,
+  User,
+} from './types';
+import { t } from './i18n';
 
 export const uid = () => Math.random().toString(36).slice(2, 10);
 export const now = () => new Date().toISOString();
@@ -129,10 +145,9 @@ export function blankEntity<K extends EntityKind>(kind: K, code: string, title =
       trainings: '',
       incompatibleRoleIds: [],
       complianceRelevant: false,
-      appointmentRequired: false,
-      appointedAt: '',
-      appointedByUserId: '',
-      appointmentDocument: '',
+      requiredMandate: 'Keine',
+      writtenForm: false,
+      authorityNotice: '',
       version: '0.1',
       status: 'Entwurf',
       lastReview: '',
@@ -149,6 +164,43 @@ export function blankEntity<K extends EntityKind>(kind: K, code: string, title =
       validUntil: '',
       positionId: '',
       positionSince: '',
+      employer: '',
+      employmentType: 'Unbefristet angestellt',
+      entryDate: '',
+      contractEnd: '',
+      contractRef: '',
+      jobDescriptionAckAt: '',
+      confidentialityAt: '',
+      codeOfConductAt: '',
+      conflictOfInterestAt: '',
+    },
+    mandate: {
+      ...common,
+      mandateType: 'Bestellung / Benennung',
+      legalBasis: '',
+      recipientUserId: '',
+      grantedByUserId: '',
+      grantedByBody: '',
+      roleId: '',
+      positionId: '',
+      scope: '',
+      powers: '',
+      budget: '',
+      amountLimit: 0,
+      representation: '',
+      subDelegationAllowed: false,
+      status: 'Entwurf',
+      validFrom: today(),
+      validUntil: '',
+      revokedAt: '',
+      document: '',
+      acceptedAt: '',
+      registerEntry: '',
+      registeredAt: '',
+      supervision: '',
+      supervisionFrequency: 'Jährlich',
+      lastSupervision: '',
+      nextSupervision: '',
     },
     position: {
       ...common,
@@ -169,6 +221,8 @@ export function blankEntity<K extends EntityKind>(kind: K, code: string, title =
       reportsToFunctionalId: '',
       deputyPositionId: '',
       deputyInducted: false,
+      signingAuthority: 'Keine',
+      approvalLimit: 0,
       roles: [],
       version: '0.1',
       status: 'Entwurf',
@@ -287,7 +341,7 @@ export function elementNames(xml: string): Record<string, string> {
 /** Finds all process steps an entity is assigned to. */
 export function findUsages(processes: ProcessModel[], kind: EntityKind, id: string): Usage[] {
   const out: Usage[] = [];
-  if (kind === 'user' || kind === 'audit' || kind === 'position') return out;
+  if (kind === 'user' || kind === 'audit' || kind === 'position' || kind === 'mandate') return out;
   for (const p of processes) {
     const names = elementNames(p.xml);
     for (const [elementId, a] of Object.entries(p.assignments)) {
@@ -330,6 +384,10 @@ const orgUnitMigration: Record<string, string> = {
 };
 
 type LegacyRole = Partial<Role> & {
+  appointmentRequired?: boolean;
+  appointedAt?: string;
+  appointedByUserId?: string;
+  appointmentDocument?: string;
   members?: unknown;
   holders?: string;
   mandatoryBy?: string[];
@@ -356,11 +414,20 @@ export function normalizeRole(r: LegacyRole): Role {
     reportsToFunctionalRoleId: _rf,
     reportsToDisciplinaryRoleId: _rd,
     members: _m,
+    appointmentRequired,
+    appointedAt: _aa,
+    appointedByUserId: _ab,
+    appointmentDocument: _ad,
     ...rest
   } = r;
   const merged = { ...base, ...rest, id: r.id ?? base.id } as Role;
   if (holders) merged.description = [merged.description, `Stelleninhaber (alt): ${holders}`].filter(Boolean).join('\n');
   if (r.mandatory === undefined) merged.mandatory = (mandatoryBy?.length ?? 0) > 0;
+  // v5: the appointment itself moved to the mandates module, the role only states what is required
+  if (r.requiredMandate === undefined && appointmentRequired) {
+    merged.requiredMandate = 'Bestellung / Benennung';
+    merged.writtenForm = true;
+  }
   if (!orgUnits.includes(merged.orgUnit)) merged.orgUnit = merged.orgUnit ? (orgUnitMigration[merged.orgUnit] ?? 'Other') : 'Generic';
   return merged;
 }
@@ -368,6 +435,11 @@ export function normalizeRole(r: LegacyRole): Role {
 export function normalizeUser(u: Partial<User>): User {
   const base = blankEntity('user', u.code ?? '', u.title ?? '');
   return { ...base, ...u, id: u.id ?? base.id } as User;
+}
+
+export function normalizeMandate(m: Partial<Mandate>): Mandate {
+  const base = blankEntity('mandate', m.code ?? '', m.title ?? '');
+  return { ...base, ...m, id: m.id ?? base.id } as Mandate;
 }
 
 export function normalizePosition(p: Partial<Position>): Position {
@@ -382,6 +454,8 @@ export interface OrgData {
   role: Role[];
   position: Position[];
   user: User[];
+  /** optional: mandates (e.g. a deputy appointment) also make a person hold a role */
+  mandate?: Mandate[];
 }
 
 export interface RoleHolder {
@@ -399,7 +473,11 @@ export function roleHolders(role: Role, org: Pick<OrgData, 'position' | 'user'>)
 
 /** Roles a person holds via their position. */
 export function rolesOfUser(userId: string, org: OrgData) {
-  return org.role.flatMap((role) => roleHolders(role, org).filter((h) => h.user.id === userId).map((h) => ({ role, holder: h })));
+  return org.role.flatMap((role) =>
+    roleHolders(role, org)
+      .filter((h) => h.user.id === userId)
+      .map((h) => ({ role, holder: h })),
+  );
 }
 
 export function positionHolders(position: Position, users: User[]) {
@@ -417,7 +495,13 @@ const incompatible = (a: Role, b: Role) => a.incompatibleRoleIds.includes(b.id) 
 /** Persons who hold two roles that are declared incompatible (SoD check on person level). */
 export function personSodConflicts(org: OrgData): PersonSodConflict[] {
   const out: PersonSodConflict[] = [];
-  const holders = new Map(org.role.map((r) => [r.id, roleHolders(r, org).map((h) => h.user.id)]));
+  const active = (org.mandate ?? []).filter((m) => mandateState(m) === 'active' && m.roleId && m.recipientUserId);
+  const holders = new Map(
+    org.role.map((r) => [
+      r.id,
+      [...new Set([...roleHolders(r, org).map((h) => h.user.id), ...active.filter((m) => m.roleId === r.id).map((m) => m.recipientUserId)])],
+    ]),
+  );
   for (const role of org.role) {
     for (const other of org.role) {
       // each pair once, declared on either side
@@ -523,7 +607,9 @@ export function independenceConflicts(audit: Audit, org: OrgData, processes: Pro
         out.push({ user, process: p, reason: owner.title });
         continue;
       }
-      const ra = held.find((r) => Object.values(p.assignments).some((a) => a.roles.some((x) => x.roleId === r.id && (x.raci === 'R' || x.raci === 'A'))));
+      const ra = held.find((r) =>
+        Object.values(p.assignments).some((a) => a.roles.some((x) => x.roleId === r.id && (x.raci === 'R' || x.raci === 'A'))),
+      );
       if (ra) out.push({ user, process: p, reason: ra.title });
     }
   }
@@ -540,4 +626,211 @@ export function normalizeAudit(a: LegacyAudit): Audit {
     id: a.id ?? base.id,
     findings: (a.findings ?? []).map((f) => ({ ...blankFinding(f.code ?? ''), ...f })),
   } as Audit;
+}
+
+// ---- Mandates: appointments, delegations of duties, powers of attorney ------------
+
+export type MandateState = 'draft' | 'future' | 'pending' | 'active' | 'expired' | 'revoked';
+
+export const mandateStateLabel: Record<MandateState, string> = {
+  draft: 'Entwurf',
+  future: 'Noch nicht gültig',
+  pending: 'Annahme fehlt',
+  active: 'Wirksam',
+  expired: 'Abgelaufen',
+  revoked: 'Widerrufen',
+};
+
+/** Effective state: granted, within its validity and accepted by the recipient. */
+export function mandateState(m: Mandate, now = today()): MandateState {
+  if (m.status === 'Widerrufen') return 'revoked';
+  if (m.status !== 'Erteilt') return 'draft';
+  if (m.validUntil && m.validUntil < now) return 'expired';
+  if (m.validFrom && m.validFrom > now) return 'future';
+  if (!m.acceptedAt) return 'pending';
+  return 'active';
+}
+
+/** Granted mandates still binding someone (accepted or not). */
+const isLive = (s: MandateState) => s === 'active' || s === 'pending' || s === 'future';
+
+/** Powers of attorney that can be compared with the target of a position. */
+const powerRank: Record<string, number> = { Keine: 0, Handlungsvollmacht: 1, Prokura: 2, 'Gesetzliche Vertretung (Organ)': 3 };
+
+export const addDays = (date: string, days: number) => new Date(Date.parse(date) + days * 86_400_000).toISOString().slice(0, 10);
+
+export interface OrgIssue {
+  text: string;
+  /** entity the issue opens */
+  kind: EntityKind;
+  id: string;
+  userId?: string;
+  roleId?: string;
+  positionId?: string;
+  mandateId?: string;
+}
+
+export type MandateOrg = OrgData & { mandate: Mandate[] };
+
+/**
+ * Legal-certainty checks across persons, contracts, positions, roles and mandates:
+ * missing/expired/unaccepted mandates, leavers with live mandates, overdue supervision,
+ * unacknowledged job descriptions and mandates beyond the position's target authority.
+ */
+export function orgIssues(org: MandateOrg, now = today()): OrgIssue[] {
+  const out: OrgIssue[] = [];
+  const userById = new Map(org.user.map((u) => [u.id, u]));
+  const roleById = new Map(org.role.map((r) => [r.id, r]));
+  const positionById = new Map(org.position.map((p) => [p.id, p]));
+  const in90 = addDays(now, 90);
+
+  // roles that need a formal transfer: every holder needs an effective mandate
+  for (const role of org.role) {
+    if (!role.requiredMandate || role.requiredMandate === 'Keine') continue;
+    for (const h of roleHolders(role, org)) {
+      const own = org.mandate.filter((m) => m.roleId === role.id && m.recipientUserId === h.user.id && m.mandateType === role.requiredMandate);
+      const states = own.map((m) => mandateState(m, now));
+      const base = { kind: 'role' as EntityKind, id: role.id, roleId: role.id, userId: h.user.id };
+      if (states.includes('active')) {
+        const m = own[states.indexOf('active')];
+        if (role.writtenForm && !m.document)
+          out.push({
+            ...base,
+            mandateId: m.id,
+            text: t('„{role}“: {type} für {user} ohne schriftliches Dokument.', {
+              role: role.title,
+              type: t(role.requiredMandate),
+              user: h.user.title,
+            }),
+          });
+        if (role.authorityNotice && !m.registeredAt)
+          out.push({
+            ...base,
+            mandateId: m.id,
+            text: t('„{role}“: Meldung an {authority} für {user} nicht nachgewiesen.', {
+              role: role.title,
+              authority: role.authorityNotice,
+              user: h.user.title,
+            }),
+          });
+      } else if (states.includes('pending')) {
+        out.push({
+          ...base,
+          mandateId: own[states.indexOf('pending')].id,
+          text: t('„{role}“: {user} hat die {type} nicht angenommen.', { role: role.title, user: h.user.title, type: t(role.requiredMandate) }),
+        });
+      } else if (states.includes('expired')) {
+        out.push({
+          ...base,
+          mandateId: own[states.indexOf('expired')].id,
+          text: t('„{role}“: {type} für {user} ist abgelaufen.', { role: role.title, type: t(role.requiredMandate), user: h.user.title }),
+        });
+      } else {
+        out.push({
+          ...base,
+          text: t('„{role}“: {user} hat keine wirksame {type}.', { role: role.title, user: h.user.title, type: t(role.requiredMandate) }),
+        });
+      }
+    }
+  }
+
+  for (const m of org.mandate) {
+    const state = mandateState(m, now);
+    const user = userById.get(m.recipientUserId);
+    const base = { kind: 'mandate' as EntityKind, id: m.id, mandateId: m.id, userId: m.recipientUserId || undefined, roleId: m.roleId || undefined };
+    const label = `${m.code} ${m.title}`;
+    if (!isLive(state)) continue;
+    if (!user) {
+      out.push({ ...base, text: t('{mandate}: kein Empfänger festgelegt.', { mandate: label }) });
+      continue;
+    }
+    if (user.status !== 'Aktiv' || (user.contractEnd && user.contractEnd < now))
+      out.push({ ...base, text: t('{mandate}: {user} ist ausgeschieden oder inaktiv – widerrufen.', { mandate: label, user: user.title }) });
+    else if (user.contractEnd && user.contractEnd <= in90 && (!m.validUntil || m.validUntil > user.contractEnd))
+      out.push({
+        ...base,
+        text: t('{mandate}: Vertrag von {user} endet am {date} – Übertragung befristen oder übergeben.', {
+          mandate: label,
+          user: user.title,
+          date: user.contractEnd,
+        }),
+      });
+    if (state === 'active' && m.validUntil && m.validUntil <= addDays(now, 60))
+      out.push({ ...base, text: t('{mandate}: läuft am {date} ab.', { mandate: label, date: m.validUntil }) });
+    if (state === 'active' && m.nextSupervision && m.nextSupervision < now)
+      out.push({ ...base, text: t('{mandate}: Überwachung überfällig (fällig {date}).', { mandate: label, date: m.nextSupervision }) });
+    if (state === 'active' && m.mandateType === 'Pflichtendelegation' && !m.supervision)
+      out.push({ ...base, text: t('{mandate}: Pflichtendelegation ohne festgelegte Überwachung.', { mandate: label }) });
+    if (m.mandateType === 'Bank- / Zahlungsvollmacht' && m.representation === 'Einzelvertretung')
+      out.push({ ...base, text: t('{mandate}: Einzelvollmacht für Zahlungen – Vier-Augen-Prinzip nicht gewährleistet.', { mandate: label }) });
+    const role = roleById.get(m.roleId);
+    if (role && !roleHolders(role, org).some((h) => h.user.id === user.id) && m.mandateType !== 'Stellvertretung')
+      out.push({
+        ...base,
+        text: t('{mandate}: {user} hat die Rolle „{role}“ nicht mehr (Stellenwechsel?).', { mandate: label, user: user.title, role: role.title }),
+      });
+    // compare with the target authority of the recipient's position
+    const pos = positionById.get(user.positionId);
+    if (pos && m.mandateType in powerRank && powerRank[m.mandateType] > (powerRank[pos.signingAuthority] ?? 0))
+      out.push({
+        ...base,
+        text: t('{mandate}: geht über die Soll-Vollmacht der Stelle „{position}“ hinaus.', { mandate: label, position: pos.title }),
+      });
+    if (pos && pos.approvalLimit > 0 && m.amountLimit > pos.approvalLimit)
+      out.push({
+        ...base,
+        text: t('{mandate}: Betragsgrenze {amount} über dem Limit der Stelle ({limit}).', {
+          mandate: label,
+          amount: fmtEur(m.amountLimit),
+          limit: fmtEur(pos.approvalLimit),
+        }),
+      });
+  }
+
+  // positions: target powers of attorney must be granted to every holder
+  for (const p of org.position) {
+    if (p.signingAuthority !== 'Prokura' && p.signingAuthority !== 'Handlungsvollmacht') continue;
+    for (const u of positionHolders(p, org.user)) {
+      const has = org.mandate.some((m) => m.recipientUserId === u.id && m.mandateType === p.signingAuthority && isLive(mandateState(m, now)));
+      if (!has)
+        out.push({
+          kind: 'position',
+          id: p.id,
+          positionId: p.id,
+          userId: u.id,
+          text: t('Stelle „{position}“ sieht {type} vor, {user} hat keine.', { position: p.title, type: t(p.signingAuthority), user: u.title }),
+        });
+    }
+  }
+
+  // persons: employment evidence
+  for (const u of org.user) {
+    if (u.status !== 'Aktiv') continue;
+    const pos = positionById.get(u.positionId);
+    const base = { kind: 'user' as EntityKind, id: u.id, userId: u.id };
+    if (pos && !u.jobDescriptionAckAt) out.push({ ...base, text: t('{user}: Kenntnisnahme der Stellenbeschreibung fehlt.', { user: u.title }) });
+    else if (pos && u.jobDescriptionAckAt < pos.lastReview)
+      out.push({ ...base, text: t('{user}: Stellenbeschreibung wurde nach der Kenntnisnahme geändert.', { user: u.title }) });
+    if (pos?.ndaRequired && !u.confidentialityAt) out.push({ ...base, text: t('{user}: Vertraulichkeitsverpflichtung fehlt.', { user: u.title }) });
+    if (u.employmentType !== 'Externer Dienstleister' && !u.codeOfConductAt)
+      out.push({ ...base, text: t('{user}: Verhaltenskodex nicht bestätigt.', { user: u.title }) });
+    if (u.contractEnd && u.contractEnd < now)
+      out.push({ ...base, text: t('{user}: Vertrag endete am {date}, Benutzer ist noch aktiv.', { user: u.title, date: u.contractEnd }) });
+  }
+  return out;
+}
+
+export const fmtEur = (n: number) => `${n.toLocaleString('de-DE')} EUR`;
+
+/** Mandates granted to a person. */
+export function mandatesOfUser(userId: string, mandates: Mandate[]) {
+  return mandates.filter((m) => m.recipientUserId === userId);
+}
+
+/** Abbreviation used when signing with a power of attorney (org chart badge). */
+export function signingPrefix(userId: string, mandates: Mandate[], now = today()) {
+  const live = mandates.filter((m) => m.recipientUserId === userId && mandateState(m, now) === 'active');
+  if (live.some((m) => m.mandateType === 'Prokura')) return 'ppa.';
+  if (live.some((m) => m.mandateType === 'Handlungsvollmacht')) return 'i. V.';
+  return '';
 }

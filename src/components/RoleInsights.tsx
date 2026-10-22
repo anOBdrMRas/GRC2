@@ -3,7 +3,20 @@ import type { Role } from '../types';
 import { useStore } from '../store';
 import { useUi } from '../ui';
 import { modules } from '../schema';
-import { allFindings, elementNames, findUsages, isOpenFinding, personSodConflicts, residualScore, riskLevel, roleHolders, today } from '../logic';
+import {
+  allFindings,
+  elementNames,
+  findUsages,
+  isOpenFinding,
+  mandateState,
+  mandateStateLabel,
+  orgIssues,
+  personSodConflicts,
+  residualScore,
+  riskLevel,
+  roleHolders,
+  today,
+} from '../logic';
 import { isoLabel } from '../iso';
 import { LevelBadge, StatusPill, Tag, download } from './common';
 import { FindingLine } from './AuditViews';
@@ -25,6 +38,8 @@ function useRoleDerived(role: Role) {
     processesOwned: s.processes.filter((p) => p.ownerRoleId === role.id),
     positions: s.position.filter((p) => p.roles.some((pr) => pr.roleId === role.id)),
     members: roleHolders(role, s),
+    mandates: s.mandate.filter((m) => m.roleId === role.id),
+    mandateIssues: orgIssues(s).filter((i) => i.roleId === role.id),
     roleById: (id: string) => s.role.find((r) => r.id === id),
     userById: (id: string) => s.user.find((u) => u.id === id),
     personConflicts: personSodConflicts(s).filter((c) => c.role.id === role.id || c.other.id === role.id),
@@ -54,12 +69,12 @@ function useRoleDerived(role: Role) {
 function findings(role: Role, d: ReturnType<typeof useRoleDerived>) {
   const out: string[] = [];
   if (d.members.length === 0) out.push(t('Rolle ist nicht besetzt.'));
-  if (role.appointmentRequired && (!role.appointedAt || !role.appointmentDocument))
-    out.push(t('Formale Bestellung erforderlich, aber Datum oder Dokument fehlt.'));
+  out.push(...d.mandateIssues.map((i) => i.text));
   if (role.mandatory && !role.roleOwnerUserId) out.push(t('Pflichtrolle ohne Rollenverantwortlichen.'));
   if (role.nextReview && role.nextReview < today()) out.push(t('Review überfällig (fällig {date}).', { date: role.nextReview }));
   for (const m of d.members)
-    if (m.user.status !== 'Aktiv') out.push(t('{user} ist {status}, aber der Rolle zugeordnet.', { user: m.user.title, status: t(m.user.status).toLowerCase() }));
+    if (m.user.status !== 'Aktiv')
+      out.push(t('{user} ist {status}, aber der Rolle zugeordnet.', { user: m.user.title, status: t(m.user.status).toLowerCase() }));
   return out;
 }
 
@@ -112,7 +127,10 @@ export function RoleInsights({ role, part }: { role: Role; part: 'warnings' | 'd
             })}
             {d.processConflicts.map((c, i) => (
               <div key={'s' + i} className="small link" onClick={() => openStep(c.p.id, c.el)}>
-                {t('Funktionstrennung im Prozess: {step}: R/A gemeinsam mit „{role}“', { step: `${c.p.code} › ${c.name}`, role: c.other?.title ?? '' })}
+                {t('Funktionstrennung im Prozess: {step}: R/A gemeinsam mit „{role}“', {
+                  step: `${c.p.code} › ${c.name}`,
+                  role: c.other?.title ?? '',
+                })}
               </div>
             ))}
           </div>
@@ -218,8 +236,8 @@ export function RoleProfile({ role, onClose }: { role: Role; onClose: () => void
             {t('Rollenbeschreibung')}: {role.title} ({role.code})
           </h1>
           <p className="small">
-            {t('Version')} {role.version} · {t('Status')}: <StatusPill status={role.status} /> · {t('letzte Überprüfung')} {role.lastReview || '–'} · {t('nächste Überprüfung')}{' '}
-            {role.nextReview || '–'}
+            {t('Version')} {role.version} · {t('Status')}: <StatusPill status={role.status} /> · {t('letzte Überprüfung')} {role.lastReview || '–'} ·{' '}
+            {t('nächste Überprüfung')} {role.nextReview || '–'}
           </p>
           <h2>1. {t('Einordnung')}</h2>
           <table className="profile-table">
@@ -251,7 +269,9 @@ export function RoleProfile({ role, onClose }: { role: Role; onClose: () => void
           <h2>4. {t('Stelleninhaber und Vertretung')}</h2>
           <table className="profile-table">
             <tbody>
-              {d.members.map((m) => row('Inhaber', `${m.user.title} – ${t('über Stelle')} ${m.position.title} (${t('seit')} ${m.since || '–'})`, m.user.id))}
+              {d.members.map((m) =>
+                row('Inhaber', `${m.user.title} – ${t('über Stelle')} ${m.position.title} (${t('seit')} ${m.since || '–'})`, m.user.id),
+              )}
               {d.members.length === 0 && row('Inhaber', t('unbesetzt'))}
             </tbody>
           </table>
@@ -259,16 +279,29 @@ export function RoleProfile({ role, onClose }: { role: Role; onClose: () => void
           <table className="profile-table">
             <tbody>{row('Unvereinbare Rollen', role.incompatibleRoleIds.map(name).join(', '))}</tbody>
           </table>
-          <h2>6. {t('Bestellung / Ernennung')}</h2>
+          <h2>6. {t('Persönliche Übertragung')}</h2>
           <table className="profile-table">
             <tbody>
               {row(
-                'Formale Bestellung',
-                role.appointmentRequired
-                  ? t('erforderlich – bestellt am {date} durch {user}', { date: role.appointedAt || '–', user: user(role.appointedByUserId) })
-                  : t('nicht erforderlich'),
+                'Erforderlich',
+                role.requiredMandate === 'Keine'
+                  ? t('nicht erforderlich')
+                  : [
+                      t(role.requiredMandate),
+                      role.writtenForm ? t('schriftlich') : '',
+                      role.authorityNotice ? `${t('Meldung an')} ${role.authorityNotice}` : '',
+                    ]
+                      .filter(Boolean)
+                      .join(' · '),
               )}
-              {role.appointmentRequired && row('Bestellungsdokument', role.appointmentDocument)}
+              {d.mandates.map((m) =>
+                row(
+                  `${m.code} ${user(m.recipientUserId)}`,
+                  `${t(m.mandateType)} · ${t('erteilt durch')} ${m.grantedByBody || user(m.grantedByUserId)} · ${m.validFrom || '–'} – ${m.validUntil || t('unbefristet')} · ${t('angenommen')} ${m.acceptedAt || '–'} · ${t(mandateStateLabel[mandateState(m)])}${m.document ? ` · ${m.document}` : ''}`,
+                  m.id,
+                  false,
+                ),
+              )}
             </tbody>
           </table>
           <h2>7. {t('Verantwortung im Managementsystem (abgeleitet)')}</h2>
@@ -310,7 +343,9 @@ export function RoleProfile({ role, onClose }: { role: Role; onClose: () => void
               )}
             </tbody>
           </table>
-          <p className="small muted">{t('Normbezug')}: {role.isoRefs.map(isoLabel).join(', ') || '–'}</p>
+          <p className="small muted">
+            {t('Normbezug')}: {role.isoRefs.map(isoLabel).join(', ') || '–'}
+          </p>
         </div>
       </div>
     </div>

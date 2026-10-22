@@ -3,7 +3,7 @@ import { useStore } from '../store';
 import { useUi } from '../ui';
 import { modules } from '../schema';
 import { effectiveRights, moduleKeys, moduleLabels, rightLabel, systemRoleConflicts, systemRoles, userSystemRoleConflicts } from '../permissions';
-import { personSodConflicts, rolesOfUser } from '../logic';
+import { orgIssues, personSodConflicts, rolesOfUser } from '../logic';
 import { Tag } from './common';
 import { t } from '../i18n';
 
@@ -18,16 +18,27 @@ export function UserInsights({ user }: { user: User }) {
   const sysConflicts = userSystemRoleConflicts(user);
   const sod = personSodConflicts(org).filter((c) => c.user.id === user.id);
   const expired = user.validUntil && user.validUntil < new Date().toISOString().slice(0, 10);
+  const issues = orgIssues(org).filter((i) => i.userId === user.id);
 
   return (
     <div className="insights">
-      {(sysConflicts.length > 0 || sod.length > 0 || expired) && (
+      {(sysConflicts.length > 0 || sod.length > 0 || expired || issues.length > 0) && (
         <div className="insight warn-box">
           <div className="insight-title">⚠ {t('Handlungsbedarf')}</div>
-          {expired && <div className="small">Zugang ist seit {user.validUntil} abgelaufen, Status ist aber „{user.status}“.</div>}
+          {expired && (
+            <div className="small">
+              Zugang ist seit {user.validUntil} abgelaufen, Status ist aber „{user.status}“.
+            </div>
+          )}
           {sysConflicts.map(([a, b, why]) => (
             <div key={a + b} className="small">
-              {t('Unvereinbare Systemrollen im Tool')}: {t(systemRoles.find((r) => r.id === a)?.name ?? a)} + {t(systemRoles.find((r) => r.id === b)?.name ?? b)}. {t(why)}
+              {t('Unvereinbare Systemrollen im Tool')}: {t(systemRoles.find((r) => r.id === a)?.name ?? a)} +{' '}
+              {t(systemRoles.find((r) => r.id === b)?.name ?? b)}. {t(why)}
+            </div>
+          ))}
+          {issues.map((i, n) => (
+            <div key={'o' + n} className={`small ${i.kind !== 'user' ? 'link' : ''}`} onClick={() => i.kind !== 'user' && go(i.kind, i.id)}>
+              {i.text}
             </div>
           ))}
           {sod.map((c, i) => (
@@ -92,7 +103,9 @@ export function SystemRoleMatrix() {
   return (
     <div className="matrix-wrap">
       <p className="muted small">
-        {t('Systemrollen steuern, was ein Benutzer im Tool sehen und bearbeiten darf. Ein Benutzer kann mehrere Systemrollen haben; es gilt jeweils das höchste Recht.')}
+        {t(
+          'Systemrollen steuern, was ein Benutzer im Tool sehen und bearbeiten darf. Ein Benutzer kann mehrere Systemrollen haben; es gilt jeweils das höchste Recht.',
+        )}
       </p>
       <div className="table-wrap">
         <table className="list matrix-table">

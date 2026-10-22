@@ -18,7 +18,7 @@ const nav: { view: View; label: string; icon: string; color?: string }[] = [
     const item = {
       view: k as View,
       label: modules[k].plural,
-      icon: { risk: '⚠', opportunity: '✦', control: '✔', role: '👤', position: '▤', kpi: '📈', audit: '🔍', user: '⚙' }[k],
+      icon: { risk: '⚠', opportunity: '✦', control: '✔', role: '👤', position: '▤', mandate: '✍', kpi: '📈', audit: '🔍', user: '⚙' }[k],
       color: modules[k].color,
     };
     // the org chart sits right below the positions it visualises
@@ -45,10 +45,10 @@ export default function App() {
   const visibleNav = nav.filter((n) => n.view === 'dashboard' || canRead(moduleOf(n.view)));
 
   const exportAll = () => {
-    const { risk, opportunity, control, role, position, kpi, audit, user, processes } = useStore.getState();
+    const { risk, opportunity, control, role, position, mandate, kpi, audit, user, processes } = useStore.getState();
     download(
       `grc-export-${new Date().toISOString().slice(0, 10)}.json`,
-      JSON.stringify({ risk, opportunity, control, role, position, kpi, audit, user, processes }, null, 2),
+      JSON.stringify({ risk, opportunity, control, role, position, mandate, kpi, audit, user, processes }, null, 2),
       'application/json',
     );
   };
@@ -88,7 +88,9 @@ export default function App() {
                 </option>
               ))}
             </select>
-            <span className="login-roles">{user ? user.systemRoles.map((id) => t(systemRoleById.get(id)?.name ?? id)).join(', ') || t('keine Systemrolle') : '–'}</span>
+            <span className="login-roles">
+              {user ? user.systemRoles.map((id) => t(systemRoleById.get(id)?.name ?? id)).join(', ') || t('keine Systemrolle') : '–'}
+            </span>
           </label>
           <div className="muted small">ISO 9001 · ISO 27001 · ISO 37301</div>
           <button onClick={exportAll}>{t('Daten exportieren')}</button>
@@ -110,7 +112,9 @@ export default function App() {
               try {
                 importAll(JSON.parse(await f.text()));
               } catch {
-                useUi.getState().setNotice(t('Die Datei konnte nicht gelesen werden. Bitte eine mit „Daten exportieren“ erzeugte JSON-Datei wählen.'));
+                useUi
+                  .getState()
+                  .setNotice(t('Die Datei konnte nicht gelesen werden. Bitte eine mit „Daten exportieren“ erzeugte JSON-Datei wählen.'));
               }
             }}
           />

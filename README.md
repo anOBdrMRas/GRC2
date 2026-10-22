@@ -27,20 +27,34 @@ BPMN-2.0-Prozessmodellierung und integrierten GRC-Modulen.
     Verantwortung & Kompetenz, zugeordnete Stellen und Personen (abgeleitet aus dem Stellenmodul),
     unvereinbare Rollen („+“-Liste,
     wird bei beiden Rollen eingetragen) mit Funktionstrennungsprüfung auf Prozess-, Stellen- und Personenebene,
-    Bestellung/Ernennung, Normbezug, Version/Status/Review, abgeleitete Verantwortung, druckbare Rollenbeschreibung
+    erforderliche persönliche Übertragung (Art, Schriftform, Behördenmeldung) mit Status je Rolleninhaber,
+    Normbezug, Version/Status/Review, abgeleitete Verantwortung, druckbare Rollenbeschreibung
   - *Stellen*: Stellenbeschreibung (Zweck, Aufgaben, Befugnisse), Anforderungen (Qualifikation, Erfahrung,
     Kompetenzen, Pflichtschulungen, Sicherheitsüberprüfung, Vertraulichkeit), Hierarchie (disziplinarisch und
     fachlich, auch „n/a“), Vertretung, Stelleninhaber (Zuweisung Person → Stelle), Rollen mit Kommentar,
+    Soll-Vollmachten (Vertretungsmacht nach außen, Freigabelimit) mit Soll/Ist-Abgleich,
     abgeleitete Prozessbeteiligung, druckbare Stellenbeschreibung
-  - *Organigramm*: disziplinarische und fachliche Hierarchie als Baum, Funktionen nach Organisationseinheit,
-    Rollenzuordnungsmatrix Stelle × Rolle
+  - *Delegationen & Vollmachten*: persönliche Übertragungen an Personen – Bestellung/Benennung von Beauftragten,
+    Pflichtendelegation (z. B. § 13 ArbSchG), Prokura, Handlungsvollmacht, Bank-/Zahlungsvollmacht, interne
+    Freigabebefugnis, Stellvertretung – mit Empfänger, Erteilendem (Person oder Organ), Bezug zu Rolle/Stelle,
+    Umfang, Befugnissen, Budget, Betragsgrenze, Einzel-/Gesamtvertretung, Gültigkeit, Dokument, Annahme,
+    Registereintrag/Behördenmeldung, Überwachung durch den Delegierenden; abgeleiteter Zustand
+    (Entwurf, Annahme fehlt, Wirksam, Abgelaufen, Widerrufen)
+  - *Prüfungen zur Rechtssicherheit* (an Rolle, Stelle, Person, Übertragung und im Cockpit): fehlende, nicht
+    angenommene oder abgelaufene Übertragungen, fehlende Schriftform oder Behördenmeldung, aktive Übertragungen
+    nach Austritt oder Vertragsende, überfällige Überwachung, Vollmacht über dem Soll der Stelle, Einzelvollmacht
+    für Zahlungen, fehlende Kenntnisnahme der Stellenbeschreibung, Vertraulichkeit und Verhaltenskodex
+  - *Organigramm*: disziplinarische und fachliche Hierarchie als Baum (mit „ppa.“/„i. V.“), Funktionen nach
+    Organisationseinheit, Rollenzuordnungsmatrix Stelle × Rolle
   - *Audits* (ISO 19011, ISO 9001/27001/37301 9.2, ISO/IEC 17021-1): interne Audits, Zertifizierungs-,
     System-, Kunden- und Lieferantenaudits mit Umfang, Kriterien, Team, Terminen und Ergebnis;
     Feststellungen (Haupt-/Nebenabweichung, Beobachtung, Verbesserungspotenzial, positiv) mit Prozessschritt,
     Risiken/Controls, Ursachenanalyse, Korrekturmaßnahme, Frist und Wirksamkeitsprüfung; Feststellungsliste,
     Auditprogramm (Jahresplan, Prozess- und Normkapitel-Abdeckung), Unabhängigkeitsprüfung der Auditoren,
     Badge „A“ am Prozessschritt, Anzeige bei Controls, Risiken, Rollen und im Cockpit
-  - *Benutzerverwaltung*: Benutzer mit Systemrollen (Administrator, GRC-Manager, Prozessmodellierer,
+  - *Benutzerverwaltung*: Arbeitsverhältnis (Arbeitgeber, Beschäftigungsart, Eintritt, Befristung/Austritt,
+    Vertragsreferenz ins HR-System, Kenntnisnahme der Stellenbeschreibung, Vertraulichkeit, Verhaltenskodex,
+    Interessenkonflikterklärung), erhaltene und erteilte Übertragungen, Systemrollen (Administrator, GRC-Manager, Prozessmodellierer,
     Risikomanager, IKS-Verantwortlicher, Compliance Officer, Organisationsverantwortlicher,
     KPI-Verantwortlicher, Auditmanager, Auditor, Leser), Berechtigungsmatrix und simulierte Anmeldung („Angemeldet als“),
     die Lese-/Bearbeitungsrechte in allen Modulen durchsetzt

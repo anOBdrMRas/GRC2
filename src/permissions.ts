@@ -1,7 +1,7 @@
 // System roles of the tool itself (not to be confused with organisational roles in the role module).
 import type { User } from './types';
 
-export type ModuleKey = 'processes' | 'risk' | 'opportunity' | 'control' | 'role' | 'position' | 'kpi' | 'audit' | 'user';
+export type ModuleKey = 'processes' | 'risk' | 'opportunity' | 'control' | 'role' | 'position' | 'mandate' | 'kpi' | 'audit' | 'user';
 export type Right = 'none' | 'read' | 'edit';
 
 export const moduleLabels: Record<ModuleKey, string> = {
@@ -11,6 +11,7 @@ export const moduleLabels: Record<ModuleKey, string> = {
   control: 'Controls (IKS)',
   role: 'Rollen',
   position: 'Stellen',
+  mandate: 'Delegationen & Vollmachten',
   kpi: 'KPI',
   audit: 'Audits',
   user: 'Benutzerverwaltung',
@@ -32,6 +33,7 @@ const all = (r: Right, overrides: Partial<Record<ModuleKey, Right>> = {}): Recor
   control: r,
   role: r,
   position: r,
+  mandate: r,
   kpi: r,
   audit: r,
   user: r,
@@ -73,13 +75,13 @@ export const systemRoles: SystemRole[] = [
     id: 'compliance',
     name: 'Compliance Officer',
     description: 'Pflegt Compliance-Risiken, Kontrollen und Rollen (Compliance-Funktion).',
-    rights: all('read', { risk: 'edit', control: 'edit', role: 'edit', user: 'none' }),
+    rights: all('read', { risk: 'edit', control: 'edit', role: 'edit', mandate: 'edit', user: 'none' }),
   },
   {
     id: 'org-manager',
     name: 'Organisationsverantwortlicher',
-    description: 'Pflegt Stellen, Stellenbeschreibungen, Berichtslinien, Rollen und Stelleninhaber.',
-    rights: all('read', { role: 'edit', position: 'edit', user: 'read' }),
+    description: 'Pflegt Stellen, Stellenbeschreibungen, Berichtslinien, Rollen, Stelleninhaber sowie Delegationen und Vollmachten.',
+    rights: all('read', { role: 'edit', position: 'edit', mandate: 'edit', user: 'read' }),
   },
   {
     id: 'kpi-owner',

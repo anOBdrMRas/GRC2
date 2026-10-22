@@ -1,10 +1,24 @@
 import { useMemo, useState, type ReactNode } from 'react';
-import type { AnyEntity, Audit, Control, EntityKind, Kpi, Opportunity, Position, Risk, Role, User } from '../types';
+import type { AnyEntity, Audit, Control, EntityKind, Kpi, Mandate, Opportunity, Position, Risk, Role, User } from '../types';
+import { MandateInsights, MandateStatePill } from './MandateViews';
 import { PositionInsights, PositionProfile } from './OrgViews';
 import { auditTypes, modules } from '../schema';
 import { useStore } from '../store';
 import { useUi } from '../ui';
-import { allFindings, auditDate, findUsages, isOpenFinding, isOverdueFinding, kpiStatus, positionHolders, residualScore, riskLevel, riskScore, roleHolders } from '../logic';
+import {
+  allFindings,
+  auditDate,
+  findUsages,
+  isOpenFinding,
+  isOverdueFinding,
+  kpiStatus,
+  mandateState,
+  positionHolders,
+  residualScore,
+  riskLevel,
+  riskScore,
+  roleHolders,
+} from '../logic';
 import { Field } from './Fields';
 import { ConfirmButton, Empty, LevelBadge, StatusPill, Tag, TrafficLight } from './common';
 import { useRights } from '../useRights';
@@ -113,9 +127,24 @@ function useColumns(kind: EntityKind): Column[] {
         { label: 'Rollen', render: (e) => (e as Position).roles.length, sort: (e) => -(e as Position).roles.length },
         { label: 'Status', render: (e) => <StatusPill status={(e as Position).status} /> },
       ];
+    case 'mandate':
+      return [
+        { label: 'Art', render: (e) => t((e as Mandate).mandateType), sort: (e) => (e as Mandate).mandateType },
+        {
+          label: 'Empfänger',
+          render: (e) => org.user.find((u) => u.id === (e as Mandate).recipientUserId)?.title ?? <span className="warn">–</span>,
+          sort: (e) => org.user.find((u) => u.id === (e as Mandate).recipientUserId)?.title ?? '',
+        },
+        { label: 'Gültig bis', render: (e) => (e as Mandate).validUntil || t('unbefristet'), sort: (e) => (e as Mandate).validUntil || '9999' },
+        { label: 'Zustand', render: (e) => <MandateStatePill mandate={e as Mandate} />, sort: (e) => mandateState(e as Mandate) },
+      ];
     case 'user':
       return [
-        { label: 'Stelle', render: (e) => org.position.find((p) => p.id === (e as User).positionId)?.title ?? '–', sort: (e) => (e as User).positionId },
+        {
+          label: 'Stelle',
+          render: (e) => org.position.find((p) => p.id === (e as User).positionId)?.title ?? '–',
+          sort: (e) => (e as User).positionId,
+        },
         { label: 'Systemrollen', render: (e) => (e as User).systemRoles.map((id) => t(systemRoleById.get(id)?.name ?? id)).join(', ') },
         { label: 'Status', render: (e) => <StatusPill status={(e as User).status} /> },
       ];
@@ -245,7 +274,10 @@ export function EntityModule({ kind }: { kind: EntityKind }) {
           <button
             className="primary"
             onClick={() => {
-              const e = createEntity(kind, kind === 'user' ? t('Neuer Benutzer') : t('Neue(s) {label}', { label: t(def.label) }));
+              const e = createEntity(
+                kind,
+                kind === 'user' ? t('Neuer Benutzer') : kind === 'mandate' ? t('Neue Übertragung') : t('Neue(s) {label}', { label: t(def.label) }),
+              );
               select(kind, e.id);
             }}
           >
@@ -396,6 +428,8 @@ function EntityEditor({ kind, entity }: { kind: EntityKind; entity: AnyEntity })
         <AuditInsights audit={entity as Audit} />
       ) : kind === 'position' ? (
         <PositionInsights position={entity as Position} part="warnings" />
+      ) : kind === 'mandate' ? (
+        <MandateInsights mandate={entity as Mandate} />
       ) : (
         <Insights kind={kind} entity={entity} />
       )}
@@ -404,9 +438,11 @@ function EntityEditor({ kind, entity }: { kind: EntityKind; entity: AnyEntity })
           <fieldset key={sec.title}>
             <legend>{t(sec.title)}</legend>
             <div className="grid">
-              {sec.fields.filter((f) => !f.showIf || f.showIf(values)).map((f) => (
-                <Field key={f.key} def={f} value={values[f.key]} entityId={entity.id} onChange={(v) => update(kind, entity.id, { [f.key]: v })} />
-              ))}
+              {sec.fields
+                .filter((f) => !f.showIf || f.showIf(values))
+                .map((f) => (
+                  <Field key={f.key} def={f} value={values[f.key]} entityId={entity.id} onChange={(v) => update(kind, entity.id, { [f.key]: v })} />
+                ))}
             </div>
           </fieldset>
         ))}
@@ -414,7 +450,8 @@ function EntityEditor({ kind, entity }: { kind: EntityKind; entity: AnyEntity })
       {kind === 'role' && <RoleInsights role={entity as Role} part="derived" />}
       {kind === 'position' && <PositionInsights position={entity as Position} part="derived" />}
       <div className="muted small">
-        {t('Angelegt')} {new Date(entity.createdAt).toLocaleString(dateLocale())} · {t('zuletzt geändert')} {new Date(entity.updatedAt).toLocaleString(dateLocale())}
+        {t('Angelegt')} {new Date(entity.createdAt).toLocaleString(dateLocale())} · {t('zuletzt geändert')}{' '}
+        {new Date(entity.updatedAt).toLocaleString(dateLocale())}
       </div>
     </div>
   );

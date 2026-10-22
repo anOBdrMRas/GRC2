@@ -1,7 +1,19 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import type { AssignableKind, Audit, EntityKind, EntityMap, Position, ProcessModel, Raci, Role, StepAssignment, User } from './types';
-import { assignmentKey, blankEntity, emptyAssignment, normalizeAudit, normalizePosition, normalizeRole, normalizeUser, now, uid } from './logic';
+import type { AssignableKind, Audit, EntityKind, EntityMap, Mandate, Position, ProcessModel, Raci, Role, StepAssignment, User } from './types';
+import {
+  assignmentKey,
+  blankEntity,
+  emptyAssignment,
+  normalizeAudit,
+  normalizeMandate,
+  normalizePosition,
+  normalizeRole,
+  normalizeUser,
+  now,
+  roleHolders,
+  uid,
+} from './logic';
 import { modules } from './schema';
 import { seedData } from './seed';
 import { emptyDiagram } from './bpmn/templates';
@@ -39,11 +51,7 @@ function nextCode(items: { code: string }[], prefix: string) {
   return `${prefix}-${String(max + 1).padStart(3, '0')}`;
 }
 
-function updateStep(
-  p: ProcessModel,
-  elementId: string,
-  fn: (a: StepAssignment) => StepAssignment,
-): ProcessModel {
+function updateStep(p: ProcessModel, elementId: string, fn: (a: StepAssignment) => StepAssignment): ProcessModel {
   const current = p.assignments[elementId] ?? emptyAssignment();
   return { ...p, assignments: { ...p.assignments, [elementId]: fn(current) }, updatedAt: now() };
 }
@@ -70,7 +78,11 @@ export const useStore = create<State>()(
               const has = r.incompatibleRoleIds.includes(id);
               const should = next.includes(r.id);
               if (has === should) return r;
-              return { ...r, incompatibleRoleIds: should ? [...r.incompatibleRoleIds, id] : r.incompatibleRoleIds.filter((x) => x !== id), updatedAt: now() };
+              return {
+                ...r,
+                incompatibleRoleIds: should ? [...r.incompatibleRoleIds, id] : r.incompatibleRoleIds.filter((x) => x !== id),
+                updatedAt: now(),
+              };
             }),
           }));
           return;
@@ -86,9 +98,19 @@ export const useStore = create<State>()(
       deleteEntity: (kind, id) =>
         set((s) => {
           if (kind === 'audit') return { audit: s.audit.filter((a) => a.id !== id) };
+          if (kind === 'mandate') return { mandate: s.mandate.filter((m) => m.id !== id) };
+          const clear = (x: string) => (x === id ? '' : x);
+          // mandates are evidence: keep them, only drop the reference
+          const mandate = s.mandate.map((m) => ({
+            ...m,
+            recipientUserId: kind === 'user' ? clear(m.recipientUserId) : m.recipientUserId,
+            grantedByUserId: kind === 'user' ? clear(m.grantedByUserId) : m.grantedByUserId,
+            roleId: kind === 'role' ? clear(m.roleId) : m.roleId,
+            positionId: kind === 'position' ? clear(m.positionId) : m.positionId,
+          }));
           if (kind === 'position') {
-            const clear = (x: string) => (x === id ? '' : x);
             return {
+              mandate,
               position: s.position
                 .filter((p) => p.id !== id)
                 .map((p) => ({
@@ -104,12 +126,9 @@ export const useStore = create<State>()(
           if (kind === 'user') {
             return {
               audit,
+              mandate,
               user: s.user.filter((u) => u.id !== id),
-              role: s.role.map((r) => ({
-                ...r,
-                roleOwnerUserId: r.roleOwnerUserId === id ? '' : r.roleOwnerUserId,
-                appointedByUserId: r.appointedByUserId === id ? '' : r.appointedByUserId,
-              })),
+              role: s.role.map((r) => ({ ...r, roleOwnerUserId: clear(r.roleOwnerUserId) })),
             };
           }
           // Remove the entity and all references to it.
@@ -128,6 +147,7 @@ export const useStore = create<State>()(
             patch.control = s.control.map((c) => ({ ...c, mitigatesRiskIds: c.mitigatesRiskIds.filter((x) => x !== id) }));
           }
           if (kind === 'role') {
+            patch.mandate = mandate;
             patch.position = s.position.map((p) => ({ ...p, roles: p.roles.filter((r) => r.roleId !== id) }));
             patch.role = s.role
               .filter((r) => r.id !== id)
@@ -161,8 +181,7 @@ export const useStore = create<State>()(
         return p;
       },
 
-      updateProcess: (id, patch) =>
-        set((s) => ({ processes: s.processes.map((p) => (p.id === id ? { ...p, ...patch, updatedAt: now() } : p)) })),
+      updateProcess: (id, patch) => set((s) => ({ processes: s.processes.map((p) => (p.id === id ? { ...p, ...patch, updatedAt: now() } : p)) })),
 
       deleteProcess: (id) =>
         set((s) => ({
@@ -220,7 +239,7 @@ export const useStore = create<State>()(
     }),
     {
       name: 'grc-prototype-v1',
-      version: 4,
+      version: 5,
       // v1 had no users and free-text role holders
       migrate: (persisted) => normalizeData(persisted as Partial<State>),
     },
@@ -230,18 +249,34 @@ export const useStore = create<State>()(
 /** Brings imported or previously stored data to the current shape. */
 function normalizeData(data: Partial<State>): Partial<State> {
   const seed = seedData();
-  const users = (data.user?.length ? data.user : seed.user).map((u: Partial<User>) =>
-    normalizeUser(!data.position && u.positionId === undefined ? { ...u, ...pick(seed.user.find((x) => x.id === u.id)) } : u),
-  );
+  const users = (data.user?.length ? data.user : seed.user).map((u: Partial<User>) => {
+    const demo = seed.user.find((x) => x.id === u.id);
+    return normalizeUser({
+      ...(demo && u.employmentType === undefined ? pickEmployment(demo) : {}),
+      ...(!data.position && u.positionId === undefined ? pick(demo) : {}),
+      ...u,
+    });
+  });
+  const roles = (data.role ?? []).map((r: Partial<Role>) => normalizeRole(r));
+  // v4 added positions: older data gets the demo positions and the demo persons' assignments
+  const positions = (data.position ?? seed.position).map((p: Partial<Position>) => {
+    const demo = seed.position.find((x) => x.id === p.id);
+    // v5 added target powers of attorney
+    return normalizePosition(
+      demo && p.signingAuthority === undefined ? { ...p, signingAuthority: demo.signingAuthority, approvalLimit: demo.approvalLimit } : p,
+    );
+  });
   return {
     ...data,
     user: users,
-    role: (data.role ?? []).map((r: Partial<Role>) => normalizeRole(r)),
-    // v4 added positions: older data gets the demo positions and the demo persons' assignments
-    position: (data.position ?? seed.position).map((p: Partial<Position>) => normalizePosition(p)),
+    role: roles,
+    position: positions,
+    mandate: (data.mandate ?? migrateMandates(data.role ?? [], { role: roles, position: positions, user: users }, seed.mandate)).map(
+      (m: Partial<Mandate>) => normalizeMandate(m),
+    ),
     // v3 added audits: older data gets the demo audits
     audit: (data.audit ?? seed.audit).map((a: Partial<Audit>) => normalizeAudit(a)),
-    currentUserId: data.currentUserId && users.some((u) => u.id === data.currentUserId) ? data.currentUserId : users[0]?.id ?? '',
+    currentUserId: data.currentUserId && users.some((u) => u.id === data.currentUserId) ? data.currentUserId : (users[0]?.id ?? ''),
   };
 }
 
@@ -258,7 +293,11 @@ function scrubAudits(audits: Audit[], kind: EntityKind | 'process', id: string):
           findings: a.findings.map((f) => (f.processId === id ? { ...f, processId: '', elementId: '' } : f)),
         };
       case 'role':
-        return { ...a, auditedRoleIds: drop(a.auditedRoleIds), findings: a.findings.map((f) => ({ ...f, responsibleRoleId: clear(f.responsibleRoleId) })) };
+        return {
+          ...a,
+          auditedRoleIds: drop(a.auditedRoleIds),
+          findings: a.findings.map((f) => ({ ...f, responsibleRoleId: clear(f.responsibleRoleId) })),
+        };
       case 'user':
         return {
           ...a,
@@ -275,6 +314,67 @@ function scrubAudits(audits: Audit[], kind: EntityKind | 'process', id: string):
         return a;
     }
   });
+}
+
+type LegacyAppointment = Partial<Role> & {
+  appointmentRequired?: boolean;
+  appointedAt?: string;
+  appointedByUserId?: string;
+  appointmentDocument?: string;
+};
+
+/**
+ * v5: appointments were stored on the role. They become mandates of the current role holders.
+ * Demo mandates are added where their persons and roles exist (and no migrated mandate covers them).
+ */
+function migrateMandates(rawRoles: LegacyAppointment[], org: { role: Role[]; position: Position[]; user: User[] }, demo: Mandate[]): Mandate[] {
+  const userIds = new Set(org.user.map((u) => u.id));
+  const roleIds = new Set(org.role.map((r) => r.id));
+  const out = demo.filter((m) => userIds.has(m.recipientUserId) && (!m.roleId || roleIds.has(m.roleId)));
+  for (const raw of rawRoles) {
+    const role = org.role.find((r) => r.id === raw.id);
+    if (!role || !raw.appointmentRequired) continue;
+    const holders = roleHolders(role, org).map((h) => h.user.id);
+    for (const userId of holders.length ? holders : ['']) {
+      if (out.some((m) => m.roleId === role.id && m.recipientUserId === userId)) continue;
+      out.push({
+        ...blankEntity('mandate', nextCode(out, 'DV'), `Bestellung ${role.title}`),
+        recipientUserId: userId,
+        roleId: role.id,
+        grantedByUserId: raw.appointedByUserId ?? '',
+        status: raw.appointedAt ? 'Erteilt' : 'Entwurf',
+        validFrom: raw.appointedAt ?? '',
+        document: raw.appointmentDocument ?? '',
+        description: 'Aus der früheren Bestellung an der Rolle übernommen – Annahme bitte nachtragen.',
+      });
+    }
+  }
+  return out;
+}
+
+function pickEmployment(u: User): Partial<User> {
+  const {
+    employer,
+    employmentType,
+    entryDate,
+    contractEnd,
+    contractRef,
+    jobDescriptionAckAt,
+    confidentialityAt,
+    codeOfConductAt,
+    conflictOfInterestAt,
+  } = u;
+  return {
+    employer,
+    employmentType,
+    entryDate,
+    contractEnd,
+    contractRef,
+    jobDescriptionAckAt,
+    confidentialityAt,
+    codeOfConductAt,
+    conflictOfInterestAt,
+  };
 }
 
 /** Position assignment of a demo person (used when migrating data from before positions existed). */

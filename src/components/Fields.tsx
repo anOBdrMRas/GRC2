@@ -4,6 +4,7 @@ import { modules } from '../schema';
 import type { AnyEntity, AuditFinding, Measurement, PositionRole } from '../types';
 import { PositionHolders, PositionRoles, RoleRelations } from './OrgViews';
 import { FindingsEditor, ProcessRefs } from './AuditViews';
+import { MandateList } from './MandateViews';
 import { systemRoleConflicts, systemRoles } from '../permissions';
 import { annexA, isoById, isoCatalog, isoLabel } from '../iso';
 import { useStore } from '../store';
@@ -106,7 +107,12 @@ function FieldInput({ def, value, onChange, entityId }: { def: FieldDef; value: 
         <div>
           <div className="tags">
             {v.map((id) => (
-              <Tag key={id} color={modules[def.refKind!].color} onClick={() => go(def.refKind!, id)} onRemove={() => onChange(v.filter((x) => x !== id))}>
+              <Tag
+                key={id}
+                color={modules[def.refKind!].color}
+                onClick={() => go(def.refKind!, id)}
+                onRemove={() => onChange(v.filter((x) => x !== id))}
+              >
                 {byId.get(id) ? `${byId.get(id)!.code} ${byId.get(id)!.title}` : id}
               </Tag>
             ))}
@@ -124,13 +130,16 @@ function FieldInput({ def, value, onChange, entityId }: { def: FieldDef; value: 
           <div className="tags">
             {v.map((id) => (
               <Tag key={id} onRemove={() => onChange(v.filter((x) => x !== id))}>
-                <span title={def.type === 'iso' ? isoTitle(id) : annexA.find(([a]) => a === id)?.[1]}>
-                  {def.type === 'iso' ? isoLabel(id) : id}
-                </span>
+                <span title={def.type === 'iso' ? isoTitle(id) : annexA.find(([a]) => a === id)?.[1]}>{def.type === 'iso' ? isoLabel(id) : id}</span>
               </Tag>
             ))}
           </div>
-          <Picker options={opts} exclude={v} placeholder={t('Normkapitel suchen (z. B. 6.1, A.5.19, Lieferant)…')} onPick={(id) => onChange([...v, id])} />
+          <Picker
+            options={opts}
+            exclude={v}
+            placeholder={t('Normkapitel suchen (z. B. 6.1, A.5.19, Lieferant)…')}
+            onPick={(id) => onChange([...v, id])}
+          />
         </div>
       );
     }
@@ -144,6 +153,8 @@ function FieldInput({ def, value, onChange, entityId }: { def: FieldDef; value: 
       return <PositionHolders positionId={entityId ?? ''} />;
     case 'roleRelations':
       return <RoleRelations roleId={entityId ?? ''} />;
+    case 'mandates':
+      return <MandateList context={def.refKind as 'role' | 'position' | 'user'} entityId={entityId ?? ''} />;
     case 'processRefs':
       return <ProcessRefs value={(value as string[]) ?? []} onChange={onChange} />;
     case 'findings':
@@ -208,7 +219,11 @@ function SystemRolePicker({ value, onChange }: { value: string[]; onChange: (v: 
       <div className="sysrole-grid">
         {systemRoles.map((r) => (
           <label key={r.id} className={`sysrole ${value.includes(r.id) ? 'on' : ''}`}>
-            <input type="checkbox" checked={value.includes(r.id)} onChange={(e) => onChange(e.target.checked ? [...value, r.id] : value.filter((x) => x !== r.id))} />
+            <input
+              type="checkbox"
+              checked={value.includes(r.id)}
+              onChange={(e) => onChange(e.target.checked ? [...value, r.id] : value.filter((x) => x !== r.id))}
+            />
             <span>
               <b>{t(r.name)}</b>
               <span className="muted small"> {t(r.description)}</span>
@@ -218,7 +233,8 @@ function SystemRolePicker({ value, onChange }: { value: string[]; onChange: (v: 
       </div>
       {conflicts.map(([a, b, why]) => (
         <div key={a + b} className="warn-box small">
-          ⚠ {t('Unvereinbare Systemrollen')}: {t(systemRoles.find((r) => r.id === a)?.name ?? a)} + {t(systemRoles.find((r) => r.id === b)?.name ?? b)}. {t(why)}
+          ⚠ {t('Unvereinbare Systemrollen')}: {t(systemRoles.find((r) => r.id === a)?.name ?? a)} +{' '}
+          {t(systemRoles.find((r) => r.id === b)?.name ?? b)}. {t(why)}
         </div>
       ))}
     </div>

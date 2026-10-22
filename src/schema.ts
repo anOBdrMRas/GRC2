@@ -1,5 +1,5 @@
 // Declarative field definitions that drive the generic module editors.
-import type { EntityKind } from './types';
+import { mandateTypes, type EntityKind } from './types';
 import { orgUnits } from './logic';
 
 export const auditTypes = ['Internes Audit', 'Zertifizierungsaudit', 'Systemaudit', 'Kundenaudit', 'Lieferantenaudit'];
@@ -27,6 +27,7 @@ export type FieldType =
   | 'positionRoles' // roles of a position with comment
   | 'positionHolders' // persons holding a position (stored on the user)
   | 'roleRelations' // read-only: positions and persons holding a role
+  | 'mandates' // read-only: mandates related to the entity (refKind says which kind the entity is)
   | 'findings' // audit findings table
   | 'systemRoles'; // tool system roles of a user
 
@@ -114,7 +115,13 @@ export const modules: Record<EntityKind, ModuleDef> = {
       {
         title: 'Behandlung & Restrisiko (netto)',
         fields: [
-          { key: 'treatment', label: 'Behandlungsoption', type: 'select', options: ['Vermeiden', 'Reduzieren', 'Übertragen', 'Akzeptieren'], hint: 'ISO 27001 6.1.3' },
+          {
+            key: 'treatment',
+            label: 'Behandlungsoption',
+            type: 'select',
+            options: ['Vermeiden', 'Reduzieren', 'Übertragen', 'Akzeptieren'],
+            hint: 'ISO 27001 6.1.3',
+          },
           { key: 'treatmentPlan', label: 'Behandlungsplan / Maßnahmen', type: 'textarea', wide: true },
           { key: 'residualLikelihood', label: 'Rest-Wahrscheinlichkeit', type: 'scale', hint: scaleHint },
           { key: 'residualImpact', label: 'Rest-Ausmaß', type: 'scale', hint: scaleHint },
@@ -136,7 +143,12 @@ export const modules: Record<EntityKind, ModuleDef> = {
         ...base,
         fields: [
           ...base.fields,
-          { key: 'category', label: 'Kategorie', type: 'select', options: ['Kundenzufriedenheit', 'Effizienz', 'Innovation', 'Markt', 'Compliance', 'Informationssicherheit'] },
+          {
+            key: 'category',
+            label: 'Kategorie',
+            type: 'select',
+            options: ['Kundenzufriedenheit', 'Effizienz', 'Innovation', 'Markt', 'Compliance', 'Informationssicherheit'],
+          },
           { key: 'status', label: 'Status', type: 'select', options: ['Identifiziert', 'Bewertet', 'In Umsetzung', 'Realisiert', 'Verworfen'] },
           { key: 'ownerRoleId', label: 'Verantwortlich', type: 'ref', refKind: 'role' },
         ],
@@ -173,7 +185,12 @@ export const modules: Record<EntityKind, ModuleDef> = {
         title: 'Kontrolldesign',
         fields: [
           { key: 'controlType', label: 'Kontrollart', type: 'select', options: ['Präventiv', 'Detektiv', 'Korrektiv'] },
-          { key: 'automation', label: 'Automatisierungsgrad', type: 'select', options: ['Manuell', 'IT-abhängig manuell', 'Teilautomatisiert', 'Automatisiert'] },
+          {
+            key: 'automation',
+            label: 'Automatisierungsgrad',
+            type: 'select',
+            options: ['Manuell', 'IT-abhängig manuell', 'Teilautomatisiert', 'Automatisiert'],
+          },
           {
             key: 'frequency',
             label: 'Frequenz',
@@ -191,15 +208,30 @@ export const modules: Record<EntityKind, ModuleDef> = {
         fields: [
           { key: 'annexA', label: 'Annex-A-Controls', type: 'annexA', wide: true },
           { key: 'soaApplicable', label: 'Anwendbar', type: 'select', options: ['Ja', 'Nein'] },
-          { key: 'implementation', label: 'Umsetzungsstatus', type: 'select', options: ['Geplant', 'Teilweise umgesetzt', 'Umgesetzt', 'Nicht umgesetzt'] },
+          {
+            key: 'implementation',
+            label: 'Umsetzungsstatus',
+            type: 'select',
+            options: ['Geplant', 'Teilweise umgesetzt', 'Umgesetzt', 'Nicht umgesetzt'],
+          },
           { key: 'soaJustification', label: 'Begründung (Aufnahme/Ausschluss)', type: 'textarea', wide: true },
         ],
       },
       {
         title: 'Wirksamkeitsprüfung',
         fields: [
-          { key: 'testMethod', label: 'Prüfmethode', type: 'select', options: ['Befragung', 'Beobachtung', 'Einsichtnahme', 'Nachvollzug', 'Stichprobe'] },
-          { key: 'designEffectiveness', label: 'Design-Wirksamkeit', type: 'select', options: ['Nicht geprüft', 'Wirksam', 'Eingeschränkt wirksam', 'Nicht wirksam'] },
+          {
+            key: 'testMethod',
+            label: 'Prüfmethode',
+            type: 'select',
+            options: ['Befragung', 'Beobachtung', 'Einsichtnahme', 'Nachvollzug', 'Stichprobe'],
+          },
+          {
+            key: 'designEffectiveness',
+            label: 'Design-Wirksamkeit',
+            type: 'select',
+            options: ['Nicht geprüft', 'Wirksam', 'Eingeschränkt wirksam', 'Nicht wirksam'],
+          },
           {
             key: 'operatingEffectiveness',
             label: 'Operative Wirksamkeit',
@@ -228,7 +260,12 @@ export const modules: Record<EntityKind, ModuleDef> = {
           ...base.fields.filter((f) => f.key !== 'code'),
           { key: 'roleType', label: 'Rollentyp', type: 'select', options: ['Führungsrolle', 'Fachrolle', 'Gremium', 'Beauftragter'] },
           { key: 'orgUnit', label: 'Organisationseinheit', type: 'select', options: orgUnits },
-          { key: 'mandatory', label: 'Pflichtrolle', type: 'bool', hint: 'von Norm, Gesetz oder Behörde gefordert, z. B. ISB, DSB, Ausfuhrverantwortlicher' },
+          {
+            key: 'mandatory',
+            label: 'Pflichtrolle',
+            type: 'bool',
+            hint: 'von Norm, Gesetz oder Behörde gefordert, z. B. ISB, DSB, Ausfuhrverantwortlicher',
+          },
           { key: 'complianceRelevant', label: 'Compliance-Funktion / sensible Rolle', type: 'bool', hint: 'ISO 37301 5.3.2' },
           { key: 'roleOwnerUserId', label: 'Rollenverantwortlicher', type: 'ref', refKind: 'user', hint: 'definiert und reviewt die Rolle' },
         ],
@@ -244,7 +281,9 @@ export const modules: Record<EntityKind, ModuleDef> = {
       },
       {
         title: 'Stellen & Personen',
-        fields: [{ key: 'id', label: 'Stellen mit dieser Rolle und ihre Inhaber', type: 'roleRelations', wide: true, hint: 'Pflege im Modul Stellen' }],
+        fields: [
+          { key: 'id', label: 'Stellen mit dieser Rolle und ihre Inhaber', type: 'roleRelations', wide: true, hint: 'Pflege im Modul Stellen' },
+        ],
       },
       {
         title: 'Funktionstrennung',
@@ -259,12 +298,31 @@ export const modules: Record<EntityKind, ModuleDef> = {
         ],
       },
       {
-        title: 'Bestellung / Ernennung',
+        title: 'Erforderliche Übertragung',
         fields: [
-          { key: 'appointmentRequired', label: 'Formale Bestellung erforderlich', type: 'bool', hint: 'ISO 37301 5.3.2 · ISO 27001 5.3' },
-          { key: 'appointedAt', label: 'Bestellt am', type: 'date' },
-          { key: 'appointedByUserId', label: 'Bestellt durch', type: 'ref', refKind: 'user' },
-          { key: 'appointmentDocument', label: 'Bestellungsdokument', type: 'text', hint: 'Dokumentenname, Ablageort oder Link' },
+          {
+            key: 'requiredMandate',
+            label: 'Persönliche Übertragung erforderlich',
+            type: 'select',
+            options: ['Keine', ...mandateTypes.filter((m) => m !== 'Stellvertretung')],
+            hint: 'z. B. Bestellung des ISB oder DSB, Pflichtendelegation Arbeitsschutz · ISO 37301 5.3.2',
+          },
+          { key: 'writtenForm', label: 'Schriftform erforderlich', type: 'bool', showIf: (v) => v.requiredMandate !== 'Keine' },
+          {
+            key: 'authorityNotice',
+            label: 'Meldung an Behörde / Register',
+            type: 'text',
+            hint: 'z. B. BAFA, Datenschutzaufsicht, Handelsregister; leer = keine',
+            showIf: (v) => v.requiredMandate !== 'Keine',
+          },
+          {
+            key: 'id',
+            label: 'Übertragungen an die Rolleninhaber',
+            type: 'mandates',
+            refKind: 'role',
+            wide: true,
+            hint: 'Pflege im Modul Delegationen & Vollmachten',
+          },
         ],
       },
       { title: 'Normbezug', fields: [{ key: 'isoRefs', label: 'Normreferenzen', type: 'iso', wide: true }] },
@@ -306,6 +364,20 @@ export const modules: Record<EntityKind, ModuleDef> = {
         ],
       },
       {
+        title: 'Soll-Vollmachten',
+        fields: [
+          {
+            key: 'signingAuthority',
+            label: 'Vertretungsmacht nach außen',
+            type: 'select',
+            options: ['Keine', 'Handlungsvollmacht', 'Prokura', 'Gesetzliche Vertretung (Organ)'],
+            hint: 'Soll laut Unterschriftenregelung; erteilt wird sie der Person',
+          },
+          { key: 'approvalLimit', label: 'Freigabelimit (EUR)', type: 'number', hint: '0 = kein Limit festgelegt' },
+          { key: 'id', label: 'Übertragungen an die Stelleninhaber', type: 'mandates', refKind: 'position', wide: true },
+        ],
+      },
+      {
         title: 'Anforderungen & Kompetenz',
         fields: [
           { key: 'qualification', label: 'Ausbildung / Qualifikation', type: 'textarea', hint: 'ISO 9001 7.2' },
@@ -331,7 +403,15 @@ export const modules: Record<EntityKind, ModuleDef> = {
       },
       {
         title: 'Zugeordnete Rollen',
-        fields: [{ key: 'roles', label: 'Rollen dieser Stelle mit Kommentar', type: 'positionRoles', wide: true, hint: 'Inhaber der Stelle übernehmen diese Rollen' }],
+        fields: [
+          {
+            key: 'roles',
+            label: 'Rollen dieser Stelle mit Kommentar',
+            type: 'positionRoles',
+            wide: true,
+            hint: 'Inhaber der Stelle übernehmen diese Rollen',
+          },
+        ],
       },
       { title: 'Normbezug', fields: [{ key: 'isoRefs', label: 'Normreferenzen', type: 'iso', wide: true }] },
       {
@@ -341,6 +421,82 @@ export const modules: Record<EntityKind, ModuleDef> = {
           { key: 'status', label: 'Status', type: 'select', options: ['Entwurf', 'In Prüfung', 'Freigegeben', 'Archiviert'] },
           { key: 'lastReview', label: 'Letzte Überprüfung', type: 'date' },
           { key: 'nextReview', label: 'Nächste Überprüfung', type: 'date' },
+        ],
+      },
+    ],
+  },
+  mandate: {
+    kind: 'mandate',
+    label: 'Übertragung',
+    plural: 'Delegationen & Vollmachten',
+    codePrefix: 'DV',
+    color: '#c2255c',
+    sections: [
+      {
+        ...base,
+        fields: [
+          { key: 'code', label: 'ID', type: 'readonly', hint: 'wird automatisch vergeben' },
+          ...base.fields.filter((f) => f.key !== 'code'),
+          { key: 'mandateType', label: 'Art der Übertragung', type: 'select', options: [...mandateTypes] },
+          {
+            key: 'legalBasis',
+            label: 'Rechtsgrundlage / Anforderung',
+            type: 'text',
+            hint: 'z. B. Art. 37 DSGVO, § 13 Abs. 2 ArbSchG, §§ 48 ff. HGB',
+          },
+          { key: 'status', label: 'Status', type: 'select', options: ['Entwurf', 'Erteilt', 'Widerrufen'] },
+        ],
+      },
+      {
+        title: 'Beteiligte & Bezug',
+        fields: [
+          { key: 'recipientUserId', label: 'Empfänger (Person)', type: 'ref', refKind: 'user' },
+          { key: 'grantedByUserId', label: 'Erteilt durch (Person)', type: 'ref', refKind: 'user' },
+          { key: 'grantedByBody', label: 'Erteilt durch (Organ / Gremium)', type: 'text', hint: 'z. B. Gesellschafterversammlung' },
+          { key: 'roleId', label: 'Bezug: Rolle', type: 'ref', refKind: 'role' },
+          { key: 'positionId', label: 'Bezug: Stelle', type: 'ref', refKind: 'position' },
+        ],
+      },
+      {
+        title: 'Inhalt & Umfang',
+        fields: [
+          { key: 'scope', label: 'Übertragene Pflichten / Aufgaben', type: 'textarea', wide: true, hint: 'klar abgegrenzt' },
+          { key: 'powers', label: 'Befugnisse (Weisungs-, Entscheidungs-, Informationsrechte)', type: 'textarea', wide: true },
+          { key: 'budget', label: 'Ressourcen / Budget', type: 'text' },
+          { key: 'amountLimit', label: 'Betragsgrenze (EUR)', type: 'number', hint: '0 = keine' },
+          { key: 'representation', label: 'Vertretung', type: 'select', options: ['', 'Einzelvertretung', 'Gesamtvertretung'] },
+          { key: 'subDelegationAllowed', label: 'Weiterdelegation erlaubt', type: 'bool' },
+        ],
+      },
+      {
+        title: 'Gültigkeit & Nachweis',
+        fields: [
+          { key: 'validFrom', label: 'Gültig ab', type: 'date' },
+          { key: 'validUntil', label: 'Gültig bis', type: 'date', hint: 'leer = unbefristet' },
+          { key: 'document', label: 'Dokument', type: 'text', hint: 'Dokumentenname, Ablageort oder Link' },
+          { key: 'acceptedAt', label: 'Angenommen / gegengezeichnet am', type: 'date', hint: 'erst mit Annahme wirksam' },
+          {
+            key: 'registerEntry',
+            label: 'Registereintrag / Behördenmeldung',
+            type: 'text',
+            hint: 'z. B. Handelsregister HRB, BAFA, Datenschutzaufsicht',
+          },
+          { key: 'registeredAt', label: 'Eingetragen / gemeldet am', type: 'date' },
+          { key: 'revokedAt', label: 'Widerrufen am', type: 'date', showIf: (v) => v.status === 'Widerrufen' },
+        ],
+      },
+      {
+        title: 'Überwachung durch den Delegierenden',
+        fields: [
+          { key: 'supervision', label: 'Überwachungsmaßnahme', type: 'textarea', wide: true, hint: 'Auswahl, Einweisung, Überwachung (§ 130 OWiG)' },
+          {
+            key: 'supervisionFrequency',
+            label: 'Frequenz',
+            type: 'select',
+            options: ['Monatlich', 'Quartalsweise', 'Halbjährlich', 'Jährlich', 'Ereignisbezogen'],
+          },
+          { key: 'lastSupervision', label: 'Letzte Kontrolle', type: 'date' },
+          { key: 'nextSupervision', label: 'Nächste Kontrolle', type: 'date' },
         ],
       },
     ],
@@ -403,6 +559,48 @@ export const modules: Record<EntityKind, ModuleDef> = {
         ],
       },
       {
+        title: 'Arbeitsverhältnis',
+        fields: [
+          { key: 'employer', label: 'Arbeitgeber / Vertragspartner', type: 'text' },
+          {
+            key: 'employmentType',
+            label: 'Beschäftigungsart',
+            type: 'select',
+            options: ['Unbefristet angestellt', 'Befristet angestellt', 'Organmitglied', 'Leiharbeit', 'Freie Mitarbeit', 'Externer Dienstleister'],
+          },
+          { key: 'entryDate', label: 'Eintritt / Vertragsbeginn', type: 'date' },
+          { key: 'contractEnd', label: 'Befristet bis / Austritt', type: 'date', hint: 'leer = unbefristet' },
+          {
+            key: 'contractRef',
+            label: 'Vertragsreferenz (HR-System)',
+            type: 'text',
+            hint: 'nur Verweis – Vertragsinhalte bleiben im HR-System (§ 26 BDSG)',
+          },
+          {
+            key: 'jobDescriptionAckAt',
+            label: 'Stellenbeschreibung zur Kenntnis genommen am',
+            type: 'date',
+            hint: 'macht die Stellenbeschreibung verbindlich (§ 106 GewO)',
+          },
+          { key: 'confidentialityAt', label: 'Vertraulichkeitsverpflichtung am', type: 'date', hint: 'ISO 27001 A.6.6' },
+          { key: 'codeOfConductAt', label: 'Verhaltenskodex bestätigt am', type: 'date', hint: 'ISO 37301 5.2 / 7.3' },
+          { key: 'conflictOfInterestAt', label: 'Interessenkonflikterklärung am', type: 'date' },
+        ],
+      },
+      {
+        title: 'Delegationen & Vollmachten',
+        fields: [
+          {
+            key: 'id',
+            label: 'Dieser Person übertragen',
+            type: 'mandates',
+            refKind: 'user',
+            wide: true,
+            hint: 'Pflege im Modul Delegationen & Vollmachten',
+          },
+        ],
+      },
+      {
         title: 'Systemrollen (Berechtigungen im Tool)',
         fields: [{ key: 'systemRoles', label: 'Zugewiesene Systemrollen', type: 'systemRoles', wide: true }],
       },
@@ -453,7 +651,12 @@ export const modules: Record<EntityKind, ModuleDef> = {
         title: 'Beteiligte',
         fields: [
           { key: 'leadAuditorUserId', label: 'Leitender Auditor', type: 'ref', refKind: 'user' },
-          { key: 'externalLeadAuditor', label: 'Leitender Auditor (extern)', type: 'text', hint: 'bei Zertifizierungs-, Kunden- oder Lieferantenaudits' },
+          {
+            key: 'externalLeadAuditor',
+            label: 'Leitender Auditor (extern)',
+            type: 'text',
+            hint: 'bei Zertifizierungs-, Kunden- oder Lieferantenaudits',
+          },
           { key: 'teamUserIds', label: 'Auditteam', type: 'refs', refKind: 'user', wide: true },
           { key: 'externalOrg', label: 'Externe Organisation', type: 'text', hint: 'Zertifizierungsstelle, Kunde oder Lieferant' },
           { key: 'auditeeContactUserId', label: 'Ansprechpartner auditierte Seite', type: 'ref', refKind: 'user' },
@@ -484,9 +687,12 @@ export const modules: Record<EntityKind, ModuleDef> = {
           { key: 'strengths', label: 'Stärken', type: 'textarea', wide: true },
         ],
       },
-      { title: 'Feststellungen', fields: [{ key: 'findings', label: 'Feststellungen & Korrekturmaßnahmen', type: 'findings', wide: true, hint: 'ISO 9001 10.2' }] },
+      {
+        title: 'Feststellungen',
+        fields: [{ key: 'findings', label: 'Feststellungen & Korrekturmaßnahmen', type: 'findings', wide: true, hint: 'ISO 9001 10.2' }],
+      },
     ],
   },
 };
 
-export const kindOrder: EntityKind[] = ['risk', 'opportunity', 'control', 'role', 'position', 'kpi', 'audit', 'user'];
+export const kindOrder: EntityKind[] = ['risk', 'opportunity', 'control', 'role', 'position', 'mandate', 'kpi', 'audit', 'user'];

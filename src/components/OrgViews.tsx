@@ -3,7 +3,19 @@ import type { Position, PositionRole, Role } from '../types';
 import { useStore } from '../store';
 import { useUi } from '../ui';
 import { modules } from '../schema';
-import { findUsages, orgUnits, positionHolders, positionSodConflicts, subordinatePositions, today } from '../logic';
+import {
+  findUsages,
+  fmtEur,
+  mandateState,
+  mandateStateLabel,
+  orgIssues,
+  orgUnits,
+  positionHolders,
+  positionSodConflicts,
+  signingPrefix,
+  subordinatePositions,
+  today,
+} from '../logic';
 import { isoLabel } from '../iso';
 import { t } from '../i18n';
 import { Empty, Picker, StatusPill, Tag, download } from './common';
@@ -110,7 +122,12 @@ export function PositionHolders({ positionId }: { positionId: string }) {
                   <input type="date" value={u.positionSince} onChange={(e) => update('user', u.id, { positionSince: e.target.value })} />
                 </td>
                 <td>
-                  <button type="button" className="tag-x" title={t('Entfernen')} onClick={() => update('user', u.id, { positionId: '', positionSince: '' })}>
+                  <button
+                    type="button"
+                    className="tag-x"
+                    title={t('Entfernen')}
+                    onClick={() => update('user', u.id, { positionId: '', positionSince: '' })}
+                  >
                     ×
                   </button>
                 </td>
@@ -178,7 +195,9 @@ export function RoleRelations({ roleId }: { roleId: string }) {
 
 function usePositionDerived(position: Position) {
   const s = useStore();
-  const roles = position.roles.map((pr) => ({ pr, role: s.role.find((r) => r.id === pr.roleId) })).filter((x): x is { pr: PositionRole; role: Role } => !!x.role);
+  const roles = position.roles
+    .map((pr) => ({ pr, role: s.role.find((r) => r.id === pr.roleId) }))
+    .filter((x): x is { pr: PositionRole; role: Role } => !!x.role);
   return {
     roles,
     holders: positionHolders(position, s.user),
@@ -189,6 +208,11 @@ function usePositionDerived(position: Position) {
     steps: roles.flatMap(({ role }) => findUsages(s.processes, 'role', role.id).map((u) => ({ ...u, role }))),
     processesOwned: s.processes.filter((p) => roles.some(({ role }) => role.id === p.ownerRoleId)),
     name: (id: string) => (id === 'n/a' ? 'n/a' : (s.position.find((p) => p.id === id)?.title ?? '–')),
+    userName: (id: string) => s.user.find((u) => u.id === id)?.title ?? '–',
+    mandates: s.mandate.filter((m) => m.positionId === position.id || positionHolders(position, s.user).some((u) => u.id === m.recipientUserId)),
+    mandateIssues: orgIssues(s).filter(
+      (i) => i.positionId === position.id || (!!i.mandateId && s.mandate.find((m) => m.id === i.mandateId)?.positionId === position.id),
+    ),
   };
 }
 
@@ -200,12 +224,17 @@ export function PositionInsights({ position, part }: { position: Position; part:
   if (part === 'warnings') {
     const issues: string[] = [];
     if (d.holders.length === 0) issues.push(t('Stelle ist nicht besetzt.'));
-    if (d.holders.length > position.headcount) issues.push(t('Mehr Inhaber ({n}) als Planstellen ({m}).', { n: d.holders.length, m: position.headcount }));
-    for (const [a, b] of d.sod) issues.push(t('Funktionstrennung: Stelle bündelt die unvereinbaren Rollen „{a}“ und „{b}“.', { a: a.title, b: b.title }));
-    for (const u of d.holders) if (u.status !== 'Aktiv') issues.push(t('{user} ist {status}, aber der Stelle zugeordnet.', { user: u.title, status: t(u.status).toLowerCase() }));
+    if (d.holders.length > position.headcount)
+      issues.push(t('Mehr Inhaber ({n}) als Planstellen ({m}).', { n: d.holders.length, m: position.headcount }));
+    for (const [a, b] of d.sod)
+      issues.push(t('Funktionstrennung: Stelle bündelt die unvereinbaren Rollen „{a}“ und „{b}“.', { a: a.title, b: b.title }));
+    for (const u of d.holders)
+      if (u.status !== 'Aktiv')
+        issues.push(t('{user} ist {status}, aber der Stelle zugeordnet.', { user: u.title, status: t(u.status).toLowerCase() }));
     if (position.deputyPositionId && !position.deputyInducted) issues.push(t('Vertretung ist nicht eingearbeitet.'));
     if (!position.reportsToDisciplinaryId) issues.push(t('Keine disziplinarische Berichtslinie festgelegt.'));
     if (position.nextReview && position.nextReview < today()) issues.push(t('Review überfällig (fällig {date}).', { date: position.nextReview }));
+    issues.push(...d.mandateIssues.map((i) => i.text));
     if (issues.length === 0) return null;
     return (
       <div className="insights">
@@ -328,7 +357,10 @@ export function PositionProfile({ position: p, onClose }: { position: Position; 
               {row('Berichtet disziplinarisch an', p.reportsToDisciplinaryId ? d.name(p.reportsToDisciplinaryId) : '')}
               {row('Berichtet fachlich an', p.reportsToFunctionalId ? d.name(p.reportsToFunctionalId) : '')}
               {row('Disziplinarisch unterstellt', d.subDisciplinary.map((x) => x.title).join(', '))}
-              {row('Vertretung durch Stelle', p.deputyPositionId ? `${d.name(p.deputyPositionId)} (${p.deputyInducted ? t('eingearbeitet') : t('nicht eingearbeitet')})` : '')}
+              {row(
+                'Vertretung durch Stelle',
+                p.deputyPositionId ? `${d.name(p.deputyPositionId)} (${p.deputyInducted ? t('eingearbeitet') : t('nicht eingearbeitet')})` : '',
+              )}
               {row('Stelleninhaber', d.holders.map((u) => u.title).join(', ') || t('unbesetzt'))}
             </tbody>
           </table>
@@ -340,7 +372,22 @@ export function PositionProfile({ position: p, onClose }: { position: Position; 
               {row('Befugnisse / Vollmachten', p.authorities)}
             </tbody>
           </table>
-          <h2>3. {t('Anforderungen & Kompetenz')}</h2>
+          <h2>3. {t('Vollmachten & Übertragungen')}</h2>
+          <table className="profile-table">
+            <tbody>
+              {row('Vertretungsmacht nach außen (Soll)', t(p.signingAuthority))}
+              {row('Freigabelimit (EUR)', p.approvalLimit ? fmtEur(p.approvalLimit) : '')}
+              {d.mandates.map((m) =>
+                row(
+                  `${m.code} ${d.userName(m.recipientUserId)}`,
+                  `${t(m.mandateType)}${m.amountLimit ? ` · ${fmtEur(m.amountLimit)}` : ''}${m.representation ? ` · ${t(m.representation)}` : ''} · ${m.validFrom || '–'} – ${m.validUntil || t('unbefristet')} · ${t(mandateStateLabel[mandateState(m)])}`,
+                  m.id,
+                  false,
+                ),
+              )}
+            </tbody>
+          </table>
+          <h2>4. {t('Anforderungen & Kompetenz')}</h2>
           <table className="profile-table">
             <tbody>
               {row('Ausbildung / Qualifikation', p.qualification)}
@@ -351,14 +398,16 @@ export function PositionProfile({ position: p, onClose }: { position: Position; 
               {row('Vertraulichkeitsvereinbarung erforderlich', p.ndaRequired ? t('ja') : t('nein'))}
             </tbody>
           </table>
-          <h2>4. {t('Rollen im Managementsystem')}</h2>
+          <h2>5. {t('Rollen im Managementsystem')}</h2>
           <table className="profile-table">
             <tbody>
-              {d.roles.map(({ pr, role }) => row(`${role.code} ${role.title}`, [pr.comment, role.responsibilities].filter(Boolean).join(' – '), role.id, false))}
+              {d.roles.map(({ pr, role }) =>
+                row(`${role.code} ${role.title}`, [pr.comment, role.responsibilities].filter(Boolean).join(' – '), role.id, false),
+              )}
               {d.roles.length === 0 && row('Rollen', '')}
             </tbody>
           </table>
-          <h2>5. {t('Beteiligung an Prozessschritten (abgeleitet)')}</h2>
+          <h2>6. {t('Beteiligung an Prozessschritten (abgeleitet)')}</h2>
           <table className="profile-table">
             <thead>
               <tr>
@@ -486,18 +535,25 @@ function HierarchyTree({ line, showRoles }: { line: 'disciplinary' | 'functional
 }
 
 function PositionCard({ position: p, showRoles }: { position: Position; showRoles: boolean }) {
-  const { user, role } = useStore();
+  const { user, role, mandate } = useStore();
   const go = useUi((s) => s.go);
   const holders = positionHolders(p, user);
+  const signed = (id: string, name: string) => [signingPrefix(id, mandate), name].filter(Boolean).join(' ');
   const sod = positionSodConflicts(p, role).length > 0;
   return (
-    <div className={`pos-card ${p.isManager ? 'manager' : ''}`} style={{ borderTopColor: orgUnitColor[p.orgUnit] ?? '#868e96' }} onClick={() => go('position', p.id)}>
+    <div
+      className={`pos-card ${p.isManager ? 'manager' : ''}`}
+      style={{ borderTopColor: orgUnitColor[p.orgUnit] ?? '#868e96' }}
+      onClick={() => go('position', p.id)}
+    >
       <div className="pos-title">{p.title}</div>
       <div className="pos-meta">
         <span className="mono">{p.code}</span> · {t(p.orgUnit)}
         {p.headcount > 1 && ` · ${holders.length}/${p.headcount}`}
       </div>
-      <div className={`pos-holders ${holders.length === 0 ? 'warn' : ''}`}>{holders.map((u) => u.title).join(', ') || t('unbesetzt')}</div>
+      <div className={`pos-holders ${holders.length === 0 ? 'warn' : ''}`}>
+        {holders.map((u) => signed(u.id, u.title)).join(', ') || t('unbesetzt')}
+      </div>
       {showRoles && p.roles.length > 0 && (
         <div className="pos-roles">
           {p.roles.map((pr) => {

@@ -1,9 +1,9 @@
 // Domain model of the GRC prototype.
 // Metadata fields are aligned with ISO 9001:2015, ISO/IEC 27001:2022 and ISO 37301:2021.
 
-export type EntityKind = 'risk' | 'opportunity' | 'control' | 'role' | 'position' | 'kpi' | 'user' | 'audit';
+export type EntityKind = 'risk' | 'opportunity' | 'control' | 'role' | 'position' | 'mandate' | 'kpi' | 'user' | 'audit';
 /** Kinds that can be assigned to process steps. */
-export type AssignableKind = Exclude<EntityKind, 'user' | 'audit' | 'position'>;
+export type AssignableKind = Exclude<EntityKind, 'user' | 'audit' | 'position' | 'mandate'>;
 
 export interface BaseEntity {
   id: string;
@@ -90,11 +90,11 @@ export interface Role extends BaseEntity {
   trainings: string;
   incompatibleRoleIds: string[];
   complianceRelevant: boolean;
-  // appointment (ISO 37301 5.3.2, ISO 27001 5.3)
-  appointmentRequired: boolean;
-  appointedAt: string;
-  appointedByUserId: string;
-  appointmentDocument: string;
+  // formal transfer to the person (ISO 37301 5.3.2, ISO 27001 5.3): 'Keine' or a MandateType
+  requiredMandate: string;
+  writtenForm: boolean;
+  /** authority or register that must be notified, e.g. BAFA, data protection authority */
+  authorityNotice: string;
   // validity & review
   version: string;
   status: string;
@@ -130,6 +130,9 @@ export interface Position extends BaseEntity {
   reportsToFunctionalId: string;
   deputyPositionId: string;
   deputyInducted: boolean;
+  // target authorities (signature rules); actual authority is granted per person by a mandate
+  signingAuthority: string;
+  approvalLimit: number;
   roles: PositionRole[];
   // validity & review
   version: string;
@@ -150,6 +153,57 @@ export interface User extends BaseEntity {
   /** position (Stelle) the person holds */
   positionId: string;
   positionSince: string;
+  // employment / contract (details stay in the HR system, only reference and evidence here)
+  employer: string;
+  employmentType: string;
+  entryDate: string;
+  /** fixed-term end or exit date */
+  contractEnd: string;
+  contractRef: string;
+  jobDescriptionAckAt: string;
+  confidentialityAt: string;
+  codeOfConductAt: string;
+  conflictOfInterestAt: string;
+}
+
+export const mandateTypes = [
+  'Bestellung / Benennung',
+  'Pflichtendelegation',
+  'Prokura',
+  'Handlungsvollmacht',
+  'Bank- / Zahlungsvollmacht',
+  'Interne Freigabebefugnis',
+  'Stellvertretung',
+] as const;
+
+/** Personal transfer of duties or powers: appointment, delegation of duties, power of attorney. */
+export interface Mandate extends BaseEntity {
+  mandateType: string;
+  legalBasis: string;
+  recipientUserId: string;
+  grantedByUserId: string;
+  /** body granting it if not a person, e.g. shareholders' meeting */
+  grantedByBody: string;
+  roleId: string;
+  positionId: string;
+  scope: string;
+  powers: string;
+  budget: string;
+  amountLimit: number;
+  representation: string;
+  subDelegationAllowed: boolean;
+  status: 'Entwurf' | 'Erteilt' | 'Widerrufen';
+  validFrom: string;
+  validUntil: string;
+  revokedAt: string;
+  document: string;
+  acceptedAt: string;
+  registerEntry: string;
+  registeredAt: string;
+  supervision: string;
+  supervisionFrequency: string;
+  lastSupervision: string;
+  nextSupervision: string;
 }
 
 export type FindingType = 'Hauptabweichung' | 'Nebenabweichung' | 'Beobachtung' | 'Verbesserungspotenzial' | 'Positive Feststellung';
@@ -271,6 +325,7 @@ export interface EntityMap {
   control: Control;
   role: Role;
   position: Position;
+  mandate: Mandate;
   kpi: Kpi;
   user: User;
   audit: Audit;
