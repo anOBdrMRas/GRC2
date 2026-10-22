@@ -3,7 +3,7 @@ import { useStore } from '../store';
 import { useUi } from '../ui';
 import { modules } from '../schema';
 import { effectiveRights, moduleKeys, moduleLabels, rightLabel, systemRoleConflicts, systemRoles, userSystemRoleConflicts } from '../permissions';
-import { orgIssues, personSodConflicts, rolesOfUser } from '../logic';
+import { fmtEur, mandateState, orgIssues, personSodConflicts, rolesOfUser } from '../logic';
 import { Tag } from './common';
 import { t } from '../i18n';
 
@@ -19,6 +19,7 @@ export function UserInsights({ user }: { user: User }) {
   const sod = personSodConflicts(org).filter((c) => c.user.id === user.id);
   const expired = user.validUntil && user.validUntil < new Date().toISOString().slice(0, 10);
   const issues = orgIssues(org).filter((i) => i.userId === user.id);
+  const effective = org.mandate.filter((m) => m.recipientUserId === user.id && mandateState(m) === 'active');
 
   return (
     <div className="insights">
@@ -82,6 +83,54 @@ export function UserInsights({ user }: { user: User }) {
             </div>
           </>
         )}
+      </div>
+      <div className="insight">
+        <div className="insight-title">{t('Befugnisse')}</div>
+        <div className="derived">
+          <div className="derived-row">
+            <span className="derived-label">{t('aus der Stelle')}</span>
+            <span className="small">
+              {position
+                ? [
+                    position.authorities,
+                    position.signingAuthority !== 'Keine' ? `${t('Soll-Vollmacht')}: ${t(position.signingAuthority)}` : '',
+                    position.approvalLimit ? `${t('Freigabelimit')}: ${fmtEur(position.approvalLimit)}` : '',
+                  ]
+                    .filter(Boolean)
+                    .join(' · ') || '–'
+                : '–'}
+            </span>
+          </div>
+          <div className="derived-row">
+            <span className="derived-label">{t('aus Rollen')}</span>
+            <span className="derived-findings small">
+              {memberships.filter(({ role }) => role.authorities).length === 0 && <span className="muted">–</span>}
+              {memberships
+                .filter(({ role }) => role.authorities)
+                .map(({ role }) => (
+                  <div key={role.id}>
+                    <span className="link" onClick={() => go('role', role.id)}>
+                      {role.title}
+                    </span>
+                    : {role.authorities}
+                  </div>
+                ))}
+            </span>
+          </div>
+          <div className="derived-row">
+            <span className="derived-label">{t('persönlich übertragen (wirksam)')}</span>
+            <span className="tags">
+              {effective.length === 0 && <span className="muted small">–</span>}
+              {effective.map((m) => (
+                <Tag key={m.id} color={modules.mandate.color} onClick={() => go('mandate', m.id)}>
+                  {t(m.mandateType)}
+                  {m.amountLimit ? ` · ${fmtEur(m.amountLimit)}` : ''}
+                  {m.roleId ? ` · ${roles.find((r) => r.id === m.roleId)?.title ?? ''}` : ''}
+                </Tag>
+              ))}
+            </span>
+          </div>
+        </div>
       </div>
       <div className="insight">
         <div className="insight-title">{t('Effektive Rechte im Tool')}</div>

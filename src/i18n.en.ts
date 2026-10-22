@@ -889,4 +889,19 @@ export const en: Record<string, string> = {
   'Auswahl, Einweisung, Überwachung (§ 130 OWiG)': 'selection, instruction, supervision (§ 130 OWiG)',
   'Letzte Kontrolle': 'Last check',
   'Nächste Kontrolle': 'Next check',
+  'Funktionale Befugnisse der Rolle': 'Functional authorities of the role',
+  'gilt für jeden Inhaber, z. B. Informations-, Prüf-, Vetorecht; Beträge und Vollmachten an der Stelle bzw. als Übertragung':
+    'applies to every holder, e.g. right to information, audit, veto; amounts and powers belong to the position or a transfer',
+  'Befugnisse der Stelle': 'Authorities of the position',
+  'Weisungs-, Budget- und Entscheidungsbefugnisse': 'Authority to instruct, budget and decision authority',
+  'ergibt sich aus der Position; persönlich erteilt wird sie über Delegationen & Vollmachten':
+    'follows from the position; granted personally via delegations & powers of attorney',
+  'Funktionale Befugnisse aus Rollen': 'Functional authorities from roles',
+  'Befugnisse, Vollmachten & Übertragungen': 'Authorities, powers of attorney & transfers',
+  'aus Rolle {role}': 'from role {role}',
+  'aus der Stelle': 'from the position',
+  'aus Rollen': 'from roles',
+  'persönlich übertragen (wirksam)': 'personally transferred (effective)',
+  'Soll-Vollmacht': 'Target power',
+  Freigabelimit: 'Approval limit',
 };

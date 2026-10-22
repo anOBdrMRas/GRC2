@@ -279,6 +279,22 @@ export function PositionInsights({ position, part }: { position: Position; part:
             <span className="tags">{tags(d.deputyFor)}</span>
           </div>
           <div className="derived-row">
+            <span className="derived-label">{t('Funktionale Befugnisse aus Rollen')}</span>
+            <span className="derived-findings small">
+              {d.roles.filter(({ role }) => role.authorities).length === 0 && <span className="muted">–</span>}
+              {d.roles
+                .filter(({ role }) => role.authorities)
+                .map(({ role }) => (
+                  <div key={role.id}>
+                    <span className="link" onClick={() => go('role', role.id)}>
+                      {role.title}
+                    </span>
+                    : {role.authorities}
+                  </div>
+                ))}
+            </span>
+          </div>
+          <div className="derived-row">
             <span className="derived-label">{t('Prozessverantwortung')}</span>
             <span className="tags">
               {d.processesOwned.length === 0 && <span className="muted small">–</span>}
@@ -369,12 +385,15 @@ export function PositionProfile({ position: p, onClose }: { position: Position; 
             <tbody>
               {row('Ziel / Zweck der Stelle', p.purpose)}
               {row('Hauptaufgaben', p.tasks)}
-              {row('Befugnisse / Vollmachten', p.authorities)}
             </tbody>
           </table>
-          <h2>3. {t('Vollmachten & Übertragungen')}</h2>
+          <h2>3. {t('Befugnisse, Vollmachten & Übertragungen')}</h2>
           <table className="profile-table">
             <tbody>
+              {row('Befugnisse der Stelle', p.authorities)}
+              {d.roles
+                .filter(({ role }) => role.authorities)
+                .map(({ role }) => row(t('aus Rolle {role}', { role: role.title }), role.authorities, 'ra' + role.id, false))}
               {row('Vertretungsmacht nach außen (Soll)', t(p.signingAuthority))}
               {row('Freigabelimit (EUR)', p.approvalLimit ? fmtEur(p.approvalLimit) : '')}
               {d.mandates.map((m) =>

@@ -274,7 +274,13 @@ export const modules: Record<EntityKind, ModuleDef> = {
         title: 'Verantwortung & Kompetenz',
         fields: [
           { key: 'responsibilities', label: 'Verantwortlichkeiten', type: 'textarea', wide: true, hint: 'ISO 9001 5.3' },
-          { key: 'authorities', label: 'Befugnisse', type: 'textarea', wide: true },
+          {
+            key: 'authorities',
+            label: 'Funktionale Befugnisse der Rolle',
+            type: 'textarea',
+            wide: true,
+            hint: 'gilt für jeden Inhaber, z. B. Informations-, Prüf-, Vetorecht; Beträge und Vollmachten an der Stelle bzw. als Übertragung',
+          },
           { key: 'competencies', label: 'Erforderliche Kompetenzen', type: 'textarea', hint: 'ISO 9001 7.2' },
           { key: 'trainings', label: 'Pflichtschulungen / Awareness', type: 'textarea', hint: 'ISO 27001 A.6.3 · ISO 37301 7.2.3' },
         ],
@@ -360,12 +366,18 @@ export const modules: Record<EntityKind, ModuleDef> = {
         fields: [
           { key: 'purpose', label: 'Ziel / Zweck der Stelle', type: 'textarea', wide: true },
           { key: 'tasks', label: 'Hauptaufgaben', type: 'textarea', wide: true, hint: 'ISO 9001 5.3' },
-          { key: 'authorities', label: 'Befugnisse / Vollmachten', type: 'textarea', wide: true, hint: 'z. B. Unterschriftsregelung' },
         ],
       },
       {
-        title: 'Soll-Vollmachten',
+        title: 'Befugnisse der Stelle',
         fields: [
+          {
+            key: 'authorities',
+            label: 'Weisungs-, Budget- und Entscheidungsbefugnisse',
+            type: 'textarea',
+            wide: true,
+            hint: 'ergibt sich aus der Position; persönlich erteilt wird sie über Delegationen & Vollmachten',
+          },
           {
             key: 'signingAuthority',
             label: 'Vertretungsmacht nach außen',
