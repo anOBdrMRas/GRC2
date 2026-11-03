@@ -154,8 +154,8 @@ export function seedData() {
       confidentialityAt: '2016-05-01',
       codeOfConductAt: '2026-01-20',
     }),
-    make('user', 'U-010', 'Konrad Garhammer', {
-      email: 'k.garhammer@example.com',
+    make('user', 'U-010', 'Konrad Huber', {
+      email: 'k.huber@example.com',
       department: 'Geschäftsführung',
       jobTitle: 'Geschäftsführer',
       systemRoles: ['reader'],
@@ -230,8 +230,8 @@ export function seedData() {
       jobDescriptionAckAt: '2026-02-10',
       confidentialityAt: '2024-01-01',
     }),
-    make('user', 'U-015', 'Karsten Eschamann', {
-      email: 'k.eschamann@example.com',
+    make('user', 'U-015', 'Karsten Müller', {
+      email: 'k.mueller@example.com',
       department: 'Export Control & Customs',
       jobTitle: 'Director Export Control & Customs',
       systemRoles: ['compliance'],
@@ -246,8 +246,8 @@ export function seedData() {
       codeOfConductAt: '2026-01-20',
       conflictOfInterestAt: '2026-01-20',
     }),
-    make('user', 'U-016', 'Andreas Obermaier', {
-      email: 'a.obermaier@example.com',
+    make('user', 'U-016', 'Andreas Maier', {
+      email: 'a.maier@example.com',
       department: 'Legal & Compliance',
       jobTitle: 'Head of Legal & Compliance',
       systemRoles: ['grc-manager', 'org-manager'],
@@ -262,8 +262,8 @@ export function seedData() {
       codeOfConductAt: '2026-01-20',
       conflictOfInterestAt: '2026-01-20',
     }),
-    make('user', 'U-017', 'Torsten Blaschke', {
-      email: 't.blaschke@example.com',
+    make('user', 'U-017', 'Torsten Schmidt', {
+      email: 't.schmidt@example.com',
       department: 'Controlling',
       jobTitle: 'Leiter Controlling',
       systemRoles: ['reader'],
