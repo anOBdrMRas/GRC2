@@ -9,6 +9,7 @@ import { StepPanel } from './StepPanel';
 import { ConfirmButton, Empty, StatusPill, download } from './common';
 import { openFindingsByElement } from './AuditViews';
 import { useRights } from '../useRights';
+import { AiProcessDraft } from './AiDraft';
 import { t } from '../i18n';
 
 const categories: ProcessModel['category'][] = ['Führungsprozess', 'Kernprozess', 'Unterstützungsprozess'];
@@ -20,7 +21,10 @@ export function ProcessView() {
   const selectedId = useUi((s) => s.selected.processes);
   const select = useUi((s) => s.select);
   const fileInput = useRef<HTMLInputElement>(null);
-  const editable = useRights().canEdit('processes');
+  const { canCreate, isOwnerOf } = useRights();
+  const editable = canCreate('processes');
+  const draftOpen = useUi((s) => s.draftOpen);
+  const setDraftOpen = useUi((s) => s.setDraftOpen);
   const [naming, setNaming] = useState(false);
   const [newTitle, setNewTitle] = useState('');
   const process = processes.find((p) => p.id === selectedId) ?? processes[0];
@@ -39,26 +43,28 @@ export function ProcessView() {
           <h2>{t('Prozesse')}</h2>
         </div>
         {editable ? (
-        <div className="row gap">
-          <button className="primary" onClick={() => setNaming(true)}>
-            {t('+ Prozess')}
-          </button>
-          <button onClick={() => fileInput.current?.click()}>{t('BPMN importieren')}</button>
-          <input
-            ref={fileInput}
-            type="file"
-            accept=".bpmn,.xml"
-            hidden
-            onChange={(e) => {
-              const f = e.target.files?.[0];
-              if (f) importBpmn(f);
-              e.target.value = '';
-            }}
-          />
-        </div>
+          <div className="row gap">
+            <button className="primary" onClick={() => setNaming(true)}>
+              {t('+ Prozess')}
+            </button>
+            <button onClick={() => setDraftOpen(true)}>✨ {t('Mit KI entwerfen')}</button>
+            <button onClick={() => fileInput.current?.click()}>{t('BPMN importieren')}</button>
+            <input
+              ref={fileInput}
+              type="file"
+              accept=".bpmn,.xml"
+              hidden
+              onChange={(e) => {
+                const f = e.target.files?.[0];
+                if (f) importBpmn(f);
+                e.target.value = '';
+              }}
+            />
+          </div>
         ) : (
-          <span className="badge readonly">{t('Nur Lesen')}</span>
+          <span className="small muted">{t('Neue Prozesse legt die Administration an.')}</span>
         )}
+        {draftOpen && editable && <AiProcessDraft onClose={() => setDraftOpen(false)} />}
         {naming && (
           <form
             className="row gap"
@@ -70,7 +76,13 @@ export function ProcessView() {
               setNaming(false);
             }}
           >
-            <input id="new-process-title" autoFocus placeholder={t('Name des Prozesses')} value={newTitle} onChange={(e) => setNewTitle(e.target.value)} />
+            <input
+              id="new-process-title"
+              autoFocus
+              placeholder={t('Name des Prozesses')}
+              value={newTitle}
+              onChange={(e) => setNewTitle(e.target.value)}
+            />
             <button type="submit" className="primary" disabled={!newTitle.trim()}>
               {t('Anlegen')}
             </button>
@@ -85,6 +97,7 @@ export function ProcessView() {
                 <div key={p.id} className={`proc-item ${p.id === process?.id ? 'selected' : ''}`} onClick={() => select('processes', p.id)}>
                   <div>
                     <span className="mono">{p.code}</span> {p.title}
+                    {isOwnerOf('processes', p) && <span className="owner-badge">{t('Owner')}</span>}
                   </div>
                   <div className="muted small">
                     v{p.version} · {t(p.status)}
@@ -111,7 +124,8 @@ function ProcessWorkspace({ process }: { process: ProcessModel }) {
   const clearFocus = useUi((s) => s.clearFocus);
   const openStep = useUi((s) => s.openStep);
   const select = useUi((s) => s.select);
-  const editable = useRights().canEdit('processes');
+  const { canEditEntity, isOwnerOf, isAdmin } = useRights();
+  const editable = canEditEntity('processes', process);
   const audits = useStore((s) => s.audit);
   const findingCounts = useMemo(() => openFindingsByElement(audits, process.id), [audits, process.id]);
 
@@ -125,7 +139,8 @@ function ProcessWorkspace({ process }: { process: ProcessModel }) {
       <div className="workspace-head">
         <div>
           <div className="muted small">
-            {process.code} · {t(process.category)} · v{process.version} · {t(process.status)}
+            {process.code} · {t(process.category)}
+            {process.area && ` · ${process.area}`} · v{process.version} · {t(process.status)}
           </div>
           <h2>{process.title}</h2>
         </div>
@@ -147,7 +162,9 @@ function ProcessWorkspace({ process }: { process: ProcessModel }) {
               <button onClick={async () => download(`${fileBase}.svg`, await editor.current!.saveSvg(), 'image/svg+xml')}>⬇ SVG</button>
             </>
           )}
-          {editable ? (
+          {editable && !isAdmin && <span className="owner-badge big">🔑 {t('Owner – Sie dürfen bearbeiten')}</span>}
+          {isOwnerOf('processes', process) && isAdmin && <span className="owner-badge">{t('Owner')}</span>}
+          {isAdmin ? (
             <ConfirmButton
               label={t('Löschen')}
               confirmLabel={t('Prozess wirklich löschen?')}
@@ -157,7 +174,7 @@ function ProcessWorkspace({ process }: { process: ProcessModel }) {
               }}
             />
           ) : (
-            <span className="badge readonly">{t('Nur Lesen')}</span>
+            !editable && <span className="badge readonly">{t('Nur Lesen')}</span>
           )}
         </div>
       </div>
@@ -190,6 +207,7 @@ function ProcessWorkspace({ process }: { process: ProcessModel }) {
 
 function ProcessProfile({ process }: { process: ProcessModel }) {
   const update = useStore((s) => s.updateProcess);
+  const { isAdmin } = useRights();
   const roles = useStore((s) => s.role);
   const set = (patch: Partial<ProcessModel>) => update(process.id, patch);
   const text = (key: 'code' | 'title' | 'version', label: string) => (
@@ -227,7 +245,12 @@ function ProcessProfile({ process }: { process: ProcessModel }) {
           </label>
           <label className="field">
             <span className="field-label">{t('Prozessverantwortlicher')}</span>
-            <select value={process.ownerRoleId} onChange={(e) => set({ ownerRoleId: e.target.value })}>
+            <select
+              value={process.ownerRoleId}
+              disabled={!isAdmin}
+              title={isAdmin ? undefined : t('Nur die Administration ändert die Ownership.')}
+              onChange={(e) => set({ ownerRoleId: e.target.value })}
+            >
               <option value="">{t('— nicht zugewiesen —')}</option>
               {roles.map((r) => (
                 <option key={r.id} value={r.id}>
@@ -235,6 +258,13 @@ function ProcessProfile({ process }: { process: ProcessModel }) {
                 </option>
               ))}
             </select>
+          </label>
+          <label className="field">
+            <span className="field-label">
+              {t('Prozessbereich')}
+              <span className="hint"> · {t('für die Prozesslandschaft')}</span>
+            </span>
+            <input value={process.area ?? ''} onChange={(e) => set({ area: e.target.value })} />
           </label>
           {text('version', 'Version')}
           <label className="field">
@@ -307,7 +337,9 @@ function StepMatrix({ process, onOpen }: { process: ProcessModel; onOpen: (eleme
   return (
     <div className="matrix">
       <div className="row space">
-        <p className="muted small">{t('Alle Aktivitäten inkl. Subprozess-Schritte mit ihren Zuordnungen. Klick auf eine Zeile öffnet den Schritt im Modell.')}</p>
+        <p className="muted small">
+          {t('Alle Aktivitäten inkl. Subprozess-Schritte mit ihren Zuordnungen. Klick auf eine Zeile öffnet den Schritt im Modell.')}
+        </p>
         <button onClick={exportCsv}>⬇ CSV (Excel)</button>
       </div>
       <table className="list">

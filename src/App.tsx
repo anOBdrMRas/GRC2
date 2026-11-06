@@ -6,14 +6,20 @@ import { Dashboard } from './components/Dashboard';
 import { ProcessView } from './components/ProcessView';
 import { EntityModule } from './components/EntityModule';
 import { OrgChart } from './components/OrgViews';
+import { Login } from './components/Login';
+import { Home } from './components/Home';
+import { ProcessLandscape } from './components/ProcessLandscape';
+import { AssistantChat } from './components/AssistantChat';
 import { ConfirmButton, Empty, ExportDialog, Notice, download } from './components/common';
 import { useRights } from './useRights';
 import { t, useLang } from './i18n';
 import { systemRoleById, type ModuleKey } from './permissions';
 
 const nav: { view: View; label: string; icon: string; color?: string }[] = [
-  { view: 'dashboard', label: 'Cockpit', icon: '◧' },
+  { view: 'home', label: 'Startseite', icon: '⌂' },
+  { view: 'landscape', label: 'Prozesslandschaft', icon: '▦' },
   { view: 'processes', label: 'Prozesse (BPMN)', icon: '⇄' },
+  { view: 'dashboard', label: 'GRC-Cockpit', icon: '◧' },
   ...kindOrder.flatMap((k) => {
     const item = {
       view: k as View,
@@ -27,7 +33,8 @@ const nav: { view: View; label: string; icon: string; color?: string }[] = [
 ];
 
 /** Rights module that governs a navigation entry. */
-const moduleOf = (v: View): ModuleKey => (v === 'orgchart' ? 'position' : (v as ModuleKey));
+const moduleOf = (v: View): ModuleKey => (v === 'orgchart' ? 'position' : v === 'landscape' ? 'processes' : (v as ModuleKey));
+const open = (v: View) => v === 'home' || v === 'dashboard';
 
 export default function App() {
   const view = useUi((s) => s.view);
@@ -35,14 +42,14 @@ export default function App() {
   const importAll = useStore((s) => s.importAll);
   const resetDemo = useStore((s) => s.resetDemo);
   const fileInput = useRef<HTMLInputElement>(null);
-  const users = useStore((s) => s.user);
-  const currentUserId = useStore((s) => s.currentUserId);
-  const setCurrentUser = useStore((s) => s.setCurrentUser);
-  const { canRead, canEdit, user } = useRights();
-  const isAdmin = canEdit('user');
+  const loggedIn = useStore((s) => s.loggedIn);
+  const logout = useStore((s) => s.logout);
+  const positions = useStore((s) => s.position);
+  const { canRead, isAdmin, user } = useRights();
   const lang = useLang((s) => s.lang);
   const setLang = useLang((s) => s.setLang);
-  const visibleNav = nav.filter((n) => n.view === 'dashboard' || canRead(moduleOf(n.view)));
+  const visibleNav = nav.filter((n) => open(n.view) || canRead(moduleOf(n.view)));
+  if (!loggedIn || !user) return <Login key={lang} />;
 
   const exportAll = () => {
     const { risk, opportunity, control, role, position, mandate, kpi, audit, user, processes } = useStore.getState();
@@ -79,19 +86,28 @@ export default function App() {
           </button>
         ))}
         <div className="sidebar-foot">
-          <label className="login">
-            <span>{t('Angemeldet als (Simulation)')}</span>
-            <select id="current-user" value={currentUserId} onChange={(e) => setCurrentUser(e.target.value)}>
-              {users.map((u) => (
-                <option key={u.id} value={u.id}>
-                  {u.title}
-                </option>
-              ))}
-            </select>
-            <span className="login-roles">
-              {user ? user.systemRoles.map((id) => t(systemRoleById.get(id)?.name ?? id)).join(', ') || t('keine Systemrolle') : '–'}
-            </span>
-          </label>
+          <div className="user-menu">
+            <div className="user-avatar">
+              {user.title
+                .split(' ')
+                .map((w) => w[0])
+                .slice(0, 2)
+                .join('')}
+            </div>
+            <div className="user-info">
+              <b>{user.title}</b>
+              <span>{positions.find((p) => p.id === user.positionId)?.title ?? user.jobTitle}</span>
+              <span className="login-roles">{user.systemRoles.map((id) => t(systemRoleById.get(id)?.name ?? id)).join(', ')}</span>
+            </div>
+          </div>
+          <button
+            onClick={() => {
+              logout();
+              go('home');
+            }}
+          >
+            ⏻ {t('Abmelden')}
+          </button>
           <div className="muted small">ISO 9001 · ISO 27001 · ISO 37301</div>
           <button onClick={exportAll}>{t('Daten exportieren')}</button>
           {isAdmin && (
@@ -121,12 +137,15 @@ export default function App() {
         </div>
       </nav>
       <main className="main">
+        {view === 'home' && <Home />}
+        {view === 'landscape' && <ProcessLandscape />}
         {view === 'dashboard' && <Dashboard />}
         {view === 'processes' && canRead('processes') && <ProcessView />}
         {view === 'orgchart' && canRead('position') && <OrgChart />}
-        {view !== 'dashboard' && !canRead(moduleOf(view)) && <Empty>{t('Ihre Systemrollen erlauben keinen Zugriff auf diesen Bereich.')}</Empty>}
+        {!open(view) && !canRead(moduleOf(view)) && <Empty>{t('Ihre Systemrollen erlauben keinen Zugriff auf diesen Bereich.')}</Empty>}
         {kindOrder.includes(view as never) && canRead(view as ModuleKey) && <EntityModule key={view} kind={view as (typeof kindOrder)[number]} />}
       </main>
+      {view !== 'home' && <AssistantChat floating />}
       <ExportDialog />
       <Notice />
     </div>

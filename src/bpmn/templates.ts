@@ -1,7 +1,7 @@
-const header = `<?xml version="1.0" encoding="UTF-8"?>
+export const header = `<?xml version="1.0" encoding="UTF-8"?>
 <bpmn:definitions xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL" xmlns:bpmndi="http://www.omg.org/spec/BPMN/20100524/DI" xmlns:dc="http://www.omg.org/spec/DD/20100524/DC" xmlns:di="http://www.omg.org/spec/DD/20100524/DI" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" id="Definitions_1" targetNamespace="http://grc.example/bpmn">`;
 
-function esc(s: string) {
+export function esc(s: string) {
   return s.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
 }
 
@@ -23,8 +23,8 @@ export function emptyDiagram(title: string) {
 
 // ---- Seed diagrams -------------------------------------------------------
 
-type Node = { id: string; type: string; name: string; x: number; y: number; extra?: string };
-type Flow = { id: string; from: string; to: string; name?: string; points: [number, number][] };
+export type Node = { id: string; type: string; name: string; x: number; y: number; extra?: string };
+export type Flow = { id: string; from: string; to: string; name?: string; points: [number, number][] };
 
 function size(type: string) {
   if (type.endsWith('Event')) return { w: 36, h: 36 };
@@ -32,7 +32,7 @@ function size(type: string) {
   return { w: 100, h: 80 };
 }
 
-function semantic(nodes: Node[], flows: Flow[], indent: string) {
+export function semantic(nodes: Node[], flows: Flow[], indent: string) {
   const out: string[] = [];
   for (const n of nodes) {
     const inc = flows.filter((f) => f.to === n.id).map((f) => `${indent}  <bpmn:incoming>${f.id}</bpmn:incoming>`);
@@ -46,7 +46,7 @@ function semantic(nodes: Node[], flows: Flow[], indent: string) {
   return out.join('\n');
 }
 
-function di(nodes: Node[], flows: Flow[], collapsed: string[] = []) {
+export function di(nodes: Node[], flows: Flow[], collapsed: string[] = []) {
   const out: string[] = [];
   for (const n of nodes) {
     const { w, h } = size(n.type);

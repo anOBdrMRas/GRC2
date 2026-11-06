@@ -21,14 +21,34 @@ const isoTitle = (id: string) => {
 };
 const isoOptions = () => isoCatalog.map((r) => ({ id: r.id, label: `${r.standard} ${r.clause}`, sub: isoTitle(r.id) }));
 
-export function Field({ def, value, onChange, entityId }: { def: FieldDef; value: unknown; onChange: (v: unknown) => void; entityId?: string }) {
+export function Field({
+  def,
+  value,
+  onChange,
+  entityId,
+  locked = false,
+}: {
+  def: FieldDef;
+  value: unknown;
+  onChange: (v: unknown) => void;
+  entityId?: string;
+  /** ownership field: only administrators may change it */
+  locked?: boolean;
+}) {
   return (
     <label className={`field ${def.wide || def.type === 'textarea' ? 'wide' : ''}`}>
       <span className="field-label">
         {t(def.label)}
         {def.hint && <span className="hint"> · {t(def.hint)}</span>}
+        {locked && <span className="hint lock"> · 🔒 {t('legt die Ownership fest – nur Administration')}</span>}
       </span>
-      <FieldInput def={def} value={value} onChange={onChange} entityId={entityId} />
+      {locked ? (
+        <fieldset className="plain" disabled>
+          <FieldInput def={def} value={value} onChange={onChange} entityId={entityId} />
+        </fieldset>
+      ) : (
+        <FieldInput def={def} value={value} onChange={onChange} entityId={entityId} />
+      )}
     </label>
   );
 }

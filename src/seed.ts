@@ -10,12 +10,14 @@ import type {
   Opportunity,
   Position,
   ProcessModel,
+  Raci,
   Risk,
   Role,
   User,
 } from './types';
 import { blankEntity, blankFinding, emptyAssignment, now } from './logic';
 import { accessManagementXml, purchaseToPayXml } from './bpmn/templates';
+import { generateProcessXml, type DraftStep } from './bpmn/generate';
 
 function make<K extends EntityKind>(kind: K, code: string, title: string, patch: Partial<EntityMap[K]>): EntityMap[K] {
   return { ...blankEntity(kind, code, title), id: code, ...patch };
@@ -41,7 +43,7 @@ export function seedData() {
       email: 'a.berger@example.com',
       department: 'Einkauf',
       jobTitle: 'Leiterin Einkauf',
-      systemRoles: ['process-modeler', 'org-manager'],
+      systemRoles: ['employee'],
       positionId: 'ST-002',
       positionSince: '2018-01-01',
       employer: 'Muster GmbH',
@@ -56,7 +58,7 @@ export function seedData() {
       email: 'm.huber@example.com',
       department: 'Einkauf',
       jobTitle: 'Senior Einkäufer',
-      systemRoles: ['reader'],
+      systemRoles: ['employee'],
       positionId: 'ST-003',
       positionSince: '2019-03-01',
       employer: 'Muster GmbH',
@@ -71,7 +73,7 @@ export function seedData() {
       email: 's.klein@example.com',
       department: 'Einkauf',
       jobTitle: 'Einkäuferin',
-      systemRoles: ['reader'],
+      systemRoles: ['employee'],
       positionId: 'ST-003',
       positionSince: '2023-09-01',
       employer: 'Muster GmbH',
@@ -88,7 +90,7 @@ export function seedData() {
       email: 'k.wagner@example.com',
       department: 'Finanzen',
       jobTitle: 'Teamleiterin Kreditoren',
-      systemRoles: ['control-owner'],
+      systemRoles: ['employee'],
       positionId: 'ST-004',
       positionSince: '2017-06-01',
       employer: 'Muster GmbH',
@@ -102,7 +104,7 @@ export function seedData() {
       email: 't.roth@example.com',
       department: 'Finanzen',
       jobTitle: 'Kreditorenbuchhalter',
-      systemRoles: ['reader'],
+      systemRoles: ['employee'],
       positionId: 'ST-005',
       positionSince: '2022-01-01',
       employer: 'Muster GmbH',
@@ -115,7 +117,7 @@ export function seedData() {
       email: 'l.schmid@example.com',
       department: 'Recht & Compliance',
       jobTitle: 'Chief Compliance Officer',
-      systemRoles: ['compliance', 'risk-manager'],
+      systemRoles: ['employee'],
       positionId: 'ST-006',
       positionSince: '2020-07-01',
       employer: 'Muster GmbH',
@@ -130,7 +132,7 @@ export function seedData() {
       email: 'j.neumann@example.com',
       department: 'IT / ISMS',
       jobTitle: 'Informationssicherheitsbeauftragter',
-      systemRoles: ['grc-manager'],
+      systemRoles: ['employee'],
       positionId: 'ST-007',
       positionSince: '2022-02-01',
       employer: 'Muster GmbH',
@@ -144,7 +146,7 @@ export function seedData() {
       email: 'p.yilmaz@example.com',
       department: 'Logistik',
       jobTitle: 'Leiterin Wareneingang',
-      systemRoles: ['kpi-owner'],
+      systemRoles: ['employee'],
       positionId: 'ST-009',
       positionSince: '2016-05-01',
       employer: 'Muster GmbH',
@@ -158,7 +160,7 @@ export function seedData() {
       email: 'k.huber@example.com',
       department: 'Geschäftsführung',
       jobTitle: 'Geschäftsführer',
-      systemRoles: ['reader'],
+      systemRoles: ['employee'],
       positionId: 'ST-001',
       positionSince: '2014-01-01',
       employer: 'Muster GmbH',
@@ -174,7 +176,7 @@ export function seedData() {
       email: 'c.hoffmann@example.com',
       department: 'Vertrieb',
       jobTitle: 'Bereichsleiterin Vertrieb',
-      systemRoles: ['reader'],
+      systemRoles: ['employee'],
       positionId: 'ST-010',
       positionSince: '2021-04-01',
       employer: 'Muster GmbH',
@@ -189,7 +191,7 @@ export function seedData() {
       email: 'r.krueger@example.com',
       department: 'Interne Revision',
       jobTitle: 'Interner Revisor',
-      systemRoles: ['auditor'],
+      systemRoles: ['employee'],
       positionId: 'ST-011',
       positionSince: '2020-01-01',
       employer: 'Muster GmbH',
@@ -204,7 +206,7 @@ export function seedData() {
       email: 'm.lang@example.com',
       department: 'Qualitätsmanagement',
       jobTitle: 'Qualitätsmanagerin',
-      systemRoles: ['grc-manager'],
+      systemRoles: ['employee'],
       positionId: 'ST-012',
       positionSince: '2021-01-01',
       employer: 'Muster GmbH',
@@ -218,7 +220,7 @@ export function seedData() {
       email: 'dsb@datenschutz-gmbh.example',
       department: 'extern',
       jobTitle: 'Externer DSB',
-      systemRoles: ['reader'],
+      systemRoles: ['employee'],
       validUntil: '2027-12-31',
       positionId: 'ST-013',
       positionSince: '2024-01-01',
@@ -234,7 +236,7 @@ export function seedData() {
       email: 'k.mueller@example.com',
       department: 'Export Control & Customs',
       jobTitle: 'Director Export Control & Customs',
-      systemRoles: ['compliance'],
+      systemRoles: ['employee'],
       positionId: 'ST-014',
       positionSince: '2023-04-01',
       employer: 'Muster GmbH',
@@ -250,7 +252,7 @@ export function seedData() {
       email: 'a.maier@example.com',
       department: 'Legal & Compliance',
       jobTitle: 'Head of Legal & Compliance',
-      systemRoles: ['grc-manager', 'org-manager'],
+      systemRoles: ['employee'],
       positionId: 'ST-015',
       positionSince: '2021-10-01',
       employer: 'Muster GmbH',
@@ -266,7 +268,7 @@ export function seedData() {
       email: 't.schmidt@example.com',
       department: 'Controlling',
       jobTitle: 'Leiter Controlling',
-      systemRoles: ['reader'],
+      systemRoles: ['employee'],
       positionId: 'ST-016',
       positionSince: '2019-07-01',
       employer: 'Muster GmbH',
@@ -275,6 +277,22 @@ export function seedData() {
       contractRef: 'HR-P-0017',
       jobDescriptionAckAt: '2026-02-02',
       confidentialityAt: '2019-07-01',
+      codeOfConductAt: '2026-01-20',
+      conflictOfInterestAt: '2026-01-20',
+    }),
+    make('user', 'U-018', 'Lisa Wolf', {
+      email: 'l.wolf@example.com',
+      department: 'Export Control & Customs',
+      jobTitle: 'Export Control Specialist',
+      systemRoles: ['employee'],
+      positionId: 'ST-017',
+      positionSince: '2024-09-01',
+      employer: 'Muster GmbH',
+      employmentType: 'Unbefristet angestellt',
+      entryDate: '2024-09-01',
+      contractRef: 'HR-P-0018',
+      jobDescriptionAckAt: '2026-02-03',
+      confidentialityAt: '2024-09-01',
       codeOfConductAt: '2026-01-20',
       conflictOfInterestAt: '2026-01-20',
     }),
@@ -454,6 +472,36 @@ export function seedData() {
       writtenForm: true,
       isoRefs: ['37301:4.5', '37301:5.3'],
     }),
+    make('role', 'RO-016', 'Exportkontroll-Sachbearbeiter', {
+      ...reviewed,
+      orgUnit: 'Business Enablement',
+      description: 'Bearbeitet Exportvorgänge im Team Export Control & Customs.',
+      responsibilities:
+        'Prüft Aufträge auf Exportrelevanz, klassifiziert Güter, führt Sanktionslistenprüfungen durch und erstellt Ausfuhranmeldungen.',
+      authorities: 'Vorläufige Liefersperre bei Treffer in der Sanktionslistenprüfung',
+      competencies: 'Grundlagen Exportkontroll- und Zollrecht, ATLAS',
+      trainings: 'Exportkontrolle Grundlagen (einmalig), Zoll-Update (jährlich)',
+      roleOwnerUserId: 'U-015',
+      complianceRelevant: true,
+      isoRefs: ['37301:4.5'],
+    }),
+    make('role', 'RO-017', 'Leitung Kreditorenbuchhaltung', {
+      ...reviewed,
+      roleType: 'Führungsrolle',
+      orgUnit: 'Finance and Admin',
+      responsibilities: 'Verantwortet Risiken, Kontrollen und Verbesserungen der Kreditorenbuchhaltung.',
+      authorities: 'Freigabe der Zahlläufe (zweite Unterschrift), Weisungsrecht im Team',
+      roleOwnerUserId: 'U-010',
+      isoRefs: ['9001:5.3'],
+    }),
+    make('role', 'RO-018', 'Vertrieb', {
+      ...reviewed,
+      orgUnit: 'Sales',
+      responsibilities: 'Qualifiziert Leads, erstellt Angebote und nimmt Aufträge an.',
+      authorities: 'Angebote im Rahmen der Preisliste',
+      roleOwnerUserId: 'U-011',
+      isoRefs: ['9001:8.2'],
+    }),
   ];
 
   const pr = (roleId: string, comment = '') => ({ roleId, comment });
@@ -529,7 +577,7 @@ export function seedData() {
       reportsToFunctionalId: 'ST-001',
       deputyPositionId: 'ST-005',
       deputyInducted: true,
-      roles: [pr('RO-005', 'Freigabe der Zahlläufe'), pr('RO-001')],
+      roles: [pr('RO-017'), pr('RO-005', 'Freigabe der Zahlläufe'), pr('RO-001')],
     }),
     make('position', 'ST-005', 'Kreditorenbuchhalter/in', {
       signingAuthority: 'Keine',
@@ -606,7 +654,7 @@ export function seedData() {
       reportsToDisciplinaryId: 'ST-001',
       reportsToFunctionalId: 'ST-001',
       authorities: 'Disziplinarische Führung des Vertriebs, Freigabe von Angeboten und Kundenverträgen bis 100.000 EUR, Rabatte bis 15 %',
-      roles: [pr('RO-002', 'Kostenstelle Vertrieb, bis 100.000 EUR'), pr('RO-001')],
+      roles: [pr('RO-018', 'Leitung'), pr('RO-002', 'Kostenstelle Vertrieb, bis 100.000 EUR'), pr('RO-001')],
     }),
     make('position', 'ST-011', 'Interne Revision', {
       ...reviewed,
@@ -689,6 +737,23 @@ export function seedData() {
       roles: [pr('RO-001')],
       isoRefs: ['9001:5.3'],
     }),
+    make('position', 'ST-017', 'Export Control Specialist', {
+      ...reviewed,
+      orgUnit: 'Business Enablement',
+      location: 'Hauptsitz',
+      purpose: 'Operative Abwicklung von Exportkontrolle und Zoll.',
+      tasks: 'Exportrelevanzprüfung, Güterklassifizierung, Sanktionslistenprüfung, Ausfuhranmeldungen.',
+      authorities: 'Vorläufige Liefersperre bei Treffer, Freigabe von Standard-Ausfuhranmeldungen',
+      qualification: 'Kaufmännische Ausbildung mit Weiterbildung Außenwirtschaft',
+      experience: '2 Jahre Zoll oder Exportkontrolle',
+      screeningRequired: true,
+      reportsToDisciplinaryId: 'ST-014',
+      reportsToFunctionalId: 'ST-014',
+      deputyPositionId: 'ST-014',
+      deputyInducted: true,
+      roles: [pr('RO-016'), pr('RO-001')],
+      isoRefs: ['37301:5.3'],
+    }),
   ];
 
   const risk: Risk[] = [
@@ -743,7 +808,7 @@ export function seedData() {
       impact: 3,
       residualLikelihood: 1,
       residualImpact: 3,
-      ownerRoleId: 'RO-005',
+      ownerRoleId: 'RO-017',
       status: 'In Behandlung',
       isoRefs: ['9001:6.1'],
     }),
@@ -787,7 +852,7 @@ export function seedData() {
       benefit: 'Kürzere Durchlaufzeit, Skontonutzung',
       likelihood: 3,
       benefitScore: 4,
-      ownerRoleId: 'RO-005',
+      ownerRoleId: 'RO-017',
     }),
   ];
 
@@ -854,7 +919,7 @@ export function seedData() {
       controlType: 'Detektiv',
       automation: 'Automatisiert',
       keyControl: true,
-      ownerRoleId: 'RO-005',
+      ownerRoleId: 'RO-017',
       executorRoleId: 'RO-005',
       implementation: 'Umgesetzt',
       designEffectiveness: 'Wirksam',
@@ -1381,6 +1446,50 @@ export function seedData() {
 
   const a = (patch: Partial<ReturnType<typeof emptyAssignment>>) => ({ ...emptyAssignment(), ...patch });
 
+  /** Demo processes for the process landscape, drawn by the generator. */
+  type S = [name: string, roles?: [string, Raci][], type?: DraftStep['type'], no?: string];
+  const gen = (
+    id: string,
+    title: string,
+    category: ProcessModel['category'],
+    area: string,
+    landscapeOrder: number,
+    ownerRoleId: string,
+    description: string,
+    steps: S[],
+    ends: [string, string],
+  ): ProcessModel => {
+    const prefix = id.replace('-', '');
+    const { xml, elementIds } = generateProcessXml(
+      title,
+      steps.map(([name, , type, no]) => ({ name, type, no })),
+      { prefix, start: ends[0], end: ends[1] },
+    );
+    const assignments: ProcessModel['assignments'] = {};
+    steps.forEach(([, roles], i) => {
+      if (roles?.length) assignments[elementIds[i]] = a({ roles: roles.map(([roleId, raci]) => ({ roleId, raci })) });
+    });
+    return {
+      id,
+      code: id,
+      title,
+      description,
+      category,
+      area,
+      landscapeOrder,
+      ownerRoleId,
+      version: '1.0',
+      status: 'Freigegeben',
+      standards: ['ISO 9001'],
+      nextReview: '2027-06-30',
+      xml,
+      callLinks: {},
+      assignments,
+      createdAt: now(),
+      updatedAt: now(),
+    };
+  };
+
   const processes: ProcessModel[] = [
     {
       id: 'P-001',
@@ -1388,6 +1497,8 @@ export function seedData() {
       title: 'Beschaffung (Purchase-to-Pay)',
       description: 'Von der Bedarfsanforderung bis zur Zahlung an den Lieferanten.',
       category: 'Kernprozess',
+      area: 'Einkauf',
+      landscapeOrder: 3,
       ownerRoleId: 'RO-004',
       version: '1.2',
       status: 'Freigegeben',
@@ -1446,6 +1557,8 @@ export function seedData() {
       title: 'Berechtigungsmanagement',
       description: 'Vergabe, Änderung und Rezertifizierung von Zugriffsrechten.',
       category: 'Unterstützungsprozess',
+      area: 'IT',
+      landscapeOrder: 3,
       ownerRoleId: 'RO-007',
       version: '1.0',
       status: 'In Prüfung',
@@ -1470,6 +1583,257 @@ export function seedData() {
       createdAt: now(),
       updatedAt: now(),
     },
+    gen(
+      'P-003',
+      'Strategie & Planung',
+      'Führungsprozess',
+      'Geschäftsführung',
+      1,
+      'RO-010',
+      'Jährliche Strategie, Ziele und Budget.',
+      [
+        [
+          'Kontext und interessierte Parteien analysieren',
+          [
+            ['RO-010', 'A'],
+            ['RO-006', 'C'],
+          ],
+        ],
+        ['Strategische Ziele festlegen', [['RO-010', 'R']]],
+        [
+          'Budget planen',
+          [
+            ['RO-010', 'A'],
+            ['RO-002', 'R'],
+          ],
+        ],
+        ['Ziele kommunizieren', [['RO-010', 'R']]],
+      ],
+      ['Planungszyklus startet', 'Ziele und Budget freigegeben'],
+    ),
+    gen(
+      'P-004',
+      'Managementbewertung',
+      'Führungsprozess',
+      'Qualitätsmanagement',
+      2,
+      'RO-011',
+      'Bewertung der Managementsysteme durch die oberste Leitung (ISO 9001/27001/37301 9.3).',
+      [
+        [
+          'Eingaben sammeln (KPI, Audits, Risiken)',
+          [
+            ['RO-011', 'R'],
+            ['RO-007', 'C'],
+            ['RO-006', 'C'],
+          ],
+        ],
+        [
+          'Bewertung durchführen',
+          [
+            ['RO-010', 'A'],
+            ['RO-011', 'R'],
+          ],
+        ],
+        ['Maßnahmen beschließen', [['RO-010', 'R']]],
+      ],
+      ['Termin Managementbewertung', 'Protokoll freigegeben'],
+    ),
+    gen(
+      'P-005',
+      'Compliance-Management',
+      'Führungsprozess',
+      'Compliance',
+      3,
+      'RO-006',
+      'Ermittlung von Compliance-Pflichten, Risiken und Maßnahmen (ISO 37301).',
+      [
+        ['Compliance-Pflichten ermitteln', [['RO-006', 'R']]],
+        [
+          'Compliance-Risiken bewerten',
+          [
+            ['RO-006', 'R'],
+            ['RO-014', 'C'],
+          ],
+        ],
+        ['Hinweise bearbeiten', [['RO-006', 'R']]],
+        [
+          'Compliance-Bericht erstellen',
+          [
+            ['RO-006', 'R'],
+            ['RO-010', 'I'],
+          ],
+        ],
+      ],
+      ['Jahreszyklus', 'Bericht an die GF'],
+    ),
+    gen(
+      'P-006',
+      'Lead-to-Cash',
+      'Kernprozess',
+      'Vertrieb',
+      1,
+      'RO-010',
+      'Vom Interessenten bis zum Zahlungseingang.',
+      [
+        ['Lead qualifizieren', [['RO-018', 'R']]],
+        ['Angebot erstellen', [['RO-018', 'R']]],
+        ['Angebot freigeben', [['RO-018', 'A']]],
+        ['Auftrag annehmen', [['RO-018', 'R']]],
+        ['Exportprüfung erforderlich?', [['RO-015', 'C']], 'decision', 'Auftrag ohne Export'],
+        [
+          'Exportprüfung anstoßen',
+          [
+            ['RO-016', 'R'],
+            ['RO-015', 'A'],
+          ],
+        ],
+        ['Rechnung stellen', [['RO-005', 'R']], 'system'],
+      ],
+      ['Kundenanfrage', 'Zahlung eingegangen'],
+    ),
+    gen(
+      'P-007',
+      'Order-to-Delivery',
+      'Kernprozess',
+      'Operations & Logistik',
+      2,
+      'RO-008',
+      'Von der Auftragsfreigabe bis zur Auslieferung.',
+      [
+        ['Auftrag einplanen', [['RO-008', 'R']]],
+        ['Ware kommissionieren', [['RO-008', 'R']], 'manual'],
+        ['Ausfuhrfreigabe vorhanden?', [['RO-016', 'C']], 'decision', 'Versand gestoppt'],
+        ['Ware versenden', [['RO-008', 'R']], 'manual'],
+      ],
+      ['Auftrag freigegeben', 'Ware ausgeliefert'],
+    ),
+    gen(
+      'P-008',
+      'Export & Zoll',
+      'Kernprozess',
+      'Trade Compliance',
+      4,
+      'RO-015',
+      'Exportkontrolle und Zollabwicklung für alle Ausfuhren (AWG/AWV, EU-Dual-Use-VO).',
+      [
+        [
+          'Auftrag auf Exportrelevanz prüfen',
+          [
+            ['RO-016', 'R'],
+            ['RO-015', 'A'],
+          ],
+        ],
+        [
+          'Güter klassifizieren',
+          [
+            ['RO-016', 'R'],
+            ['RO-015', 'A'],
+          ],
+        ],
+        ['Sanktionslisten prüfen', [['RO-016', 'R']], 'system'],
+        ['Genehmigung erforderlich?', [['RO-015', 'R']], 'decision', 'Keine Genehmigung nötig'],
+        [
+          'Genehmigung beim BAFA beantragen',
+          [
+            ['RO-015', 'R'],
+            ['RO-013', 'A'],
+          ],
+        ],
+        [
+          'Ausfuhranmeldung erstellen',
+          [
+            ['RO-016', 'R'],
+            ['RO-008', 'I'],
+          ],
+        ],
+        [
+          'Ware zur Ausfuhr freigeben',
+          [
+            ['RO-015', 'A'],
+            ['RO-008', 'R'],
+          ],
+        ],
+      ],
+      ['Exportauftrag eingegangen', 'Ausfuhr freigegeben'],
+    ),
+    gen(
+      'P-009',
+      'Reklamation',
+      'Kernprozess',
+      'Qualität',
+      5,
+      'RO-011',
+      'Bearbeitung von Kundenreklamationen bis zur Wirksamkeitsprüfung.',
+      [
+        ['Reklamation erfassen', [['RO-018', 'R']]],
+        ['Ursache analysieren', [['RO-011', 'R']]],
+        ['Korrekturmaßnahme umsetzen', [['RO-011', 'A']]],
+        ['Wirksamkeit prüfen', [['RO-011', 'R']]],
+      ],
+      ['Reklamation eingegangen', 'Reklamation abgeschlossen'],
+    ),
+    gen(
+      'P-010',
+      'Hire-to-Retire',
+      'Unterstützungsprozess',
+      'Personal',
+      1,
+      'RO-010',
+      'Personalgewinnung, Einarbeitung, Veränderung und Austritt.',
+      [
+        ['Stelle ausschreiben', [['RO-002', 'R']]],
+        ['Bewerber auswählen', [['RO-002', 'R']]],
+        ['Vertrag und Verpflichtungen unterzeichnen', [['RO-010', 'A']]],
+        ['Einarbeitung und Pflichtschulungen', [['RO-002', 'R']]],
+        [
+          'Austritt: Rechte und Vollmachten entziehen',
+          [
+            ['RO-009', 'R'],
+            ['RO-002', 'A'],
+          ],
+        ],
+      ],
+      ['Personalbedarf', 'Austritt abgeschlossen'],
+    ),
+    gen(
+      'P-011',
+      'Record-to-Report',
+      'Unterstützungsprozess',
+      'Finanzen',
+      2,
+      'RO-010',
+      'Buchhaltung, Monatsabschluss und Berichtswesen.',
+      [
+        ['Kreditorenrechnungen buchen', [['RO-005', 'R']]],
+        ['Zahllauf freigeben', [['RO-005', 'A']]],
+        ['Monatsabschluss erstellen', [['RO-005', 'R']]],
+        ['Kostenstellenbericht versenden', [['RO-002', 'I']], 'system'],
+      ],
+      ['Monat beginnt', 'Bericht versendet'],
+    ),
+    gen(
+      'P-012',
+      'IT-Service & Incident',
+      'Unterstützungsprozess',
+      'IT',
+      4,
+      'RO-009',
+      'Störungen und Anfragen an die IT bearbeiten.',
+      [
+        ['Ticket erfassen', [['RO-001', 'R']]],
+        ['Sicherheitsvorfall?', [['RO-009', 'R']], 'decision', 'Standard-Incident gelöst'],
+        [
+          'Sicherheitsvorfall bewerten',
+          [
+            ['RO-007', 'R'],
+            ['RO-009', 'C'],
+          ],
+        ],
+        ['Maßnahmen umsetzen', [['RO-009', 'R']]],
+      ],
+      ['Störung gemeldet', 'Ticket geschlossen'],
+    ),
   ];
 
   return { user, role, position, mandate, risk, opportunity, control, kpi, audit, processes, currentUserId: 'U-001' };

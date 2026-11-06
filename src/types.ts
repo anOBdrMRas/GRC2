@@ -302,6 +302,10 @@ export interface ProcessModel {
   description: string;
   category: 'Führungsprozess' | 'Kernprozess' | 'Unterstützungsprozess';
   ownerRoleId: string;
+  /** process area shown in the process landscape, e.g. Vertrieb, IT */
+  area?: string;
+  /** position within its band of the process landscape */
+  landscapeOrder?: number;
   version: string;
   status: string;
   standards: string[];

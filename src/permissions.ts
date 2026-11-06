@@ -40,82 +40,34 @@ const all = (r: Right, overrides: Partial<Record<ModuleKey, Right>> = {}): Recor
   ...overrides,
 });
 
+/**
+ * Two system roles only. What a person may EDIT follows from ownership in the data
+ * (role owner, process owner, supervisor of a position …), see src/ownership.ts.
+ */
 export const systemRoles: SystemRole[] = [
+  {
+    id: 'employee',
+    name: 'Mitarbeiter',
+    description: 'Liest alle Inhalte außer der Benutzerverwaltung. Bearbeitet die Elemente, deren Owner er ist.',
+    rights: all('read', { user: 'none' }),
+  },
   {
     id: 'admin',
     name: 'Administrator',
-    description: 'Vollzugriff inkl. Benutzerverwaltung, Systemrollen und Datenimport.',
+    description: 'Legt neue Elemente an, löscht und bearbeitet alles, pflegt Benutzer und Systemrollen.',
     rights: all('edit'),
   },
-  {
-    id: 'grc-manager',
-    name: 'GRC-Manager',
-    description: 'Pflegt alle Fachmodule und Prozesse, sieht die Benutzerverwaltung.',
-    rights: all('edit', { user: 'read' }),
-  },
-  {
-    id: 'process-modeler',
-    name: 'Prozessmodellierer',
-    description: 'Modelliert Prozesse und ordnet Elemente den Prozessschritten zu.',
-    rights: all('read', { processes: 'edit', user: 'none' }),
-  },
-  {
-    id: 'risk-manager',
-    name: 'Risikomanager',
-    description: 'Identifiziert und bewertet Risiken und Chancen.',
-    rights: all('read', { risk: 'edit', opportunity: 'edit', user: 'none' }),
-  },
-  {
-    id: 'control-owner',
-    name: 'IKS-Verantwortlicher',
-    description: 'Pflegt Kontrollen, SoA und dokumentiert Wirksamkeitsprüfungen.',
-    rights: all('read', { control: 'edit', user: 'none' }),
-  },
-  {
-    id: 'compliance',
-    name: 'Compliance Officer',
-    description: 'Pflegt Compliance-Risiken, Kontrollen und Rollen (Compliance-Funktion).',
-    rights: all('read', { risk: 'edit', control: 'edit', role: 'edit', mandate: 'edit', user: 'none' }),
-  },
-  {
-    id: 'org-manager',
-    name: 'Organisationsverantwortlicher',
-    description: 'Pflegt Stellen, Stellenbeschreibungen, Berichtslinien, Rollen, Stelleninhaber sowie Delegationen und Vollmachten.',
-    rights: all('read', { role: 'edit', position: 'edit', mandate: 'edit', user: 'read' }),
-  },
-  {
-    id: 'kpi-owner',
-    name: 'KPI-Verantwortlicher',
-    description: 'Definiert Kennzahlen und erfasst Messwerte.',
-    rights: all('read', { kpi: 'edit', user: 'none' }),
-  },
-  {
-    id: 'audit-manager',
-    name: 'Auditmanager',
-    description: 'Plant das Auditprogramm, pflegt Audits und verfolgt Feststellungen nach.',
-    rights: all('read', { audit: 'edit', user: 'none' }),
-  },
-  {
-    id: 'auditor',
-    name: 'Auditor',
-    description: 'Lesezugriff auf alle Inhalte inkl. Benutzer und Berechtigungen; dokumentiert Audits und Feststellungen.',
-    rights: all('read', { audit: 'edit' }),
-  },
-  {
-    id: 'reader',
-    name: 'Leser',
-    description: 'Lesezugriff auf Prozesse und Fachmodule, z. B. für Mitarbeitende.',
-    rights: all('read', { user: 'none' }),
-  },
 ];
+
+/** Maps system roles of earlier versions: administrators stay administrators, everybody else becomes an employee. */
+export function migrateSystemRoles(ids: string[] | undefined): string[] {
+  return ids?.includes('admin') ? ['admin'] : ['employee'];
+}
 
 export const systemRoleById = new Map(systemRoles.map((r) => [r.id, r]));
 
 /** System role combinations that violate segregation of duties within the tool. */
-export const systemRoleConflicts: [string, string, string][] = [
-  ['admin', 'auditor', 'Administratoren dürfen sich nicht selbst prüfen.'],
-  ['control-owner', 'auditor', 'Kontrollverantwortliche dürfen ihre Kontrollen nicht selbst auditieren.'],
-];
+export const systemRoleConflicts: [string, string, string][] = [];
 
 const rank: Record<Right, number> = { none: 0, read: 1, edit: 2 };
 

@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import type { EntityKind } from './types';
 
-export type View = 'dashboard' | 'processes' | 'orgchart' | EntityKind;
+export type View = 'home' | 'landscape' | 'dashboard' | 'processes' | 'orgchart' | EntityKind;
 
 export interface ExportFile {
   filename: string;
@@ -28,10 +28,13 @@ interface UiState {
   setExportFile: (f: ExportFile | null) => void;
   notice: string | null;
   setNotice: (msg: string | null) => void;
+  /** AI process draft dialog in the process module */
+  draftOpen: boolean;
+  setDraftOpen: (open: boolean) => void;
 }
 
 export const useUi = create<UiState>()((set) => ({
-  view: 'dashboard',
+  view: 'home',
   selected: {},
   focusElementId: null,
   go: (view, id) => set((s) => ({ view, selected: id ? { ...s.selected, [view]: id } : s.selected })),
@@ -46,4 +49,6 @@ export const useUi = create<UiState>()((set) => ({
   setExportFile: (exportFile) => set({ exportFile }),
   notice: null,
   setNotice: (notice) => set({ notice }),
+  draftOpen: false,
+  setDraftOpen: (draftOpen) => set({ draftOpen }),
 }));

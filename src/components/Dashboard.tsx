@@ -91,7 +91,7 @@ export function Dashboard() {
 
   return (
     <div className="dashboard">
-      <h2>{t('Cockpit')}</h2>
+      <h2>{t('GRC-Cockpit')}</h2>
       <div className="stat-grid wide">
         <div className="stat clickable" onClick={() => go('processes')}>
           <div className="stat-num">{store.processes.length}</div>

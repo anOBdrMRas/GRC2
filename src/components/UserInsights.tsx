@@ -2,7 +2,8 @@ import type { User } from '../types';
 import { useStore } from '../store';
 import { useUi } from '../ui';
 import { modules } from '../schema';
-import { effectiveRights, moduleKeys, moduleLabels, rightLabel, systemRoleConflicts, systemRoles, userSystemRoleConflicts } from '../permissions';
+import { effectiveRights, moduleKeys, moduleLabels, rightLabel, systemRoles, userSystemRoleConflicts } from '../permissions';
+import { ownershipOf, ownershipRule, type OwnKind } from '../ownership';
 import { fmtEur, mandateState, orgIssues, personSodConflicts, rolesOfUser } from '../logic';
 import { Tag } from './common';
 import { t } from '../i18n';
@@ -134,6 +135,14 @@ export function UserInsights({ user }: { user: User }) {
       </div>
       <div className="insight">
         <div className="insight-title">{t('Effektive Rechte im Tool')}</div>
+        <div className="small" style={{ marginBottom: 6 }}>
+          {(() => {
+            const own = ownershipOf(user.id, org);
+            return own.count
+              ? `🔑 ${t('Owner von {n} Elementen – darf diese bearbeiten.', { n: own.count })}`
+              : t('Kein Owner – bearbeitet nichts, außer als Administrator.');
+          })()}
+        </div>
         <div className="rights-row">
           {moduleKeys.map((m) => (
             <span key={m} className={`right right-${rights[m]}`}>
@@ -147,55 +156,76 @@ export function UserInsights({ user }: { user: User }) {
 }
 
 /** Overview of the tool's system roles and what each may do. */
+const matrixRows: [string, boolean | string, boolean | string, boolean | string][] = [
+  ['Anmelden, persönliche Startseite, Prozesslandschaft', true, true, true],
+  ['Alle Inhalte lesen (außer Benutzerverwaltung)', true, true, true],
+  ['KI-Assistent: Fragen zu Prozessen und Zuständigkeiten', true, true, true],
+  ['Eigene Elemente bearbeiten', false, 'nur als Owner', true],
+  ['Ownership ändern (Owner-Felder)', false, false, true],
+  ['Neue Elemente anlegen, auch mit KI-Entwurf', false, false, true],
+  ['Elemente löschen', false, false, true],
+  ['Benutzer und Systemrollen pflegen, Daten importieren', false, false, true],
+];
+
+const mark = (v: boolean | string) =>
+  v === true ? <span className="ok">✓</span> : v === false ? <span className="muted">–</span> : <span className="small">{t(v)}</span>;
+
+/** Overview of the rights model: two system roles plus ownership derived from the data. */
 export function SystemRoleMatrix() {
-  const users = useStore((s) => s.user);
+  const d = useStore();
+  const users = d.user;
+  const owners = users.filter((u) => ownershipOf(u.id, d).count > 0).length;
   return (
     <div className="matrix-wrap">
       <p className="muted small">
         {t(
-          'Systemrollen steuern, was ein Benutzer im Tool sehen und bearbeiten darf. Ein Benutzer kann mehrere Systemrollen haben; es gilt jeweils das höchste Recht.',
+          'Jeder Mitarbeitende ist Mitarbeiter. Bearbeiten darf, wer Owner eines Elements ist – das ergibt sich aus den Daten (z. B. Rollenverantwortlicher, Vorgesetzter). Administratoren legen zusätzlich Neues an.',
         )}
       </p>
       <div className="table-wrap">
         <table className="list matrix-table">
           <thead>
             <tr>
-              <th>{t('Systemrolle')}</th>
-              {moduleKeys.map((m) => (
-                <th key={m}>{t(moduleLabels[m])}</th>
-              ))}
-              <th>{t('Benutzer')}</th>
+              <th>{t('Recht')}</th>
+              <th>{t('Mitarbeiter')}</th>
+              <th>🔑 {t('Owner')}</th>
+              <th>{t('Administrator')}</th>
             </tr>
           </thead>
           <tbody>
-            {systemRoles.map((r) => {
-              const holders = users.filter((u) => u.systemRoles.includes(r.id));
-              return (
-                <tr key={r.id}>
-                  <td>
-                    <b>{t(r.name)}</b>
-                    <div className="muted small">{t(r.description)}</div>
-                  </td>
-                  {moduleKeys.map((m) => (
-                    <td key={m}>
-                      <span className={`right right-${r.rights[m]}`}>{t(rightLabel[r.rights[m]])}</span>
-                    </td>
-                  ))}
-                  <td className="small">{holders.map((u) => u.title).join(', ') || <span className="muted">–</span>}</td>
-                </tr>
-              );
-            })}
+            {matrixRows.map(([label, a, b, c]) => (
+              <tr key={label}>
+                <td>{t(label)}</td>
+                <td>{mark(a)}</td>
+                <td>{mark(b)}</td>
+                <td>{mark(c)}</td>
+              </tr>
+            ))}
+            <tr>
+              <td className="muted small">{t('Personen')}</td>
+              <td className="small">{users.filter((u) => u.systemRoles.includes('employee')).length}</td>
+              <td className="small">{owners}</td>
+              <td className="small">
+                {users
+                  .filter((u) => u.systemRoles.includes('admin'))
+                  .map((u) => u.title)
+                  .join(', ') || '–'}
+              </td>
+            </tr>
           </tbody>
         </table>
       </div>
-      <h3 style={{ marginTop: 16 }}>{t('Unvereinbare Systemrollen')}</h3>
-      <ul className="small">
-        {systemRoleConflicts.map(([a, b, why]) => (
-          <li key={a + b}>
-            {t(systemRoles.find((r) => r.id === a)?.name ?? a)} + {t(systemRoles.find((r) => r.id === b)?.name ?? b)}: {t(why)}
-          </li>
-        ))}
-      </ul>
+      <h3 style={{ marginTop: 16 }}>{t('Wer ist Owner?')}</h3>
+      <table className="list matrix-table">
+        <tbody>
+          {(Object.entries(ownershipRule) as [OwnKind, string][]).map(([kind, rule]) => (
+            <tr key={kind}>
+              <td>{kind === 'processes' ? t('Prozesse') : t(modules[kind as keyof typeof modules].plural)}</td>
+              <td className="small">{t(rule)}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
     </div>
   );
 }

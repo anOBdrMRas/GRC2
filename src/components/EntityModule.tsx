@@ -22,6 +22,8 @@ import {
 import { Field } from './Fields';
 import { ConfirmButton, Empty, LevelBadge, StatusPill, Tag, TrafficLight } from './common';
 import { useRights } from '../useRights';
+import { AiFieldSuggest, canSuggest } from './AiDraft';
+import { useSample } from '../ai';
 import { dateLocale, t } from '../i18n';
 import { systemRoleById } from '../permissions';
 import { RoleInsights, RoleProfile } from './RoleInsights';
@@ -222,11 +224,13 @@ export function EntityModule({ kind }: { kind: EntityKind }) {
   const focusFindingId = useUi((s) => s.focusFindingId);
   // Opening a finding from elsewhere always shows the audit form.
   if (kind === 'audit' && focusFindingId && auditTab !== 'audits') setAuditTab('audits');
-  const { canRead, canEdit } = useRights();
+  const { canRead, canEdit, isOwnerOf } = useRights();
+  const [mineOnly, setMineOnly] = useState(false);
 
   const filtered = useMemo(() => {
     const needle = q.trim().toLowerCase();
     let list = items.filter((e) => !needle || `${e.code} ${e.title} ${e.description}`.toLowerCase().includes(needle));
+    if (mineOnly) list = list.filter((e) => isOwnerOf(kind, e));
     if (kind === 'risk' && heatCell) {
       list = list.filter((e) => {
         const r = e as Risk;
@@ -241,7 +245,7 @@ export function EntityModule({ kind }: { kind: EntityKind }) {
     const sorter = sortCol !== null ? columns[sortCol].sort : undefined;
     if (sorter) list = [...list].sort((a, b) => (sorter(a) < sorter(b) ? -1 : sorter(a) > sorter(b) ? 1 : 0));
     return list;
-  }, [items, q, kind, heatCell, heatMode, sortCol, columns, roleType, mandatoryOnly, auditType]);
+  }, [items, q, kind, heatCell, heatMode, sortCol, columns, roleType, mandatoryOnly, auditType, mineOnly, isOwnerOf]);
 
   const selected = items.find((e) => e.id === selectedId);
   if (!canRead(kind)) return <Empty>{t('Ihre Systemrollen erlauben keinen Zugriff auf {name}.', { name: t(def.plural) })}</Empty>;
@@ -269,7 +273,11 @@ export function EntityModule({ kind }: { kind: EntityKind }) {
             ))}
           </div>
         )}
-        {!canEdit(kind) && <span className="badge readonly">{t('Nur Lesen')}</span>}
+        {!canEdit(kind) && kind !== 'user' && (
+          <label className="checkbox small" title={t('Nur Elemente zeigen, deren Owner Sie sind')}>
+            <input type="checkbox" checked={mineOnly} onChange={(e) => setMineOnly(e.target.checked)} /> 🔑 {t('nur meine')}
+          </label>
+        )}
         {canEdit(kind) && !(kind === 'user' && userTab === 'matrix') && !(kind === 'audit' && auditTab !== 'audits') && (
           <button
             className="primary"
@@ -366,7 +374,10 @@ export function EntityModule({ kind }: { kind: EntityKind }) {
               {filtered.map((e) => (
                 <tr key={e.id} className={e.id === selectedId ? 'selected' : ''} onClick={() => select(kind, e.id)}>
                   <td className="mono">{e.code}</td>
-                  <td>{e.title}</td>
+                  <td>
+                    {e.title}
+                    {kind !== 'user' && isOwnerOf(kind, e) && <span className="owner-badge">{t('Owner')}</span>}
+                  </td>
                   {columns.map((c) => (
                     <td key={c.label}>{c.render(e)}</td>
                   ))}
@@ -389,9 +400,11 @@ function EntityEditor({ kind, entity }: { kind: EntityKind; entity: AnyEntity })
   const update = useStore((s) => s.updateEntity);
   const remove = useStore((s) => s.deleteEntity);
   const select = useUi((s) => s.select);
-  const { canEdit } = useRights();
-  const editable = canEdit(kind);
+  const { canEdit, canEditEntity, canEditField, isOwnerOf, isAdmin } = useRights();
+  const editable = canEditEntity(kind, entity);
   const [showProfile, setShowProfile] = useState(false);
+  const [suggest, setSuggest] = useState(false);
+  const sample = useSample();
   const values = entity as unknown as Record<string, unknown>;
 
   return (
@@ -406,7 +419,15 @@ function EntityEditor({ kind, entity }: { kind: EntityKind; entity: AnyEntity })
         <div className="row gap">
           {kind === 'role' && <button onClick={() => setShowProfile(true)}>{t('Rollenbeschreibung')}</button>}
           {kind === 'position' && <button onClick={() => setShowProfile(true)}>{t('Stellenbeschreibung')}</button>}
-          {editable && (
+          {editable && sample && canSuggest(kind) && <button onClick={() => setSuggest(true)}>✨ {t('Mit KI vorschlagen')}</button>}
+          {!isAdmin &&
+            (editable ? (
+              <span className="owner-badge big">🔑 {t('Owner – Sie dürfen bearbeiten')}</span>
+            ) : (
+              <span className="badge readonly">{t('Nur Lesen')}</span>
+            ))}
+          {isAdmin && isOwnerOf(kind, entity) && <span className="owner-badge">{t('Owner')}</span>}
+          {canEdit(kind) && (
             <ConfirmButton
               label={t('Löschen')}
               confirmLabel={t('Wirklich löschen? (inkl. Zuordnungen)')}
@@ -418,6 +439,7 @@ function EntityEditor({ kind, entity }: { kind: EntityKind; entity: AnyEntity })
           )}
         </div>
       </div>
+      {suggest && <AiFieldSuggest kind={kind} entity={entity} onClose={() => setSuggest(false)} />}
       {kind === 'role' && showProfile && <RoleProfile role={entity as Role} onClose={() => setShowProfile(false)} />}
       {kind === 'position' && showProfile && <PositionProfile position={entity as Position} onClose={() => setShowProfile(false)} />}
       {kind === 'role' ? (
@@ -441,7 +463,14 @@ function EntityEditor({ kind, entity }: { kind: EntityKind; entity: AnyEntity })
               {sec.fields
                 .filter((f) => !f.showIf || f.showIf(values))
                 .map((f) => (
-                  <Field key={f.key} def={f} value={values[f.key]} entityId={entity.id} onChange={(v) => update(kind, entity.id, { [f.key]: v })} />
+                  <Field
+                    key={f.key}
+                    def={f}
+                    value={values[f.key]}
+                    entityId={entity.id}
+                    locked={editable && !canEditField(kind, f.key)}
+                    onChange={(v) => update(kind, entity.id, { [f.key]: v })}
+                  />
                 ))}
             </div>
           </fieldset>

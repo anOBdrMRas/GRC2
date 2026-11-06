@@ -16,6 +16,7 @@ import {
 } from './logic';
 import { modules } from './schema';
 import { seedData } from './seed';
+import { migrateSystemRoles } from './permissions';
 import { emptyDiagram } from './bpmn/templates';
 
 type Collections = { [K in EntityKind]: EntityMap[K][] };
@@ -25,6 +26,10 @@ interface State extends Collections {
   /** simulated login (prototype has no authentication) */
   currentUserId: string;
   setCurrentUser: (id: string) => void;
+  /** simulated single sign-on */
+  loggedIn: boolean;
+  login: (userId: string) => void;
+  logout: () => void;
 
   createEntity: <K extends EntityKind>(kind: K, title?: string) => EntityMap[K];
   updateEntity: <K extends EntityKind>(kind: K, id: string, patch: Partial<EntityMap[K]>) => void;
@@ -234,14 +239,21 @@ export const useStore = create<State>()(
         })),
 
       setCurrentUser: (currentUserId) => set({ currentUserId }),
+      loggedIn: false,
+      login: (currentUserId) => set({ currentUserId, loggedIn: true }),
+      logout: () => set({ loggedIn: false }),
       importAll: (data) => set(normalizeData(data)),
-      resetDemo: () => set(seedData()),
+      resetDemo: () =>
+        set((s) => {
+          const seed = seedData();
+          return { ...seed, currentUserId: seed.user.some((u) => u.id === s.currentUserId) ? s.currentUserId : seed.currentUserId };
+        }),
     }),
     {
       name: 'grc-prototype-v1',
-      version: 5,
+      version: 6,
       // v1 had no users and free-text role holders
-      migrate: (persisted) => normalizeData(persisted as Partial<State>),
+      migrate: (persisted) => ({ ...normalizeData(persisted as Partial<State>), loggedIn: false }),
     },
   ),
 );
@@ -249,17 +261,25 @@ export const useStore = create<State>()(
 /** Brings imported or previously stored data to the current shape. */
 function normalizeData(data: Partial<State>): Partial<State> {
   const seed = seedData();
-  const users = (data.user?.length ? data.user : seed.user).map((u: Partial<User>) => {
+  // Data that started from the demo gets demo elements added in later versions (matched by id).
+  const demoBased = !data.user?.length || data.user.some((u) => u.id === 'U-001');
+  const addMissing = <T extends { id: string }>(xs: T[], demo: T[]): T[] =>
+    demoBased ? [...xs, ...demo.filter((d) => !xs.some((x) => x.id === d.id))] : xs;
+  const users = addMissing(data.user?.length ? data.user : seed.user, seed.user).map((u: Partial<User>) => {
     const demo = seed.user.find((x) => x.id === u.id);
-    return normalizeUser({
+    const merged = normalizeUser({
       ...(demo && u.employmentType === undefined ? pickEmployment(demo) : {}),
       ...(!data.position && u.positionId === undefined ? pick(demo) : {}),
       ...u,
     });
+    // v6: only the system roles "employee" and "admin" remain
+    return merged.systemRoles.every((r) => r === 'employee' || r === 'admin') && merged.systemRoles.length
+      ? merged
+      : { ...merged, systemRoles: migrateSystemRoles(merged.systemRoles) };
   });
-  const roles = (data.role ?? []).map((r: Partial<Role>) => normalizeRole(r));
+  const roles = addMissing(data.role ?? [], seed.role).map((r: Partial<Role>) => normalizeRole(r));
   // v4 added positions: older data gets the demo positions and the demo persons' assignments
-  const positions = (data.position ?? seed.position).map((p: Partial<Position>) => {
+  const positions = addMissing(data.position ?? seed.position, seed.position).map((p: Partial<Position>) => {
     const demo = seed.position.find((x) => x.id === p.id);
     // v5 added target powers of attorney
     return normalizePosition(
@@ -271,9 +291,15 @@ function normalizeData(data: Partial<State>): Partial<State> {
     user: users,
     role: roles,
     position: positions,
-    mandate: (data.mandate ?? migrateMandates(data.role ?? [], { role: roles, position: positions, user: users }, seed.mandate)).map(
-      (m: Partial<Mandate>) => normalizeMandate(m),
-    ),
+    // v6 added the process landscape (area, order) and more demo processes
+    processes: addMissing(data.processes ?? seed.processes, seed.processes).map((p) => {
+      const demo = seed.processes.find((x) => x.id === p.id);
+      return demo && p.area === undefined ? { ...p, area: demo.area, landscapeOrder: demo.landscapeOrder } : p;
+    }),
+    mandate: (data.mandate
+      ? addMissing(data.mandate, seed.mandate)
+      : migrateMandates(data.role ?? [], { role: roles, position: positions, user: users }, seed.mandate)
+    ).map((m: Partial<Mandate>) => normalizeMandate(m)),
     // v3 added audits: older data gets the demo audits
     audit: (data.audit ?? seed.audit).map((a: Partial<Audit>) => normalizeAudit(a)),
     currentUserId: data.currentUserId && users.some((u) => u.id === data.currentUserId) ? data.currentUserId : (users[0]?.id ?? ''),

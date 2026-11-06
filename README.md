@@ -5,6 +5,25 @@ BPMN-2.0-Prozessmodellierung und integrierten GRC-Modulen.
 
 ## Funktionen
 
+- **Anmeldung und persönliche Startseite**
+  - Anmeldeseite im Stil einer Firmen-SSO (Keycloak im Prototyp nicht verbunden) mit Demo-Personen
+    (Mitarbeiter, Mitarbeiter und Owner, Führungskraft, Administrator)
+  - **Prozesslandschaft** als Prozesshaus: Führungsprozesse, Ende-zu-Ende-Kernprozesse als Pfeilkette,
+    Unterstützungsprozesse; markiert, wo die Person beteiligt ist (R/A) und wo sie Owner ist
+  - **Mir zugewiesen**: Stelle mit Vorgesetzten, Rollen, Prozessschritte mit RACI, Übertragungen,
+    durchgeführte Controls, ausgewertete KPI, offene Audit-Feststellungen, „Für mich zu tun“
+  - **In meiner Verantwortung** (Owner): Prozesse, Stellen des Teams, Rollen, Risiken, Controls, KPI,
+    erteilte Übertragungen und Audits mit Handlungsbedarf und „Bearbeiten“
+  - **Administration**: neue Elemente anlegen, Prozess mit KI entwerfen
+- **Rechtemodell**: zwei Systemrollen (Mitarbeiter, Administrator). Alle lesen alles außer der
+  Benutzerverwaltung; bearbeiten darf, wer Owner eines Elements ist (z. B. Rollenverantwortlicher,
+  Inhaber der Rolle „Prozessverantwortlicher“, disziplinarischer Vorgesetzter einer Stelle, Delegierender);
+  nur Administratoren legen an, löschen und ändern die Owner-Felder
+- **KI** (in der veröffentlichten Version über die KI-Schnittstelle von claude.ai, lokal als Suche ohne KI)
+  - Assistent für alle: „Wo finde ich …?“ mit Links direkt in Prozessschritte, Rollen und Stellen
+  - Prozess mit KI entwerfen (Administration): Beschreibung → Schritte, Entscheidungen, Rollen → BPMN-Entwurf;
+    ohne KI: eine Zeile pro Schritt
+  - „Mit KI vorschlagen“ für Textfelder von Rollen, Stellen, Risiken, Controls und Übertragungen
 - **Prozessmodellierung (BPMN 2.0)** auf Basis von [bpmn-js](https://bpmn.io)
   - Prozesslandkarte nach Führungs-, Kern- und Unterstützungsprozessen
   - Subprozesse (zugeklappte Subprozesse mit Drill-down und Brotkrumen-Navigation)
@@ -54,19 +73,18 @@ BPMN-2.0-Prozessmodellierung und integrierten GRC-Modulen.
     Badge „A“ am Prozessschritt, Anzeige bei Controls, Risiken, Rollen und im Cockpit
   - *Benutzerverwaltung*: Arbeitsverhältnis (Arbeitgeber, Beschäftigungsart, Eintritt, Befristung/Austritt,
     Vertragsreferenz ins HR-System, Kenntnisnahme der Stellenbeschreibung, Vertraulichkeit, Verhaltenskodex,
-    Interessenkonflikterklärung), erhaltene und erteilte Übertragungen, Systemrollen (Administrator, GRC-Manager, Prozessmodellierer,
-    Risikomanager, IKS-Verantwortlicher, Compliance Officer, Organisationsverantwortlicher,
-    KPI-Verantwortlicher, Auditmanager, Auditor, Leser), Berechtigungsmatrix und simulierte Anmeldung („Angemeldet als“),
-    die Lese-/Bearbeitungsrechte in allen Modulen durchsetzt
+    Interessenkonflikterklärung), erhaltene und erteilte Übertragungen, Systemrollen (Mitarbeiter, Administrator)
+    und Rechteübersicht inkl. der Regeln, wer Owner welcher Elemente ist
   - *KPI*: Ziel, Formel, Einheit, Ziel-/Warn-/Kritisch-Schwellen, Frequenz, Datenquelle,
     Messreihe mit Ampel und Verlauf
   - Jedes Element zeigt, in welchen Prozessschritten es verwendet wird (mit Sprung ins Modell)
-- **Cockpit**: Risikomatrizen, IKS-Wirksamkeit, Rollenabdeckung, KPI-Ampel und Handlungsbedarf
+- **GRC-Cockpit**: Risikomatrizen, IKS-Wirksamkeit, Rollenabdeckung, KPI-Ampel und Handlungsbedarf
 
 Die Oberfläche lässt sich oben links zwischen Deutsch und Englisch umschalten (eingegebene Inhalte werden nicht übersetzt).
 
 Alle Daten werden im Browser (localStorage) gespeichert und lassen sich als JSON exportieren/importieren.
-Beim ersten Start werden Demodaten (Beschaffungsprozess mit Subprozess, Berechtigungsmanagement) geladen.
+Beim ersten Start werden Demodaten geladen (12 Prozesse der Prozesslandschaft, u. a. Beschaffung mit Subprozess,
+Export & Zoll, Berechtigungsmanagement; Organisation mit Stellen, Rollen und Übertragungen).
 
 ## Starten
 
