@@ -113,7 +113,12 @@ export const modules: Record<EntityKind, ModuleDef> = {
           { key: 'description', label: 'Risikobeschreibung', type: 'textarea', wide: true, hint: 'der erste Satz erscheint in Listen' },
           { key: 'cause', label: 'Ursache und Auswirkung', type: 'textarea', wide: true },
           { key: 'ownerUserId', label: 'Risikoeigner', type: 'ref', refKind: 'user', hint: 'ISO 27001 6.1.2 c) 2)' },
-          { key: 'status', label: 'Status', type: 'select', options: ['Identifiziert', 'Bewertet', 'In Behandlung', 'Akzeptiert', 'Geschlossen'] },
+          {
+            key: 'treatmentStatus',
+            label: 'Behandlungsstatus',
+            type: 'select',
+            options: ['Identifiziert', 'Bewertet', 'In Behandlung', 'Akzeptiert', 'Geschlossen'],
+          },
         ],
       },
       {
@@ -189,7 +194,12 @@ export const modules: Record<EntityKind, ModuleDef> = {
             type: 'select',
             options: ['Kundenzufriedenheit', 'Effizienz', 'Innovation', 'Markt', 'Compliance', 'Informationssicherheit'],
           },
-          { key: 'status', label: 'Status', type: 'select', options: ['Identifiziert', 'Bewertet', 'In Umsetzung', 'Realisiert', 'Verworfen'] },
+          {
+            key: 'progressStatus',
+            label: 'Umsetzungsstatus',
+            type: 'select',
+            options: ['Identifiziert', 'Bewertet', 'In Umsetzung', 'Realisiert', 'Verworfen'],
+          },
           { key: 'ownerRoleId', label: 'Verantwortlich', type: 'ref', refKind: 'role' },
         ],
       },

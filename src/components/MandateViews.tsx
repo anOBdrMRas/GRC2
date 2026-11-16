@@ -1,6 +1,9 @@
 // Mandates (appointments, delegations of duties, powers of attorney) shown in the role, position and user forms.
+import { useState } from 'react';
 import type { Mandate } from '../types';
 import { useStore } from '../store';
+import { mandateStage, stepLabel } from '../workflow';
+import { fmtTime } from './WorkflowBar';
 import { useUi } from '../ui';
 import { fmtEur, mandateState, mandateStateLabel, orgIssues, positionHolders, roleHolders, type MandateState } from '../logic';
 import { useRights } from '../useRights';
@@ -183,6 +186,147 @@ export function MandateInsights({ mandate }: { mandate: Mandate }) {
             </div>
           ))}
         </div>
+      )}
+    </div>
+  );
+}
+
+export interface PendingMandate {
+  m: Mandate;
+  stage: 'grant' | 'accept';
+  /** person who has to act (empty for a granting body) */
+  userId: string;
+  /** waiting since (ISO) */
+  since: string;
+}
+
+/** Delegations waiting for the grantor (to grant) or the recipient (to accept). */
+export function pendingMandates(mandates: Mandate[]): PendingMandate[] {
+  return mandates
+    .map((m) => ({ m, stage: mandateStage(m) }))
+    .filter((x): x is { m: Mandate; stage: 'grant' | 'accept' } => x.stage === 'grant' || x.stage === 'accept')
+    .map(({ m, stage }) => ({
+      m,
+      stage,
+      userId: stage === 'grant' ? m.grantedByUserId : m.recipientUserId,
+      since: (m.workflow ?? []).at(-1)?.at ?? m.createdAt,
+    }))
+    .sort((a, b) => a.since.localeCompare(b.since));
+}
+
+const mandateSteps = [
+  { key: 'draft', label: 'Entwurf' },
+  { key: 'grant', label: 'Erteilung' },
+  { key: 'accept', label: 'Annahme' },
+  { key: 'done', label: 'Wirksam' },
+] as const;
+
+/** Actions of one pending delegation for the current user (grant / accept / decline). */
+export function MandateActions({ m, compact = false }: { m: Mandate; compact?: boolean }) {
+  const act = useStore((s) => s.mandateAction);
+  const { user, isAdmin } = useRights();
+  const [comment, setComment] = useState('');
+  const stage = mandateStage(m);
+  const isGrantor = !!user && m.grantedByUserId === user.id;
+  const isRecipient = !!user && m.recipientUserId === user.id;
+  const run = (a: 'grant' | 'accept' | 'decline') => {
+    act(m.id, a, comment.trim());
+    setComment('');
+  };
+  if (stage === 'grant' && (isGrantor || isAdmin)) {
+    const onBehalf = !isGrantor;
+    const missing = !m.recipientUserId;
+    return (
+      <span className="mandate-actions">
+        {!compact && <input value={comment} onChange={(e) => setComment(e.target.value)} placeholder={t('Kommentar (optional)')} />}
+        <button
+          className="primary small-btn"
+          disabled={missing}
+          title={missing ? t('Bitte zuerst den Empfänger eintragen.') : undefined}
+          onClick={() => run('grant')}
+        >
+          ✓ {onBehalf ? t('Erteilung bestätigen (stellvertretend)') : t('Erteilen')}
+        </button>
+      </span>
+    );
+  }
+  if (stage === 'accept' && (isRecipient || isAdmin)) {
+    return (
+      <span className="mandate-actions">
+        <input value={comment} onChange={(e) => setComment(e.target.value)} placeholder={t('Kommentar (für Ablehnen erforderlich)')} />
+        <button className="primary small-btn" onClick={() => run('accept')}>
+          ✓ {isRecipient ? t('Annehmen') : t('Annahme erfassen (stellvertretend)')}
+        </button>
+        <button
+          className="danger small-btn"
+          disabled={!comment.trim()}
+          title={!comment.trim() ? t('Bitte einen Kommentar angeben.') : undefined}
+          onClick={() => run('decline')}
+        >
+          ↩ {t('Ablehnen')}
+        </button>
+      </span>
+    );
+  }
+  return null;
+}
+
+/** Approval of a delegation: draft → granted by the grantor → accepted by the recipient → effective. */
+export function MandateWorkflowBar({ mandate: m }: { mandate: Mandate }) {
+  const users = useStore((s) => s.user);
+  const [showHistory, setShowHistory] = useState(false);
+  const name = (id: string) => users.find((u) => u.id === id)?.title ?? '–';
+  const stage = mandateStage(m);
+  const pos = { draft: 0, grant: 1, accept: 2, done: 3, revoked: -1 }[stage];
+  const history = m.workflow ?? [];
+  const last = history.at(-1);
+  const grantor = m.grantedByUserId ? name(m.grantedByUserId) : m.grantedByBody || '–';
+  const who = { draft: '', grant: grantor, accept: m.recipientUserId ? name(m.recipientUserId) : '–', done: '' } as const;
+  return (
+    <div className={`workflow-bar compact stage-${stage === 'done' ? 'released' : stage === 'accept' ? 'review' : 'draft'}`}>
+      <div className="wf-line">
+        <div className="wf-steps">
+          {mandateSteps.map((s, i) => (
+            <span key={s.key} className={`wf-step ${i < pos || stage === 'done' ? 'done' : ''} ${i === pos && stage !== 'done' ? 'current' : ''}`}>
+              <span className="wf-dot">{i < pos || stage === 'done' ? '✓' : i + 1}</span>
+              {t(s.label)}
+              {who[s.key] && <span className="wf-who"> · {who[s.key]}</span>}
+            </span>
+          ))}
+          {stage === 'revoked' && <span className="pill pill-neutral">{t('Widerrufen')}</span>}
+        </div>
+        <div className="wf-actions">
+          <MandateActions m={m} />
+          {stage === 'grant' && !m.grantedByUserId && m.grantedByBody && (
+            <span className="small muted">{t('Erteilt durch ein Gremium – die Administration bestätigt die Erteilung anhand des Dokuments.')}</span>
+          )}
+          {history.length > 0 && (
+            <button className="small-btn" onClick={() => setShowHistory(!showHistory)}>
+              {t('Historie')} ({history.length})
+            </button>
+          )}
+        </div>
+      </div>
+      {last?.step === 'declined' && stage === 'grant' && (
+        <div className="wf-note small warn">
+          ↩ <b>{t('Abgelehnt von {user}', { user: name(last.byUserId) })}</b> ({fmtTime(last.at)}): {last.comment}
+        </div>
+      )}
+      {showHistory && (
+        <table className="mini wide-table wf-history">
+          <tbody>
+            {[...history].reverse().map((h, i) => (
+              <tr key={i}>
+                <td className="small">{fmtTime(h.at)}</td>
+                <td className="small">
+                  <b>{t(stepLabel[h.step])}</b>
+                </td>
+                <td className="small">{name(h.byUserId)}</td>
+                <td className="small">{h.comment || '–'}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
       )}
     </div>
   );

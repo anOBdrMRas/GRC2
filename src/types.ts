@@ -33,7 +33,8 @@ export interface Risk extends BaseEntity {
   complianceObligation: string;
   cause: string;
   ownerUserId: string;
-  status: string;
+  /** progress of the treatment: Identifiziert … Geschlossen */
+  treatmentStatus: string;
   consequenceType: string;
   likelihood: number; // 1..4
   likelihoodReason: string;
@@ -51,6 +52,14 @@ export interface Risk extends BaseEntity {
   entity: string;
   sourceRef: string;
   isoRefs: string[];
+  /** approval workflow (Entwurf → In Prüfung → Freigegeben) */
+  status: string;
+  version: string;
+  workflow?: WorkflowEntry[];
+  /** released state kept while a changed draft waits for approval */
+  released?: ReleasedSnapshot;
+  /** person who recorded the risk (may edit it while it is a draft) */
+  createdByUserId: string;
 }
 
 /** ISO 9001 6.1 · ISO 37301 6.1 */
@@ -61,9 +70,17 @@ export interface Opportunity extends BaseEntity {
   benefitScore: number;
   measures: string;
   ownerRoleId: string;
-  status: string;
+  /** progress: Identifiziert … Realisiert / Verworfen */
+  progressStatus: string;
   nextReview: string;
   isoRefs: string[];
+  /** approval workflow (Entwurf → In Prüfung → Freigegeben) */
+  status: string;
+  version: string;
+  workflow?: WorkflowEntry[];
+  /** released state kept while a changed draft waits for approval */
+  released?: ReleasedSnapshot;
+  createdByUserId: string;
 }
 
 /** IKS · ISO/IEC 27001 Annex A + SoA · ISO 37301 8.2 · ISO 9001 8.1 */
@@ -106,6 +123,8 @@ export interface Role extends BaseEntity {
   incompatibleRoleIds: string[];
   complianceRelevant: boolean;
   workflow?: WorkflowEntry[];
+  /** released state kept while a changed draft waits for approval */
+  released?: ReleasedSnapshot;
   // formal transfer to the person (ISO 37301 5.3.2, ISO 27001 5.3): 'Keine' or a MandateType
   requiredMandate: string;
   writtenForm: boolean;
@@ -120,10 +139,14 @@ export interface Role extends BaseEntity {
 }
 
 /** One step in the approval workflow of a process, role or position. */
+/** Copy of a released element (without history), shown next to the changed draft. */
+export type ReleasedSnapshot = Record<string, unknown> & { version?: string; releasedAt?: string };
+
 export interface WorkflowEntry {
   /** submitted = released by the owner (business approval), approved = I&A quality approval,
-   *  rejected = sent back by I&A, reopened = edited after release, status = set by an administrator */
-  step: 'submitted' | 'approved' | 'rejected' | 'reopened' | 'status';
+   *  rejected = sent back by I&A, reopened = edited after release, status = set by an administrator;
+   *  mandates: granted (by the grantor), accepted / declined (by the recipient) */
+  step: 'submitted' | 'approved' | 'rejected' | 'reopened' | 'status' | 'granted' | 'accepted' | 'declined';
   byUserId: string;
   at: string;
   comment: string;
@@ -163,6 +186,8 @@ export interface Position extends BaseEntity {
   approvalLimit: number;
   roles: PositionRole[];
   workflow?: WorkflowEntry[];
+  /** released state kept while a changed draft waits for approval */
+  released?: ReleasedSnapshot;
   // validity & review
   version: string;
   status: string;
@@ -233,6 +258,8 @@ export interface Mandate extends BaseEntity {
   supervisionFrequency: string;
   lastSupervision: string;
   nextSupervision: string;
+  /** approval history: granted by the grantor, accepted by the recipient */
+  workflow?: WorkflowEntry[];
 }
 
 export type FindingType = 'Hauptabweichung' | 'Nebenabweichung' | 'Beobachtung' | 'Verbesserungspotenzial' | 'Positive Feststellung';
@@ -345,6 +372,8 @@ export interface ProcessModel {
   resources?: string;
   xml: string;
   workflow?: WorkflowEntry[];
+  /** released state kept while a changed draft waits for approval */
+  released?: ReleasedSnapshot;
   /** BPMN element id -> assignment */
   assignments: Record<string, StepAssignment>;
   /** BPMN call activity id -> linked process id */

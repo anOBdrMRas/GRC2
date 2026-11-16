@@ -6,9 +6,9 @@ import { t, useLang } from '../i18n';
 
 /** Demo persons that show the three ways of using the system. */
 const personas: { id: string; kind: string; text: string }[] = [
-  { id: 'U-006', kind: 'Mitarbeiter', text: 'Sieht die Prozesslandschaft und was ihm zugewiesen ist. Bearbeitet nichts.' },
-  { id: 'U-015', kind: 'Mitarbeiter und Owner', text: 'Owner des Prozesses Export & Zoll, einer Rolle und der Stelle seiner Mitarbeiterin.' },
+  { id: 'U-006', kind: 'Mitarbeiter', text: 'Sieht die Prozesslandschaft und was ihm zugewiesen ist. Meldet Risiken und Chancen.' },
   { id: 'U-016', kind: 'Führungskraft', text: 'Vorgesetzter und damit Owner der Stelle Director Export Control & Customs.' },
+  { id: 'U-013', kind: 'I&A-Team', text: 'Gibt Prozesse, Rollen, Stellen, Risiken und Chancen qualitativ frei und sieht das I&A-Cockpit.' },
   { id: 'U-001', kind: 'Administrator', text: 'Legt neue Elemente an, auch mit KI-Unterstützung, und pflegt Benutzer.' },
 ];
 

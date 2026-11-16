@@ -2,6 +2,11 @@
 import type { EntityKind } from './types';
 import {
   activityTypes,
+  addDays,
+  allFindings,
+  auditDate,
+  isOpenFinding,
+  isOverdueFinding,
   orgIssues,
   isHighRisk,
   scoreOf,
@@ -29,7 +34,7 @@ export interface Check {
   key: string;
   label: string;
   /** module the check belongs to (for the quality grade) */
-  module: WfKind | 'risk' | 'opportunity' | 'control' | 'mandate' | 'user' | 'other';
+  module: WfKind | 'control' | 'mandate' | 'user' | 'audit' | 'other';
   items: CheckItem[];
 }
 
@@ -45,6 +50,14 @@ export function imsChecks(d: OwnershipData): Check[] {
       .filter((e) => activityTypes.includes(e.type))
       .filter((e) => !(p.assignments[e.id]?.roles ?? []).some((r) => r.raci === 'R' || r.raci === 'A'))
       .map((e) => ({ kind: 'processes' as const, id: p.id, elementId: e.id, label: `${p.code} › ${e.name}` })),
+  );
+  const in90 = addDays(now, 90);
+  const in180 = addDays(now, 180);
+  const openFindings = allFindings(d.audit).filter(({ finding }) => isOpenFinding(finding));
+  const certs = d.audit.filter((a) => a.auditType === 'Zertifizierungsaudit' && a.certificateValidUntil);
+  // only the most recent certificate per standard counts
+  const latestCerts = certs.filter(
+    (a) => !certs.some((b) => b !== a && b.certificateValidUntil > a.certificateValidUntil && b.standards.some((x) => a.standards.includes(x))),
   );
   return [
     // processes
@@ -145,7 +158,7 @@ export function imsChecks(d: OwnershipData): Check[] {
       label: 'Risiken ohne mitigierende Kontrolle',
       module: 'risk',
       items: d.risk
-        .filter((r) => r.status !== 'Geschlossen' && !d.control.some((c) => c.mitigatesRiskIds.includes(r.id)))
+        .filter((r) => r.treatmentStatus !== 'Geschlossen' && !d.control.some((c) => c.mitigatesRiskIds.includes(r.id)))
         .map((r) => ({ kind: 'risk', id: r.id, label: label(r) })),
     },
     {
@@ -193,7 +206,7 @@ export function imsChecks(d: OwnershipData): Check[] {
       label: 'Chancen ohne Maßnahmen zur Nutzung',
       module: 'opportunity',
       items: d.opportunity
-        .filter((o) => o.status !== 'Verworfen' && !filled(o.measures))
+        .filter((o) => o.progressStatus !== 'Verworfen' && !filled(o.measures))
         .map((o) => ({ kind: 'opportunity', id: o.id, label: label(o) })),
     },
     // controls
@@ -248,6 +261,56 @@ export function imsChecks(d: OwnershipData): Check[] {
           .map((c) => ({ kind: 'control' as const, id: c.id, label: label(c), detail: c.nextTest })),
       ],
     },
+    // audits and certificates
+    {
+      key: 'audit-upcoming',
+      label: 'Anstehende Audits (90 Tage)',
+      module: 'audit',
+      items: d.audit
+        .filter((a) => !['Abgeschlossen', 'Abgesagt'].includes(a.status) && auditDate(a) >= now && auditDate(a) <= in90)
+        .sort((a, b) => auditDate(a).localeCompare(auditDate(b)))
+        .map((a) => ({ kind: 'audit', id: a.id, label: label(a), detail: auditDate(a) })),
+    },
+    {
+      key: 'audit-findings-open',
+      label: 'Offene Audit-Feststellungen',
+      module: 'audit',
+      items: openFindings.map(({ audit, finding }) => ({
+        kind: 'audit',
+        id: audit.id,
+        label: `${audit.code} · ${finding.code}`,
+        detail: t(finding.type),
+      })),
+    },
+    {
+      key: 'audit-findings-overdue',
+      label: 'Überfällige Audit-Feststellungen',
+      module: 'audit',
+      items: openFindings
+        .filter(({ finding }) => isOverdueFinding(finding, now))
+        .map(({ audit, finding }) => ({ kind: 'audit', id: audit.id, label: `${audit.code} · ${finding.code}`, detail: finding.dueDate })),
+    },
+    {
+      key: 'audit-cert',
+      label: 'Zertifikate abgelaufen oder laufen ab (< 180 Tage)',
+      module: 'audit',
+      items: latestCerts
+        .filter((a) => a.certificateValidUntil <= in180)
+        .map((a) => ({
+          kind: 'audit',
+          id: a.id,
+          label: `${a.standards.join(', ')} – ${label(a)}`,
+          detail: a.certificateValidUntil < now ? t('abgelaufen am {date}', { date: a.certificateValidUntil }) : a.certificateValidUntil,
+        })),
+    },
+    {
+      key: 'audit-report',
+      label: 'Durchgeführte Audits ohne Bericht',
+      module: 'audit',
+      items: d.audit
+        .filter((a) => a.status === 'Durchgeführt' && !a.reportDate)
+        .map((a) => ({ kind: 'audit', id: a.id, label: label(a), detail: auditDate(a) })),
+    },
     // delegations and persons
     {
       key: 'mandate',
@@ -277,7 +340,7 @@ export function workflowCounts(d: OwnershipData) {
     for (const x of xs) c[stageOf(x.status)]++;
     return c;
   };
-  return { processes: count(d.processes), role: count(d.role), position: count(d.position) };
+  return { processes: count(d.processes), role: count(d.role), position: count(d.position), risk: count(d.risk), opportunity: count(d.opportunity) };
 }
 
 export type GradeModule = WfKind | 'risk' | 'opportunity' | 'control';

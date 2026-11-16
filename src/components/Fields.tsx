@@ -192,7 +192,7 @@ function FieldInput({ def, value, onChange, entityId }: { def: FieldDef; value: 
     case 'roleList':
       return <RoleList value={(value as string[]) ?? []} selfId={entityId} onChange={onChange} />;
     case 'riskEval':
-      return <RiskEval riskId={entityId ?? ''} />;
+      return <RiskEval riskId={entityId ?? ''} shown={value as { likelihood: number; impact: number } | undefined} />;
     case 'riskActions':
       return <RiskActions value={(value as RiskAction[]) ?? []} onChange={onChange} />;
     case 'riskGuide':

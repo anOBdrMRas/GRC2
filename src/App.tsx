@@ -2,7 +2,6 @@ import { useRef } from 'react';
 import { useStore } from './store';
 import { useUi, type View } from './ui';
 import { modules, kindOrder } from './schema';
-import { Dashboard } from './components/Dashboard';
 import { ProcessView } from './components/ProcessView';
 import { EntityModule } from './components/EntityModule';
 import { OrgChart } from './components/OrgViews';
@@ -19,7 +18,6 @@ import { systemRoleById, type ModuleKey } from './permissions';
 const nav: { view: View; label: string; icon: string; color?: string }[] = [
   { view: 'home', label: 'Startseite', icon: '⌂' },
   { view: 'processes', label: 'Prozesse', icon: '▦' },
-  { view: 'dashboard', label: 'GRC-Cockpit', icon: '◧' },
   { view: 'ia', label: 'I&A-Cockpit', icon: '✓', color: '#0c8599' },
   ...kindOrder.flatMap((k) => {
     const item = {
@@ -35,7 +33,7 @@ const nav: { view: View; label: string; icon: string; color?: string }[] = [
 
 /** Rights module that governs a navigation entry. */
 const moduleOf = (v: View): ModuleKey => (v === 'orgchart' ? 'position' : (v as ModuleKey));
-const open = (v: View) => v === 'home' || v === 'dashboard' || v === 'ia';
+const open = (v: View) => v === 'home' || v === 'ia';
 
 export default function App() {
   const view = useUi((s) => s.view);
@@ -159,7 +157,6 @@ export default function App() {
         <main className="main">
           {view === 'home' && <Home />}
           {view === 'ia' && canReview && <IaCockpit />}
-          {view === 'dashboard' && <Dashboard />}
           {view === 'processes' && canRead('processes') && <ProcessView />}
           {view === 'orgchart' && canRead('position') && <OrgChart />}
           {!open(view) && !canRead(moduleOf(view)) && <Empty>{t('Ihre Systemrollen erlauben keinen Zugriff auf diesen Bereich.')}</Empty>}

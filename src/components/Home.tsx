@@ -11,6 +11,7 @@ import { CheckTiles, StatusBar } from './IaCockpit';
 import { ExcelTools } from './ExcelTools';
 import { imsChecks, workflowCounts } from '../quality';
 import { openRejection, stageOf, isWfKind, type WfItem, type WfKind } from '../workflow';
+import { MandateActions, pendingMandates } from './MandateViews';
 import { StatusPill } from './common';
 import { AssistantChat } from './AssistantChat';
 import { MandateStatePill } from './MandateViews';
@@ -126,6 +127,8 @@ export function Home() {
       <div className="home-grid">
         <div className="home-main">
           {isIa && <IaWaiting />}
+          <MyMandateApprovals userId={user.id} />
+          <RecordRisk userId={user.id} />
           <section className="home-section assigned">
             <h3>👤 {t('Mir zugewiesen')}</h3>
             <p className="small muted">{t('Diese Elemente betreffen Sie. Sie können sie lesen; bearbeitet werden sie von den Ownern.')}</p>
@@ -192,14 +195,14 @@ export function Home() {
           {own.count > 0 && (
             <section className="home-section owned">
               <h3>🔑 {t('In meiner Verantwortung')}</h3>
-              <p className="small muted">
-                {t('Hier sind Sie Owner. Diese Elemente dürfen Sie bearbeiten – neue anlegen kann nur die Administration.')}
-              </p>
+              <p className="small muted">{t('Hier sind Sie Owner. Diese Elemente dürfen Sie bearbeiten und fachlich freigeben.')}</p>
               <OwnerApprovals
                 items={[
                   ...own.processes.map((item) => ({ kind: 'processes' as WfKind, item })),
                   ...own.role.map((item) => ({ kind: 'role' as WfKind, item })),
                   ...own.position.map((item) => ({ kind: 'position' as WfKind, item })),
+                  ...own.risk.map((item) => ({ kind: 'risk' as WfKind, item })),
+                  ...own.opportunity.map((item) => ({ kind: 'opportunity' as WfKind, item })),
                 ]}
               />
               {own.issues.length > 0 && (
@@ -280,11 +283,86 @@ function OwnerApprovals({ items }: { items: { kind: WfKind; item: WfItem }[] }) 
   );
 }
 
+/** Delegations the person has to grant or accept. */
+function MyMandateApprovals({ userId }: { userId: string }) {
+  const mandates = useStore((s) => s.mandate);
+  const users = useStore((s) => s.user);
+  const go = useUi((s) => s.go);
+  const mine = pendingMandates(mandates).filter((p) => p.userId === userId);
+  if (!mine.length) return null;
+  const name = (id: string) => users.find((u) => u.id === id)?.title ?? '–';
+  return (
+    <section className="home-section mandate-home">
+      <h3>
+        ✍ {t('Delegationen: zu erteilen / anzunehmen')} <span className="count">{mine.length}</span>
+      </h3>
+      {mine.map(({ m, stage }) => (
+        <div key={m.id} className="mandate-pending">
+          <div>
+            <span className="link" onClick={() => go('mandate', m.id)}>
+              <span className="mono small muted">{m.code}</span> {m.title}
+            </span>
+            <div className="small muted">
+              {stage === 'grant'
+                ? t('Sie erteilen diese Delegation an {name}.', { name: name(m.recipientUserId) })
+                : t('{name} hat Ihnen diese Delegation erteilt. Bitte prüfen und annehmen.', {
+                    name: m.grantedByUserId ? name(m.grantedByUserId) : m.grantedByBody,
+                  })}
+            </div>
+          </div>
+          <MandateActions m={m} compact />
+        </div>
+      ))}
+    </section>
+  );
+}
+
+/** Everybody records risks and opportunities; the recorder's open drafts are listed. */
+function RecordRisk({ userId }: { userId: string }) {
+  const d = useStore();
+  const create = useStore((s) => s.createEntity);
+  const go = useUi((s) => s.go);
+  const drafts = [
+    ...d.risk.filter((r) => r.createdByUserId === userId && stageOf(r.status) !== 'released').map((e) => ({ kind: 'risk' as const, e })),
+    ...d.opportunity
+      .filter((o) => o.createdByUserId === userId && stageOf(o.status) !== 'released')
+      .map((e) => ({ kind: 'opportunity' as const, e })),
+  ];
+  return (
+    <section className="home-section record">
+      <div className="row space">
+        <h3>⚠ {t('Risiken und Chancen melden')}</h3>
+        <div className="row gap-s">
+          {(['risk', 'opportunity'] as const).map((k) => (
+            <button
+              key={k}
+              onClick={() => {
+                const e = create(k, t('Neue(s) {label}', { label: t(modules[k].label) }));
+                go(k, e.id);
+              }}
+            >
+              + {t(modules[k].label)}
+            </button>
+          ))}
+        </div>
+      </div>
+      <p className="small muted">
+        {t('Jede/r kann Risiken und Chancen erfassen. Der Owner bewertet und gibt fachlich frei, danach prüft das I&A-Team.')}
+      </p>
+      {drafts.map(({ kind, e }) => (
+        <div key={e.id} className="small link row gap-s" onClick={() => go(kind, e.id)}>
+          <span className="mono muted">{e.code}</span> {e.title} <StatusPill status={e.status} />
+        </div>
+      ))}
+    </section>
+  );
+}
+
 /** I&A team member: approvals waiting in the I&A cockpit. */
 function IaWaiting() {
   const d = useStore();
   const go = useUi((s) => s.go);
-  const n = [...d.processes, ...d.role, ...d.position].filter((x) => stageOf(x.status) === 'review').length;
+  const n = [...d.processes, ...d.role, ...d.position, ...d.risk, ...d.opportunity].filter((x) => stageOf(x.status) === 'review').length;
   return (
     <section className="home-section ia-home">
       <div className="row space">
@@ -344,7 +422,7 @@ function AdminHome() {
           <button onClick={() => go('ia')}>✓ {t('I&A-Cockpit')}</button>
         </div>
         <div className="ia-kpis">
-          {(['processes', 'role', 'position'] as WfKind[]).map((k) => (
+          {(['processes', 'role', 'position', 'risk', 'opportunity'] as WfKind[]).map((k) => (
             <div key={k} className="ia-kpi">
               <b>{k === 'processes' ? t('Prozesse') : t(modules[k].plural)}</b>
               <StatusBar c={counts[k]} />
@@ -405,7 +483,6 @@ function AdminHome() {
           <h3>{t('Daten')}</h3>
           <div className="row gap wrap">
             <ExcelTools scope="all" />
-            <button onClick={() => go('dashboard')}>◧ {t('GRC-Cockpit')}</button>
           </div>
           <p className="small muted">{t('Excel-Import und -Export gibt es zusätzlich in jedem Modul.')}</p>
         </section>

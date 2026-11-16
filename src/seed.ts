@@ -23,6 +23,17 @@ function make<K extends EntityKind>(kind: K, code: string, title: string, patch:
   return { ...blankEntity(kind, code, title), id: code, ...patch };
 }
 
+/** Workflow fields of an element released after the business approval and the I&A review. */
+const approvedBy = (owner: string, submittedOn: string, ia: string, approvedOn: string) => ({
+  status: 'Freigegeben',
+  version: '1.0',
+  createdByUserId: owner,
+  workflow: [
+    { step: 'submitted' as const, byUserId: owner, at: `${submittedOn}T09:00:00.000Z`, comment: '', status: 'In Prüfung' },
+    { step: 'approved' as const, byUserId: ia, at: `${approvedOn}T10:00:00.000Z`, comment: '', status: 'Freigegeben' },
+  ],
+});
+
 export function seedData() {
   const user: User[] = [
     make('user', 'U-001', 'Daniel Becker', {
@@ -872,7 +883,7 @@ export function seedData() {
       cause:
         'Umgehung des Freigabeworkflows, fehlende Systemsperre.\nAuswirkung: Budgetüberschreitung, unberechtigte Verpflichtungen gegenüber Lieferanten.',
       ownerUserId: 'U-002',
-      status: 'In Behandlung',
+      treatmentStatus: 'In Behandlung',
       consequenceType: 'Wirtschaftlicher Schaden',
       likelihood: 3,
       likelihoodReason: 'In den letzten 3–5 Jahren mehrfach Bestellungen ohne Freigabe festgestellt (Revisionsbericht).',
@@ -889,6 +900,7 @@ export function seedData() {
       entity: 'CDE',
       sourceRef: 'Bereichsworkshop Einkauf 03/2026',
       isoRefs: ['9001:6.1', '9001:8.4'],
+      ...approvedBy('U-002', '2026-03-12', 'U-013', '2026-03-14'),
     }),
     make('risk', 'R-002', 'Korruption / Vorteilsnahme bei Vergabe', {
       department: 'Global Sourcing',
@@ -901,7 +913,7 @@ export function seedData() {
       cause:
         'Interessenkonflikte, intransparente Vergabeentscheidungen.\nAuswirkung: Strafrechtliche Konsequenzen (§§ 299 ff. StGB), Reputationsschaden.',
       ownerUserId: 'U-007',
-      status: 'In Behandlung',
+      treatmentStatus: 'In Behandlung',
       consequenceType: 'Zivil- oder strafrechtliche Haftung',
       likelihood: 2,
       likelihoodReason: 'Bei uns noch nicht vorgekommen, in der Branche aber in 5–10 Jahren zu erwarten.',
@@ -920,6 +932,7 @@ export function seedData() {
       entity: 'CDE',
       sourceRef: 'Bereichsworkshop Einkauf 03/2026',
       isoRefs: ['37301:4.6', '37301:4.5'],
+      ...approvedBy('U-007', '2026-03-12', 'U-013', '2026-03-16'),
     }),
     make('risk', 'R-003', 'Lieferant mit unzureichender Informationssicherheit', {
       department: 'Global IT',
@@ -931,7 +944,7 @@ export function seedData() {
         'Lieferant mit unzureichender Informationssicherheit. Dienstleister mit Zugriff auf Kunden- und Konstruktionsdaten erfüllen keine Mindestanforderungen.',
       cause: 'Keine IS-Anforderungen im Vertrag, fehlende Lieferantenbewertung.\nAuswirkung: Datenabfluss, Lieferkettenangriff.',
       ownerUserId: 'U-008',
-      status: 'Bewertet',
+      treatmentStatus: 'Bewertet',
       consequenceType: 'Wirtschaftlicher Schaden',
       likelihood: 3,
       likelihoodReason: 'Lieferkettenangriffe nehmen zu; ohne Lieferantenbewertung in 3–5 Jahren zu erwarten.',
@@ -950,6 +963,7 @@ export function seedData() {
       entity: 'CDE',
       sourceRef: 'ISMS-Risikoanalyse 2026',
       isoRefs: ['27001:6.1.2', '27001:A.5.19', '27001:A.5.21'],
+      ...approvedBy('U-008', '2026-02-22', 'U-013', '2026-02-25'),
     }),
     make('risk', 'R-004', 'Doppelte oder fehlerhafte Zahlung', {
       department: 'Finance',
@@ -959,7 +973,7 @@ export function seedData() {
       description: 'Doppelte oder fehlerhafte Zahlung. Rechnungen werden doppelt oder mit falschem Betrag bezahlt.',
       cause: 'Manuelle Rechnungserfassung, fehlender 3-Way-Match.\nAuswirkung: Finanzieller Verlust, Aufwand für Rückforderungen.',
       ownerUserId: 'U-005',
-      status: 'In Behandlung',
+      treatmentStatus: 'In Behandlung',
       consequenceType: 'Wirtschaftlicher Schaden',
       likelihood: 3,
       likelihoodReason: 'Doppelzahlungen zuletzt 2023 festgestellt.',
@@ -973,6 +987,7 @@ export function seedData() {
       entity: 'CUS',
       sourceRef: 'Revisionsbericht IR-2025-04',
       isoRefs: ['9001:6.1'],
+      ...approvedBy('U-005', '2026-01-16', 'U-013', '2026-01-20'),
     }),
     make('risk', 'R-005', 'Mangelhafte Ware wird angenommen', {
       department: 'Global Order Processing',
@@ -983,7 +998,7 @@ export function seedData() {
       description: 'Mangelhafte Ware wird angenommen. Fehlerhafte Zukaufteile gelangen ungeprüft in die Fertigung.',
       cause: 'Keine oder unzureichende Wareneingangsprüfung.\nAuswirkung: Fehler im Endprodukt, Reklamationen.',
       ownerUserId: 'U-009',
-      status: 'Bewertet',
+      treatmentStatus: 'Bewertet',
       consequenceType: 'Reputationsschaden',
       likelihood: 3,
       likelihoodReason: 'Reklamationen wegen Zukaufteilen in 3–5 Jahren zu erwarten.',
@@ -1000,6 +1015,18 @@ export function seedData() {
       entity: 'CCZ',
       sourceRef: 'Bereichsworkshop Qualität 02/2026',
       isoRefs: ['9001:8.4', '9001:8.6', '9001:8.7'],
+      status: 'In Prüfung',
+      version: '0.9',
+      createdByUserId: 'U-009',
+      workflow: [
+        {
+          step: 'submitted',
+          byUserId: 'U-009',
+          at: '2026-11-10T09:15:00.000Z',
+          comment: 'Bewertung nach Bereichsworkshop abgeschlossen.',
+          status: 'In Prüfung',
+        },
+      ],
     }),
     make('risk', 'R-006', 'Überberechtigungen / verwaiste Accounts', {
       department: 'Global IT',
@@ -1010,7 +1037,7 @@ export function seedData() {
       description: 'Überberechtigungen / verwaiste Accounts. Ausgeschiedene oder versetzte Mitarbeitende behalten Zugriffsrechte.',
       cause: 'Fehlende Rezertifizierung, kein Leaver-Prozess.\nAuswirkung: Unbefugter Zugriff auf vertrauliche Daten.',
       ownerUserId: 'U-008',
-      status: 'In Behandlung',
+      treatmentStatus: 'In Behandlung',
       consequenceType: 'Behördliche Maßnahmen',
       likelihood: 4,
       likelihoodReason: 'Verwaiste Accounts beim letzten Audit gefunden – bereits eingetreten.',
@@ -1029,6 +1056,10 @@ export function seedData() {
       entity: 'CDE',
       sourceRef: 'ISMS-Audit 01/2026',
       isoRefs: ['27001:6.1.2', '27001:A.5.18', '27001:A.8.2'],
+      status: 'Entwurf',
+      version: '0.1',
+      createdByUserId: 'U-006',
+      workflow: [],
     }),
   ];
 
@@ -1039,6 +1070,7 @@ export function seedData() {
       likelihood: 4,
       benefitScore: 4,
       ownerRoleId: 'RO-004',
+      ...approvedBy('U-002', '2026-02-01', 'U-013', '2026-02-03'),
     }),
     make('opportunity', 'CH-002', 'Automatisierte Rechnungsverarbeitung (OCR/E-Rechnung)', {
       category: 'Innovation',
@@ -1046,6 +1078,10 @@ export function seedData() {
       likelihood: 3,
       benefitScore: 4,
       ownerRoleId: 'RO-017',
+      status: 'Entwurf',
+      version: '0.1',
+      createdByUserId: 'U-006',
+      workflow: [],
     }),
   ];
 
@@ -1444,6 +1480,38 @@ export function seedData() {
       supervisionFrequency: 'Jährlich',
       lastSupervision: '2026-01-15',
       nextSupervision: '2027-01-15',
+    }),
+    // approval workflow: waiting for the grantor (Andreas Maier) …
+    make('mandate', 'DV-017', 'Interne Freigabebefugnis Ausfuhranmeldungen', {
+      status: 'Entwurf',
+      mandateType: 'Interne Freigabebefugnis',
+      legalBasis: 'Unterschriftenregelung Export Control & Customs',
+      recipientUserId: 'U-015',
+      grantedByUserId: 'U-016',
+      positionId: 'ST-014',
+      scope: 'Freigabe von Standard-Ausfuhranmeldungen ohne Genehmigungspflicht.',
+      powers: 'Freigabe im Zollsystem ATLAS',
+      amountLimit: 250000,
+      validFrom: '2026-12-01',
+      document: 'Entwurf Freigaberegelung (DMS: EXP-ORG-011)',
+      supervision: 'Stichprobe der Freigaben durch den Vorgesetzten',
+      supervisionFrequency: 'Quartalsweise',
+      workflow: [],
+    }),
+    // … and waiting for the recipient (Tobias Roth)
+    make('mandate', 'DV-018', 'Stellvertretung Zahlungsvorschlag Kreditoren', {
+      status: 'Erteilt',
+      mandateType: 'Stellvertretung',
+      recipientUserId: 'U-006',
+      grantedByUserId: 'U-005',
+      positionId: 'ST-005',
+      scope: 'Vorbereitung des Zahlungsvorschlags bei Abwesenheit der Teamleitung (ohne Zahlungsfreigabe).',
+      validFrom: '2026-11-01',
+      document: 'Vertretungsregelung Kreditoren (DMS: FIN-ORG-014)',
+      acceptedAt: '',
+      workflow: [
+        { step: 'granted', byUserId: 'U-005', at: '2026-11-03T08:00:00.000Z', comment: 'Bitte bis Monatsende bestätigen.', status: 'Erteilt' },
+      ],
     }),
   ];
 
@@ -2074,6 +2142,20 @@ export function seedData() {
       ['Störung gemeldet', 'Ticket geschlossen'],
     ),
   ];
+
+  // RO-016 was released (v1.0) and is being changed: keep the released state next to the draft
+  const ro16 = role.find((r) => r.id === 'RO-016');
+  if (ro16) {
+    const { workflow: _w, released: _r, ...copy } = ro16;
+    ro16.released = {
+      ...copy,
+      status: 'Freigegeben',
+      version: '1.0',
+      releasedAt: '2026-01-15T10:00:00.000Z',
+      responsibilities: 'Prüft Aufträge auf Exportrelevanz und führt Sanktionslistenprüfungen durch.',
+      authorities: 'Keine eigenen Befugnisse; Eskalation an den Trade Compliance Beauftragten',
+    };
+  }
 
   return { user, role, position, mandate, risk, opportunity, control, kpi, audit, processes, currentUserId: 'U-001' };
 }

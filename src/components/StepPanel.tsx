@@ -1,10 +1,10 @@
-import type { ReactNode } from 'react';
+import { useState, type ReactNode } from 'react';
 import type { AnyEntity, Control, AssignableKind, Kpi, ProcessModel, Raci, Risk } from '../types';
 import type { SelectedElement } from '../bpmn/BpmnEditor';
 import { useStore } from '../store';
 import { useUi } from '../ui';
 import { modules } from '../schema';
-import { allFindings, assignedIds, emptyAssignment, isOpenFinding, kpiStatus, riskLevel, riskScore, scoreOf } from '../logic';
+import { allFindings, assignedIds, emptyAssignment, isOpenFinding, kpiStatus, parseElements, riskLevel, riskScore, scoreOf } from '../logic';
 import { LevelBadge, Picker, TrafficLight } from './common';
 import { useRights } from '../useRights';
 import { t } from '../i18n';
@@ -78,7 +78,15 @@ export function StepPanel({
   );
 }
 
-function ActivityPanel({ process, element, onOpenSubProcess }: { process: ProcessModel; element: SelectedElement; onOpenSubProcess: (id: string) => void }) {
+function ActivityPanel({
+  process,
+  element,
+  onOpenSubProcess,
+}: {
+  process: ProcessModel;
+  element: SelectedElement;
+  onOpenSubProcess: (id: string) => void;
+}) {
   const store = useStore();
   const go = useUi((s) => s.go);
   const a = process.assignments[element.id] ?? emptyAssignment();
@@ -149,7 +157,12 @@ function ActivityPanel({ process, element, onOpenSubProcess }: { process: Proces
       {section('role', (e) => {
         const r = a.roles.find((x) => x.roleId === e.id)!;
         return (
-          <select className="raci-select" value={r.raci} title={t(raciHelp[r.raci])} onChange={(ev) => store.setRaci(process.id, element.id, e.id, ev.target.value as Raci)}>
+          <select
+            className="raci-select"
+            value={r.raci}
+            title={t(raciHelp[r.raci])}
+            onChange={(ev) => store.setRaci(process.id, element.id, e.id, ev.target.value as Raci)}
+          >
             {(['R', 'A', 'C', 'I'] as Raci[]).map((x) => (
               <option key={x} value={x} title={t(raciHelp[x])}>
                 {x}
@@ -158,7 +171,9 @@ function ActivityPanel({ process, element, onOpenSubProcess }: { process: Proces
           </select>
         );
       })}
-      {a.roles.length > 0 && !a.roles.some((r) => r.raci === 'R') && <div className="warn small pad">{t('Keine durchführende Rolle (R) festgelegt.')}</div>}
+      {a.roles.length > 0 && !a.roles.some((r) => r.raci === 'R') && (
+        <div className="warn small pad">{t('Keine durchführende Rolle (R) festgelegt.')}</div>
+      )}
 
       {section('risk', (e) => {
         const r = e as Risk;
@@ -226,10 +241,7 @@ function CallLink({ process, elementId }: { process: ProcessModel; elementId: st
     <div className="assign-section">
       <div className="assign-title">{t('Aufgerufener Prozess')}</div>
       <div className="row gap">
-        <select
-          value={linked}
-          onChange={(e) => updateProcess(process.id, { callLinks: { ...process.callLinks, [elementId]: e.target.value } })}
-        >
+        <select value={linked} onChange={(e) => updateProcess(process.id, { callLinks: { ...process.callLinks, [elementId]: e.target.value } })}>
           <option value="">{t('— nicht verknüpft —')}</option>
           {processes
             .filter((p) => p.id !== process.id)
@@ -251,7 +263,13 @@ function CallLink({ process, elementId }: { process: ProcessModel; elementId: st
 
 function ProcessSummary({ process }: { process: ProcessModel }) {
   const store = useStore();
-  const all = Object.values(process.assignments);
+  const go = useUi((s) => s.go);
+  const openStep = useUi((s) => s.openStep);
+  const [open, setOpen] = useState<AssignableKind | null>(null);
+  const names = new Map(parseElements(process.xml).map((e) => [e.id, e.name || e.id]));
+  // only steps that still exist in the diagram
+  const entries = Object.entries(process.assignments).filter(([el]) => names.has(el));
+  const all = entries.map(([, a]) => a);
   const uniq = (kind: AssignableKind) => new Set(all.flatMap((a) => assignedIds(a, kind))).size;
   const risks = store.risk.filter((r) => all.some((a) => a.risks.includes(r.id)));
   const maxGross = Math.max(0, ...risks.map((r) => riskScore(r.likelihood, r.impact)));
@@ -264,12 +282,46 @@ function ProcessSummary({ process }: { process: ProcessModel }) {
       <p className="muted small">{t('Element im Diagramm auswählen, um Rollen, Risiken, Chancen, Controls und KPI zuzuordnen.')}</p>
       <div className="stat-grid">
         {(['role', 'risk', 'opportunity', 'control', 'kpi'] as AssignableKind[]).map((k) => (
-          <div className="stat" key={k} style={{ borderColor: modules[k].color }}>
+          <div
+            className={`stat clickable ${open === k ? 'active' : ''}`}
+            key={k}
+            style={{ borderColor: modules[k].color }}
+            title={t('Zeigt, in welchen Prozessschritten die Elemente vorkommen')}
+            onClick={() => setOpen(open === k ? null : k)}
+          >
             <div className="stat-num">{uniq(k)}</div>
             <div className="stat-label">{t(modules[k].plural)}</div>
           </div>
         ))}
       </div>
+      {open && (
+        <div className="proc-sum-list">
+          <b className="small">{t(modules[open].plural)}</b>
+          {uniq(open) === 0 && <div className="muted small">{t('Keinem Schritt dieses Prozesses zugeordnet.')}</div>}
+          {(store[open] as AnyEntity[])
+            .map((e) => ({
+              e,
+              steps: entries
+                .filter(([, a]) => assignedIds(a, open).includes(e.id))
+                .map(([el, a]) => ({ el, raci: open === 'role' ? a.roles.find((r) => r.roleId === e.id)?.raci : undefined })),
+            }))
+            .filter((x) => x.steps.length)
+            .map(({ e, steps }) => (
+              <div key={e.id} className="small">
+                <span className="link" onClick={() => go(open, e.id)}>
+                  <span className="mono muted">{e.code}</span> {e.title}
+                </span>
+                <div className="steps">
+                  {steps.map(({ el, raci }) => (
+                    <span key={el} className="tag link" title={t('Schritt im Diagramm markieren')} onClick={() => openStep(process.id, el)}>
+                      {raci && <b className="raci">{raci}</b>} {names.get(el)}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            ))}
+        </div>
+      )}
       {risks.length > 0 && (
         <p className="small">
           {t('Höchstes Bruttorisiko')}: <LevelBadge level={riskLevel(maxGross)} score={maxGross} />
@@ -289,7 +341,11 @@ function ProcessSummary({ process }: { process: ProcessModel }) {
             </span>
           ))}
         </div>
-        <div className="muted">{t('Subprozess anlegen: Aufgabe auswählen → Schraubenschlüssel (Typ ändern) → „Sub-Process (collapsed)“. Hineinnavigieren über „⤵ Subprozess öffnen“ oder das blaue Symbol am Element; zurück über die Brotkrumen-Navigation oben links.')}</div>
+        <div className="muted">
+          {t(
+            'Subprozess anlegen: Aufgabe auswählen → Schraubenschlüssel (Typ ändern) → „Sub-Process (collapsed)“. Hineinnavigieren über „⤵ Subprozess öffnen“ oder das blaue Symbol am Element; zurück über die Brotkrumen-Navigation oben links.',
+          )}
+        </div>
       </div>
     </div>
   );

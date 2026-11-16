@@ -2213,12 +2213,12 @@ table.program tbody tr:hover {
 /* ---------- workflow ---------- */
 .workflow-bar {
   display: grid;
-  gap: 8px;
-  padding: 10px 12px;
+  gap: 4px;
+  padding: 5px 8px;
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: 6px;
   background: #fafbfc;
-  margin-bottom: 10px;
+  margin-bottom: 8px;
 }
 .workflow-bar.stage-review {
   border-color: #99e9f2;
@@ -2228,63 +2228,81 @@ table.program tbody tr:hover {
   border-color: #b2f2bb;
   background: #f4fcf5;
 }
+.wf-line {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 12px;
+}
 .wf-steps {
   display: flex;
   flex-wrap: wrap;
-  gap: 6px 16px;
+  gap: 4px;
   align-items: center;
-  font-size: 12px;
+  font-size: 11px;
 }
 .wf-step {
-  display: flex;
+  display: inline-flex;
   align-items: center;
-  gap: 6px;
+  gap: 4px;
   color: var(--muted);
+  padding: 1px 7px 1px 2px;
+  border-radius: 10px;
+  background: #f1f3f5;
+  white-space: nowrap;
 }
 .wf-step.done {
   color: var(--ok);
+  background: #ebfbee;
 }
 .wf-step.current {
-  color: var(--text);
-  font-weight: 700;
+  color: #fff;
+  background: #0c8599;
+  font-weight: 600;
 }
 .wf-dot {
-  width: 20px;
-  height: 20px;
+  width: 15px;
+  height: 15px;
   border-radius: 50%;
   display: grid;
   place-items: center;
-  font-size: 11px;
-  background: #e9ecef;
-  color: var(--muted);
-}
-.wf-step.done .wf-dot {
-  background: #d3f9d8;
-  color: var(--ok);
+  font-size: 9px;
+  background: #fff;
+  color: inherit;
 }
 .wf-step.current .wf-dot {
-  background: #0c8599;
-  color: #fff;
-}
-.wf-who {
-  font-weight: 400;
-  color: var(--muted);
+  color: #0c8599;
 }
 .wf-actions {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
-  align-items: center;
-}
-.wf-actions input {
-  flex: 1;
-  min-width: 200px;
-}
-.wf-admin {
-  display: flex;
   gap: 6px;
   align-items: center;
   margin-left: auto;
+}
+.wf-actions input {
+  width: 220px;
+  padding: 3px 6px;
+  font-size: 12px;
+}
+.wf-actions .small-btn,
+.wf-version button {
+  font-size: 12px;
+  padding: 3px 8px;
+}
+.wf-admin {
+  font-size: 12px;
+  padding: 2px 4px;
+}
+.wf-note {
+  padding-left: 2px;
+}
+.released-note {
+  background: #fff9db;
+  border: 1px solid #ffe066;
+  border-radius: 6px;
+  padding: 5px 8px;
+  margin-bottom: 8px;
 }
 .wf-history td {
   vertical-align: top;
@@ -2595,4 +2613,41 @@ table.program tbody tr:hover {
 }
 .bar-fill.dept-other {
   background: #a5d8ff;
+}
+.mandate-pending {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 8px;
+  align-items: center;
+  padding: 6px 0;
+  border-top: 1px solid var(--border);
+}
+.mandate-actions {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+}
+.mandate-actions input {
+  width: 200px;
+  padding: 3px 6px;
+  font-size: 12px;
+}
+.proc-sum-list {
+  margin-top: 8px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 6px 8px;
+  display: grid;
+  gap: 6px;
+}
+.proc-sum-list .steps {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 2px;
+}
+.stat.clickable.active {
+  outline: 2px solid var(--accent);
 }

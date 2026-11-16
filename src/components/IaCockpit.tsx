@@ -9,7 +9,8 @@ import { ownersOf } from '../ownership';
 import { imsChecks, qualityGrade, workflowCounts, type Check, type CheckItem } from '../quality';
 import { daysSince, lastStep, openRejection, stageOf, type WfItem, type WfKind } from '../workflow';
 import { fmtTime } from './WorkflowBar';
-import { CockpitActions, CockpitCharts, CockpitStats } from './Dashboard';
+import { CockpitCharts, CockpitStats } from './Dashboard';
+import { MandateActions, pendingMandates } from './MandateViews';
 import { t } from '../i18n';
 
 const kindLabel = (k: WfKind) => (k === 'processes' ? 'Prozess' : modules[k].label);
@@ -104,7 +105,10 @@ export function IaCockpit() {
     ...d.processes.map((item) => ({ kind: 'processes' as WfKind, item })),
     ...d.role.map((item) => ({ kind: 'role' as WfKind, item })),
     ...d.position.map((item) => ({ kind: 'position' as WfKind, item })),
+    ...d.risk.map((item) => ({ kind: 'risk' as WfKind, item })),
+    ...d.opportunity.map((item) => ({ kind: 'opportunity' as WfKind, item })),
   ];
+  const mandatesPending = pendingMandates(d.mandate);
   const waiting = all
     .filter((x) => stageOf(x.item.status) === 'review')
     .sort((a, b) => (lastStep(a.item, 'submitted')?.at ?? '').localeCompare(lastStep(b.item, 'submitted')?.at ?? ''));
@@ -125,7 +129,7 @@ export function IaCockpit() {
       segments: seg(
         ['Geschlossen', 'Akzeptiert', 'In Behandlung', 'Bewertet', 'Identifiziert'],
         ['#40c057', '#94d82d', '#15aabf', '#fab005', '#fa5252'],
-        d.risk.map((r) => r.status),
+        d.risk.map((r) => r.treatmentStatus),
       ),
     },
     {
@@ -133,7 +137,7 @@ export function IaCockpit() {
       segments: seg(
         ['Realisiert', 'In Umsetzung', 'Bewertet', 'Identifiziert', 'Verworfen'],
         ['#40c057', '#15aabf', '#fab005', '#ffa94d', '#adb5bd'],
-        d.opportunity.map((o) => o.status),
+        d.opportunity.map((o) => o.progressStatus),
       ),
     },
     {
@@ -153,7 +157,7 @@ export function IaCockpit() {
     <div className="ia-cockpit">
       <div className="module-head">
         <h2>{t('I&A-Cockpit')}</h2>
-        <span className="small muted">{t('Integrity & Assurance: Qualitätsfreigabe von Prozessen, Rollen und Stellen')}</span>
+        <span className="small muted">{t('Integrity & Assurance: Qualitätsfreigabe von Prozessen, Rollen, Stellen, Risiken und Chancen')}</span>
       </div>
 
       <CockpitStats />
@@ -184,6 +188,12 @@ export function IaCockpit() {
               </span>
             </div>
             <SegBar segments={segments} />
+            {kind !== 'control' && (
+              <div className="small muted">
+                {t('{a} von {b} freigegeben', { a: counts[kind].released, b: counts[kind].total })} ·{' '}
+                {t('{n} im I&A-Review', { n: counts[kind].review })} · {t('{n} im Entwurf', { n: counts[kind].draft })}
+              </div>
+            )}
             <div className="small muted seg-legend">
               {segments
                 .filter((x) => x.n)
@@ -277,6 +287,51 @@ export function IaCockpit() {
         )}
       </section>
 
+      <section className="ia-section">
+        <h3>
+          {t('Delegationen in Freigabe')} <span className="count">{mandatesPending.length}</span>
+        </h3>
+        <p className="small muted">{t('Delegationen werden von der erteilenden Person erteilt und von der empfangenden Person angenommen.')}</p>
+        {mandatesPending.length === 0 ? (
+          <div className="ok small">✓ {t('Keine offenen Delegationen.')}</div>
+        ) : (
+          <table className="list ia-queue">
+            <thead>
+              <tr>
+                <th>{t('Delegation')}</th>
+                <th>{t('wartet auf')}</th>
+                <th>{t('wartet')}</th>
+                <th>{t('Aktion')}</th>
+              </tr>
+            </thead>
+            <tbody>
+              {mandatesPending.map(({ m, stage, userId, since }) => (
+                <tr key={m.id}>
+                  <td>
+                    <span className="ia-kind" style={{ color: modules.mandate.color }}>
+                      {t(m.mandateType)}
+                    </span>
+                    <div className="link" onClick={() => openItem({ kind: 'mandate', id: m.id })}>
+                      <span className="mono">{m.code}</span> {m.title}
+                    </div>
+                    <div className="small muted">
+                      {t('an')} {name(m.recipientUserId)}
+                    </div>
+                  </td>
+                  <td className="small">
+                    <b>{stage === 'grant' ? t('Erteilung') : t('Annahme')}</b>: {userId ? name(userId) : m.grantedByBody || '–'}
+                  </td>
+                  <td className="small">{t('{n} Tage', { n: daysSince(since) })}</td>
+                  <td className="ia-decide">
+                    <MandateActions m={m} />
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </section>
+
       <div className="ia-grid">
         <section className="ia-section">
           <h3>
@@ -325,19 +380,20 @@ export function IaCockpit() {
         <h3>{t('Qualitätsprüfungen')}</h3>
         <p className="small muted">{t('Automatische Prüfungen. Klick auf eine Kachel zeigt die betroffenen Elemente.')}</p>
         <h4 className="ia-sub">{t('Prozesse & Organisation')}</h4>
-        <CheckTiles checks={checks.filter((c) => c.module === 'processes' || c.module === 'role' || c.module === 'position' || c.key === 'review')} />
+        <CheckTiles checks={checks.filter((c) => c.module === 'processes' || c.module === 'role' || c.module === 'position')} />
+        <h4 className="ia-sub">{t('Delegationen & Personen')}</h4>
+        <CheckTiles checks={checks.filter((c) => c.module === 'mandate' || c.module === 'user')} />
         <h4 className="ia-sub">{t('Risiken, Chancen & Controls')}</h4>
-        <CheckTiles checks={checks.filter((c) => c.module === 'risk' || c.module === 'opportunity' || c.module === 'control')} />
+        <CheckTiles
+          checks={checks.filter((c) => c.module === 'risk' || c.module === 'opportunity' || c.module === 'control' || c.key === 'review')}
+        />
+        <h4 className="ia-sub">{t('Audits & Zertifikate')}</h4>
+        <CheckTiles checks={checks.filter((c) => c.module === 'audit')} />
       </section>
 
       <h3 className="ia-heading">{t('GRC-Lagebild')}</h3>
       <div className="dashboard embedded">
         <CockpitCharts />
-      </div>
-
-      <h3 className="ia-heading">{t('Handlungsbedarf')}</h3>
-      <div className="dashboard embedded">
-        <CockpitActions />
       </div>
     </div>
   );

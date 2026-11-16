@@ -1,12 +1,13 @@
-// Approval workflow for processes, roles and positions:
-// draft (owner) → business approval by the owner → I&A review → released.
-import type { Position, ProcessModel, Role, WorkflowEntry } from './types';
+// Approval workflow for processes, roles, positions, risks and opportunities:
+// draft (owner / recorder) → business approval by the owner → I&A review → released.
+import type { Mandate, Opportunity, Position, ProcessModel, ReleasedSnapshot, Risk, Role, WorkflowEntry } from './types';
 import { now } from './logic';
 
-export type WfKind = 'role' | 'position' | 'processes';
-export type WfItem = Role | Position | ProcessModel;
+export type WfKind = 'role' | 'position' | 'processes' | 'risk' | 'opportunity';
+export type WfItem = Role | Position | ProcessModel | Risk | Opportunity;
 
-export const isWfKind = (k: string): k is WfKind => k === 'role' || k === 'position' || k === 'processes';
+export const wfKinds: WfKind[] = ['processes', 'role', 'position', 'risk', 'opportunity'];
+export const isWfKind = (k: string): k is WfKind => (wfKinds as string[]).includes(k);
 
 /** Stored status values (unchanged from earlier versions) and their meaning in the workflow. */
 export const WF = { draft: 'Entwurf', review: 'In Prüfung', released: 'Freigegeben', archived: 'Archiviert' } as const;
@@ -29,6 +30,9 @@ export const stepLabel: Record<WorkflowEntry['step'], string> = {
   rejected: 'Zurückgewiesen (I&A)',
   reopened: 'Nach Freigabe geändert',
   status: 'Status gesetzt (Administration)',
+  granted: 'Erteilt (Erteilende/r)',
+  accepted: 'Angenommen (Empfänger/in)',
+  declined: 'Abgelehnt / zurückgegeben',
 };
 
 export const historyOf = (item: WfItem): WorkflowEntry[] => item.workflow ?? [];
@@ -62,17 +66,51 @@ export function workflowPatch(item: WfItem, action: WfAction, byUserId: string, 
     case 'approve':
       return {
         status: WF.released,
-        version: bumpVersion(item.version),
+        // first release: 1.0, then 1.1, 1.2 …
+        version: lastStep(item, 'approved') || parseFloat(item.version) >= 1 ? bumpVersion(item.version) : '1.0',
+        // the changed draft is the released state now
+        released: undefined,
         ...('lastReview' in item ? { lastReview: at.slice(0, 10) } : {}),
         workflow: [...history, entry('approved', WF.released)],
       };
     case 'reject':
       return { status: WF.draft, workflow: [...history, entry('rejected', WF.draft)] };
     case 'reopen':
-      return { status: WF.draft, workflow: [...history, entry('reopened', WF.draft)] };
+      return { status: WF.draft, released: item.released ?? snapshotOf(item), workflow: [...history, entry('reopened', WF.draft)] };
     case 'setStatus':
       return { status: status ?? item.status, workflow: [...history, entry('status', status ?? item.status)] };
   }
+}
+
+/** Mandate approval: draft → granted by the grantor → accepted by the recipient (effective). */
+export type MandateWfAction = 'grant' | 'accept' | 'decline';
+
+export function mandateStage(m: Mandate): 'draft' | 'grant' | 'accept' | 'done' | 'revoked' {
+  if (m.status === 'Widerrufen') return 'revoked';
+  if (m.status !== 'Erteilt') return 'grant';
+  return m.acceptedAt ? 'done' : 'accept';
+}
+
+export function mandatePatch(m: Mandate, action: MandateWfAction, byUserId: string, comment = ''): Partial<Mandate> {
+  const at = now();
+  const history = m.workflow ?? [];
+  const entry = (step: WorkflowEntry['step'], status: string): WorkflowEntry => ({ step, byUserId, at, comment, status });
+  switch (action) {
+    case 'grant':
+      return { status: 'Erteilt', validFrom: m.validFrom || at.slice(0, 10), workflow: [...history, entry('granted', 'Erteilt')] };
+    case 'accept':
+      return { acceptedAt: at.slice(0, 10), workflow: [...history, entry('accepted', 'Erteilt')] };
+    case 'decline':
+      return { status: 'Entwurf', acceptedAt: '', workflow: [...history, entry('declined', 'Entwurf')] };
+  }
+}
+
+/** Copy of the released element (kept while a changed draft waits for approval). */
+export function snapshotOf(item: WfItem): ReleasedSnapshot {
+  const copy = JSON.parse(JSON.stringify(item)) as Record<string, unknown>;
+  delete copy.workflow;
+  delete copy.released;
+  return { ...copy, releasedAt: lastStep(item, 'approved')?.at ?? '' } as ReleasedSnapshot;
 }
 
 /** Days since an ISO timestamp. */

@@ -20,6 +20,13 @@ export function useRights() {
   const owner = (kind: OwnKind, entity: unknown) => active && isOwner(user.id, kind, entity, s);
   /** while an element waits for the I&A review its content is frozen for owners */
   const inReview = (kind: OwnKind, entity: unknown) => isWfKind(kind) && stageOf((entity as { status?: string }).status) === 'review';
+  /** risks and opportunities: the person who recorded it may edit it while it is a draft */
+  const recorder = (kind: OwnKind, entity: unknown) =>
+    active &&
+    (kind === 'risk' || kind === 'opportunity') &&
+    (entity as { createdByUserId?: string }).createdByUserId === user.id &&
+    stageOf((entity as { status?: string }).status) === 'draft';
+  const everybodyRecords = (m: ModuleKey) => active && (m === 'risk' || m === 'opportunity');
   return {
     user,
     rights,
@@ -30,12 +37,24 @@ export function useRights() {
     canRead: (m: ModuleKey) => rights[m] !== 'none',
     /** administrator level: create, delete, manage */
     canEdit: (m: ModuleKey) => rights[m] === 'edit',
-    canCreate: (m: ModuleKey) => rights[m] === 'edit',
+    /** risks and opportunities are recorded by everybody, all other elements by administrators */
+    canCreate: (m: ModuleKey) => rights[m] === 'edit' || everybodyRecords(m),
+    /** administrators; the recorder deletes an own draft that was never submitted */
+    canDelete: (kind: OwnKind, entity: unknown) =>
+      isAdmin || (recorder(kind, entity) && !((entity as { workflow?: unknown[] }).workflow ?? []).length),
+    isRecorder: recorder,
     /** edit an existing element: administrators and its owners */
-    canEditEntity: (kind: OwnKind, entity: unknown) => isAdmin || (owner(kind, entity) && !inReview(kind, entity)),
+    canEditEntity: (kind: OwnKind, entity: unknown) => isAdmin || ((owner(kind, entity) || recorder(kind, entity)) && !inReview(kind, entity)),
     isOwnerOf: owner,
     inReview,
     /** ownership-defining fields stay with administrators; the status of workflow elements is set by the workflow */
-    canEditField: (kind: OwnKind, key: string) => isAdmin || !((ownerFields[kind] ?? []).includes(key) || (isWfKind(kind) && key === 'status')),
+    canEditField: (kind: OwnKind, key: string, entity?: unknown) =>
+      isAdmin ||
+      !(
+        ((ownerFields[kind] ?? []).includes(key) && !(entity !== undefined && recorder(kind, entity))) ||
+        (isWfKind(kind) && key === 'status') ||
+        // delegations are granted and accepted in their workflow
+        (kind === 'mandate' && (key === 'status' || key === 'acceptedAt'))
+      ),
   };
 }

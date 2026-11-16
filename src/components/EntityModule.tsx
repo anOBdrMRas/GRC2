@@ -1,6 +1,6 @@
 import { useMemo, useState, type ReactNode } from 'react';
 import type { AnyEntity, Audit, Control, EntityKind, Kpi, Mandate, Opportunity, Position, Risk, Role, User } from '../types';
-import { MandateInsights, MandateStatePill } from './MandateViews';
+import { MandateInsights, MandateStatePill, MandateWorkflowBar } from './MandateViews';
 import { PositionInsights, PositionProfile } from './OrgViews';
 import { auditTypes, modules } from '../schema';
 import { useStore } from '../store';
@@ -25,7 +25,7 @@ import { useRights } from '../useRights';
 import { AiFieldSuggest, canSuggest } from './AiDraft';
 import { ExcelTools } from './ExcelTools';
 import { WorkflowBar } from './WorkflowBar';
-import { isWfKind } from '../workflow';
+import { isWfKind, type WfItem } from '../workflow';
 import { useSample } from '../ai';
 import { dateLocale, t } from '../i18n';
 import { systemRoleById } from '../permissions';
@@ -64,7 +64,8 @@ function useColumns(kind: EntityKind): Column[] {
           sort: (e) => (isHighRisk(scoreOf(e as Risk)) ? 0 : 1),
         },
         { label: 'Controls', render: (e) => controls.filter((c) => c.mitigatesRiskIds.includes(e.id)).length || <span className="warn">0</span> },
-        { label: 'Status', render: (e) => t((e as Risk).status) },
+        { label: 'Behandlung', render: (e) => t((e as Risk).treatmentStatus) },
+        { label: 'Freigabe', render: (e) => <StatusPill status={(e as Risk).status} /> },
       ];
     case 'opportunity':
       return [
@@ -75,7 +76,8 @@ function useColumns(kind: EntityKind): Column[] {
           render: (e) => (e as Opportunity).likelihood * (e as Opportunity).benefitScore,
           sort: (e) => -(e as Opportunity).likelihood * (e as Opportunity).benefitScore,
         },
-        { label: 'Status', render: (e) => t((e as Opportunity).status) },
+        { label: 'Umsetzung', render: (e) => t((e as Opportunity).progressStatus) },
+        { label: 'Freigabe', render: (e) => <StatusPill status={(e as Risk).status} /> },
       ];
     case 'control':
       return [
@@ -222,7 +224,7 @@ export function EntityModule({ kind }: { kind: EntityKind }) {
   const focusFindingId = useUi((s) => s.focusFindingId);
   // Opening a finding from elsewhere always shows the audit form.
   if (kind === 'audit' && focusFindingId && auditTab !== 'audits') setAuditTab('audits');
-  const { canRead, canEdit, isOwnerOf } = useRights();
+  const { canRead, canEdit, canCreate, isOwnerOf } = useRights();
   const [mineOnly, setMineOnly] = useState(false);
 
   const filtered = useMemo(() => {
@@ -277,7 +279,7 @@ export function EntityModule({ kind }: { kind: EntityKind }) {
           </label>
         )}
         {!(kind === 'user' && userTab === 'matrix') && <ExcelTools scope={kind} compact />}
-        {canEdit(kind) && !(kind === 'user' && userTab === 'matrix') && !(kind === 'audit' && auditTab !== 'audits') && (
+        {canCreate(kind) && !(kind === 'user' && userTab === 'matrix') && !(kind === 'audit' && auditTab !== 'audits') && (
           <button
             className="primary"
             onClick={() => {
@@ -403,12 +405,17 @@ function EntityEditor({ kind, entity }: { kind: EntityKind; entity: AnyEntity })
   const update = useStore((s) => s.updateEntity);
   const remove = useStore((s) => s.deleteEntity);
   const select = useUi((s) => s.select);
-  const { canEdit, canEditEntity, canEditField, isOwnerOf, isAdmin } = useRights();
-  const editable = canEditEntity(kind, entity);
+  const { canDelete, canEditEntity, canEditField, isOwnerOf, isRecorder, isAdmin } = useRights();
+  // a changed draft of a released element: the released state can be shown next to it
+  const [showReleased, setShowReleased] = useState(false);
+  const snapshot = (entity as { released?: Record<string, unknown> }).released;
+  const viewingReleased = showReleased && !!snapshot;
+  const editable = canEditEntity(kind, entity) && !viewingReleased;
   const [showProfile, setShowProfile] = useState(false);
   const [suggest, setSuggest] = useState(false);
   const sample = useSample();
-  const values = entity as unknown as Record<string, unknown>;
+  const values = (viewingReleased ? { ...entity, ...snapshot } : { ...entity }) as unknown as Record<string, unknown>;
+  if (kind === 'risk') values['#score'] = { likelihood: values.likelihood, impact: values.impact };
 
   return (
     <div className="editor">
@@ -424,13 +431,15 @@ function EntityEditor({ kind, entity }: { kind: EntityKind; entity: AnyEntity })
           {kind === 'position' && <button onClick={() => setShowProfile(true)}>{t('Stellenbeschreibung')}</button>}
           {editable && sample && canSuggest(kind) && <button onClick={() => setSuggest(true)}>✨ {t('Mit KI vorschlagen')}</button>}
           {!isAdmin &&
-            (editable ? (
+            (editable && !isOwnerOf(kind, entity) && isRecorder(kind, entity) ? (
+              <span className="owner-badge big">✎ {t('Von Ihnen erfasst – Entwurf bearbeitbar')}</span>
+            ) : editable ? (
               <span className="owner-badge big">🔑 {t('Owner – Sie dürfen bearbeiten')}</span>
             ) : (
               <span className="badge readonly">{t('Nur Lesen')}</span>
             ))}
           {isAdmin && isOwnerOf(kind, entity) && <span className="owner-badge">{t('Owner')}</span>}
-          {canEdit(kind) && (
+          {canDelete(kind, entity) && (
             <ConfirmButton
               label={t('Löschen')}
               confirmLabel={t('Wirklich löschen? (inkl. Zuordnungen)')}
@@ -442,7 +451,18 @@ function EntityEditor({ kind, entity }: { kind: EntityKind; entity: AnyEntity })
           )}
         </div>
       </div>
-      {(kind === 'role' || kind === 'position') && <WorkflowBar kind={kind} item={entity as Role | Position} />}
+      {isWfKind(kind) && (
+        <WorkflowBar kind={kind} item={entity as WfItem} showReleased={viewingReleased} onShowReleased={snapshot ? setShowReleased : undefined} />
+      )}
+      {viewingReleased && (
+        <div className="released-note small">
+          🔒{' '}
+          {t('Freigegebener Stand v{v} – nur Lesen. Die Änderungen des Entwurfs sind noch nicht freigegeben.', {
+            v: String(snapshot!.version ?? ''),
+          })}
+        </div>
+      )}
+      {kind === 'mandate' && <MandateWorkflowBar mandate={entity as Mandate} />}
       {suggest && <AiFieldSuggest kind={kind} entity={entity} onClose={() => setSuggest(false)} />}
       {kind === 'role' && showProfile && <RoleProfile role={entity as Role} onClose={() => setShowProfile(false)} />}
       {kind === 'position' && showProfile && <PositionProfile position={entity as Position} onClose={() => setShowProfile(false)} />}
@@ -474,8 +494,10 @@ function EntityEditor({ kind, entity }: { kind: EntityKind; entity: AnyEntity })
                     entityId={entity.id}
                     locked={
                       editable &&
-                      !canEditField(kind, f.key) &&
-                      (f.key === 'status' && isWfKind(kind) ? 'wird über den Freigabe-Workflow gesetzt' : true)
+                      !canEditField(kind, f.key, entity) &&
+                      ((f.key === 'status' && isWfKind(kind)) || (kind === 'mandate' && (f.key === 'status' || f.key === 'acceptedAt'))
+                        ? 'wird über den Freigabe-Workflow gesetzt'
+                        : true)
                     }
                     onChange={(v) => update(kind, entity.id, { [f.key]: v })}
                   />

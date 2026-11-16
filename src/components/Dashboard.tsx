@@ -2,46 +2,18 @@ import type { EntityKind } from '../types';
 import { useStore } from '../store';
 import { useUi } from '../ui';
 import { modules } from '../schema';
-import {
-  activityTypes,
-  allFindings,
-  auditDate,
-  isOpenFinding,
-  isOverdueFinding,
-  kpiStatus,
-  orgIssues,
-  parseElements,
-  personSodConflicts,
-  positionHolders,
-  positionSodConflicts,
-  isHighRisk,
-  scoreOf,
-  riskLevel,
-  roleHolders,
-  today,
-} from '../logic';
+import { activityTypes, allFindings, isHighRisk, isOpenFinding, isOverdueFinding, kpiStatus, parseElements, scoreOf, today } from '../logic';
 import { Heatmap } from './Heatmap';
-import { FindingLine, auditTypeColor } from './AuditViews';
 import { findingTypes } from '../schema';
 import { t } from '../i18n';
 import { useRights } from '../useRights';
-import { LevelBadge, TrafficLight } from './common';
+import { TrafficLight } from './common';
 
-/** Figures of the GRC cockpit (also shown in the I&A cockpit). */
+/** Figures shown in the I&A cockpit (counts and charts). */
 function useCockpit() {
   const store = useStore();
   const go = useUi((s) => s.go);
-  const openStep = useUi((s) => s.openStep);
   const now = today();
-
-  const risksWithoutControl = store.risk.filter((r) => !store.control.some((c) => c.mitigatesRiskIds.includes(r.id)));
-  const highRisks = store.risk.filter((r) => isHighRisk(scoreOf(r)));
-  const weakControls = store.control.filter((c) => c.operatingEffectiveness !== 'Wirksam');
-  const overdue = [
-    ...store.risk.filter((r) => r.nextReview && r.nextReview < now).map((r) => ({ kind: 'risk' as EntityKind, e: r })),
-    ...store.control.filter((c) => c.nextTest && c.nextTest < now).map((c) => ({ kind: 'control' as EntityKind, e: c })),
-  ];
-
   // Process coverage: activities that have a responsible (R) role.
   const steps = store.processes.flatMap((p) =>
     parseElements(p.xml)
@@ -49,70 +21,14 @@ function useCockpit() {
       .map((e) => ({ p, e, a: p.assignments[e.id] })),
   );
   const withRole = steps.filter((s) => s.a?.roles.some((r) => r.raci === 'R'));
-  const withoutRole = steps.filter((s) => !s.a?.roles.some((r) => r.raci === 'R' || r.raci === 'A'));
   const coverage = steps.length ? Math.round((withRole.length / steps.length) * 100) : 0;
-
-  const roleIssues = [
-    ...store.role.filter((r) => r.mandatory && roleHolders(r, store).length === 0).map((r) => ({ r, text: t('Pflichtrolle unbesetzt') })),
-    ...personSodConflicts(store).map((c) => ({
-      r: c.role,
-      text: t('{user}: unvereinbar mit „{role}“', { user: c.user.title, role: c.other.title }),
-    })),
-    ...store.role.filter((r) => r.nextReview && r.nextReview < now).map((r) => ({ r, text: t('Review überfällig') })),
-  ];
-
-  // Audits
-  const in90 = new Date(Date.parse(now) + 90 * 86_400_000).toISOString().slice(0, 10);
-  const in180 = new Date(Date.parse(now) + 180 * 86_400_000).toISOString().slice(0, 10);
-  const upcomingAudits = store.audit
-    .filter((a) => !['Abgeschlossen', 'Abgesagt'].includes(a.status) && auditDate(a) >= now && auditDate(a) <= in90)
-    .sort((a, b) => auditDate(a).localeCompare(auditDate(b)));
   const openFindings = allFindings(store.audit).filter(({ finding }) => isOpenFinding(finding));
   const overdueFindings = openFindings.filter(({ finding }) => isOverdueFinding(finding, now));
-  const certs = store.audit.filter((a) => a.auditType === 'Zertifizierungsaudit' && a.certificateValidUntil);
-  // only the most recent certificate per standard counts
-  const expiringCerts = certs.filter(
-    (a) =>
-      a.certificateValidUntil <= in180 &&
-      !certs.some((b) => b !== a && b.certificateValidUntil > a.certificateValidUntil && b.standards.some((s) => a.standards.includes(s))),
-  );
-
-  const positionIssues = [
-    ...store.position.filter((p) => positionHolders(p, store.user).length === 0).map((p) => ({ p, text: t('Stelle ist nicht besetzt.') })),
-    ...store.position.flatMap((p) =>
-      positionSodConflicts(p, store.role).map(([a, b]) => ({ p, text: t('unvereinbare Rollen „{a}“ und „{b}“', { a: a.title, b: b.title }) })),
-    ),
-    ...store.position.filter((p) => p.deputyPositionId && !p.deputyInducted).map((p) => ({ p, text: t('Vertretung ist nicht eingearbeitet.') })),
-  ];
-
-  const legalIssues = orgIssues(store, now);
-
   const effectiveness = ['Wirksam', 'Eingeschränkt wirksam', 'Nicht wirksam', 'Nicht geprüft'].map((v) => ({
     v,
     n: store.control.filter((c) => c.operatingEffectiveness === v).length,
   }));
-
-  return {
-    store,
-    go,
-    openStep,
-    now,
-    risksWithoutControl,
-    highRisks,
-    weakControls,
-    overdue,
-    steps,
-    withoutRole,
-    coverage,
-    roleIssues,
-    upcomingAudits,
-    openFindings,
-    overdueFindings,
-    expiringCerts,
-    positionIssues,
-    legalIssues,
-    effectiveness,
-  };
+  return { store, go, steps, coverage, openFindings, overdueFindings, effectiveness };
 }
 
 /** Counts per module (clickable). */
@@ -233,133 +149,5 @@ export function CockpitCharts() {
         </div>
       </div>
     </>
-  );
-}
-
-/** Cards with the action required. */
-export function CockpitActions() {
-  const {
-    go,
-    openStep,
-    risksWithoutControl,
-    highRisks,
-    weakControls,
-    overdue,
-    withoutRole,
-    roleIssues,
-    upcomingAudits,
-    overdueFindings,
-    expiringCerts,
-    positionIssues,
-    legalIssues,
-  } = useCockpit();
-  return (
-    <>
-      <div className="dash-grid">
-        <Finding title="Risiken ohne Kontrolle" count={risksWithoutControl.length}>
-          {risksWithoutControl.map((r) => (
-            <div key={r.id} className="link small" onClick={() => go('risk', r.id)}>
-              {r.code} {r.title}
-            </div>
-          ))}
-        </Finding>
-        <Finding title="Höhere Risiken (> 8)" count={highRisks.length}>
-          {highRisks.map((r) => (
-            <div key={r.id} className="link small row gap-s" onClick={() => go('risk', r.id)}>
-              <LevelBadge level={riskLevel(scoreOf(r))} score={scoreOf(r)} /> {r.code} {r.title}
-            </div>
-          ))}
-        </Finding>
-        <Finding title="Controls nicht (voll) wirksam / ungeprüft" count={weakControls.length}>
-          {weakControls.map((c) => (
-            <div key={c.id} className="link small" onClick={() => go('control', c.id)}>
-              {c.code} {c.title} – <span className="muted">{t(c.operatingEffectiveness)}</span>
-            </div>
-          ))}
-        </Finding>
-        <Finding title="Prozessschritte ohne Verantwortung (R/A)" count={withoutRole.length}>
-          {withoutRole.map((s) => (
-            <div key={s.p.id + s.e.id} className="link small" onClick={() => openStep(s.p.id, s.e.id)}>
-              {s.p.code} › {s.e.name}
-            </div>
-          ))}
-        </Finding>
-        <Finding title="Rollen: Besetzung, Vertretung & Funktionstrennung" count={roleIssues.length}>
-          {roleIssues.map(({ r, text }, i) => (
-            <div key={i} className="link small" onClick={() => go('role', r.id)}>
-              {r.code} {r.title} – <span className="muted">{text}</span>
-            </div>
-          ))}
-        </Finding>
-        <Finding title="Stellen: Besetzung, Vertretung & Funktionstrennung" count={positionIssues.length}>
-          {positionIssues.map(({ p, text }, i) => (
-            <div key={i} className="link small" onClick={() => go('position', p.id)}>
-              {p.code} {p.title} – <span className="muted">{text}</span>
-            </div>
-          ))}
-        </Finding>
-        <Finding title="Delegationen, Vollmachten & Arbeitsverhältnis" count={legalIssues.length}>
-          {legalIssues.map((i, n) => (
-            <div key={n} className="link small" onClick={() => go(i.kind, i.id)}>
-              {i.text}
-            </div>
-          ))}
-        </Finding>
-        <Finding title="Anstehende Audits (90 Tage)" count={upcomingAudits.length}>
-          {upcomingAudits.map((a) => (
-            <div key={a.id} className="link small row gap-s" onClick={() => go('audit', a.id)}>
-              <span className="swatch" style={{ background: auditTypeColor[a.auditType] }} />
-              {auditDate(a)} · {a.code} {a.title} – <span className="muted">{t(a.status)}</span>
-            </div>
-          ))}
-        </Finding>
-        <Finding title="Überfällige Audit-Feststellungen" count={overdueFindings.length}>
-          {overdueFindings.map(({ audit, finding }) => (
-            <FindingLine key={finding.id} audit={audit} finding={finding} />
-          ))}
-        </Finding>
-        <Finding title="Zertifikate laufen ab (< 180 Tage)" count={expiringCerts.length}>
-          {expiringCerts.map((a) => (
-            <div key={a.id} className="link small" onClick={() => go('audit', a.id)}>
-              {a.certificateValidUntil} · {a.standards.join(', ')} –{' '}
-              <span className="muted">
-                {a.code} {a.title}
-              </span>
-            </div>
-          ))}
-        </Finding>
-        <Finding title="Überfällige Reviews / Prüfungen" count={overdue.length}>
-          {overdue.map(({ kind, e }) => (
-            <div key={e.id} className="link small" onClick={() => go(kind, e.id)}>
-              {e.code} {e.title}
-            </div>
-          ))}
-        </Finding>
-      </div>
-    </>
-  );
-}
-
-export function Dashboard() {
-  return (
-    <div className="dashboard">
-      <h2>{t('GRC-Cockpit')}</h2>
-      <CockpitStats />
-      <CockpitCharts />
-      <h3>{t('Handlungsbedarf')}</h3>
-      <CockpitActions />
-    </div>
-  );
-}
-
-function Finding({ title, count, children }: { title: string; count: number; children: React.ReactNode }) {
-  return (
-    <div className={`card finding ${count ? 'has' : 'none'}`}>
-      <div className="row space">
-        <strong>{t(title)}</strong>
-        <span className="count">{count}</span>
-      </div>
-      <div className="finding-list">{count ? children : <span className="ok small">✓ {t('nichts offen')}</span>}</div>
-    </div>
   );
 }

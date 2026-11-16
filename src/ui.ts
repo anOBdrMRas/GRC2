@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import type { EntityKind } from './types';
 
-export type View = 'home' | 'ia' | 'dashboard' | 'processes' | 'orgchart' | EntityKind;
+export type View = 'home' | 'ia' | 'processes' | 'orgchart' | EntityKind;
 
 export interface ExportFile {
   filename: string;

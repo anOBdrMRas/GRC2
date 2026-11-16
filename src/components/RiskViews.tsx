@@ -10,8 +10,10 @@ import { t } from '../i18n';
 const range = Array.from({ length: RISK_SCALE }, (_, i) => i + 1);
 
 /** "3 Bewerten": score = likelihood × impact, level and "higher risk" (> 8). */
-export function RiskEval({ riskId }: { riskId: string }) {
-  const r = useStore((s) => s.risk.find((x) => x.id === riskId));
+export function RiskEval({ riskId, shown }: { riskId: string; shown?: { likelihood: number; impact: number } }) {
+  const current = useStore((s) => s.risk.find((x) => x.id === riskId));
+  // the released state may be shown instead of the current draft
+  const r = shown ?? current;
   if (!r) return null;
   const score = scoreOf(r);
   const high = isHighRisk(score);

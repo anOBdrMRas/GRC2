@@ -219,8 +219,12 @@ function ProcessOverview() {
 
 type Tab = 'model' | 'profile' | 'matrix';
 
-function ProcessWorkspace({ process }: { process: ProcessModel }) {
+function ProcessWorkspace({ process: current }: { process: ProcessModel }) {
   const [tab, setTab] = useState<Tab>('model');
+  // a changed draft of a released process: the released state can be shown instead (read-only)
+  const [showReleased, setShowReleased] = useState(false);
+  const viewingReleased = showReleased && !!current.released;
+  const process = viewingReleased ? ({ ...current, ...current.released, workflow: current.workflow } as ProcessModel) : current;
   const [selected, setSelected] = useState<SelectedElement | null>(null);
   const editor = useRef<BpmnEditorHandle>(null);
   const updateProcess = useStore((s) => s.updateProcess);
@@ -230,7 +234,7 @@ function ProcessWorkspace({ process }: { process: ProcessModel }) {
   const openStep = useUi((s) => s.openStep);
   const select = useUi((s) => s.select);
   const { canEditEntity, isOwnerOf, isAdmin } = useRights();
-  const editable = canEditEntity('processes', process);
+  const editable = canEditEntity('processes', current) && !viewingReleased;
   const audits = useStore((s) => s.audit);
   const findingCounts = useMemo(() => openFindingsByElement(audits, process.id), [audits, process.id]);
 
@@ -292,11 +296,17 @@ function ProcessWorkspace({ process }: { process: ProcessModel }) {
         <span className="small muted">
           {process.code} · v{process.version}
         </span>
-        <WorkflowBar kind="processes" item={process} />
+        <WorkflowBar kind="processes" item={current} showReleased={viewingReleased} onShowReleased={current.released ? setShowReleased : undefined} />
+        {viewingReleased && (
+          <div className="released-note small">
+            🔒 {t('Freigegebener Stand v{v} – nur Lesen. Die Änderungen des Entwurfs sind noch nicht freigegeben.', { v: process.version })}
+          </div>
+        )}
       </div>
       {tab === 'model' && (
         <div className="model-area">
           <BpmnEditor
+            key={viewingReleased ? 'released' : 'draft'}
             ref={editor}
             process={process}
             findingCounts={findingCounts}

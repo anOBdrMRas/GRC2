@@ -1,6 +1,20 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import type { AssignableKind, Audit, EntityKind, EntityMap, Mandate, Position, ProcessModel, Raci, Risk, Role, StepAssignment, User } from './types';
+import type {
+  AssignableKind,
+  Audit,
+  Opportunity,
+  EntityKind,
+  EntityMap,
+  Mandate,
+  Position,
+  ProcessModel,
+  Raci,
+  Risk,
+  Role,
+  StepAssignment,
+  User,
+} from './types';
 import {
   assignmentKey,
   blankEntity,
@@ -21,7 +35,7 @@ import { modules } from './schema';
 import { seedData } from './seed';
 import { migrateSystemRoles } from './permissions';
 import { emptyDiagram } from './bpmn/templates';
-import { stageOf, workflowPatch, type WfAction, type WfItem, type WfKind } from './workflow';
+import { isWfKind, mandatePatch, stageOf, workflowPatch, type MandateWfAction, type WfAction, type WfItem, type WfKind } from './workflow';
 
 type Collections = { [K in EntityKind]: EntityMap[K][] };
 
@@ -49,6 +63,8 @@ interface State extends Collections {
   setStepNote: (processId: string, elementId: string, note: string) => void;
   /** approval workflow (processes, roles, positions) */
   workflowAction: (kind: WfKind, id: string, action: WfAction, comment?: string, status?: string) => void;
+  /** mandates: granted by the grantor, accepted (or declined) by the recipient */
+  mandateAction: (id: string, action: MandateWfAction, comment?: string) => void;
 
   importAll: (data: Partial<Collections> & { processes: ProcessModel[] }) => void;
   resetDemo: () => void;
@@ -71,11 +87,12 @@ function updateStep(p: ProcessModel, elementId: string, fn: (a: StepAssignment) 
  * A released process, role or position that is changed by someone other than an administrator
  * goes back to draft and needs a new approval.
  */
-function reopenIfReleased<T extends WfItem>(item: T, s: { user: User[]; currentUserId: string }, patch: object = {}): T {
+function reopenIfReleased<T extends WfItem>(item: T, s: { user: User[]; currentUserId: string }, patch: object, before: T): T {
   if (stageOf(item.status) !== 'released' || 'status' in patch || 'workflow' in patch) return item;
   const user = s.user.find((u) => u.id === s.currentUserId);
   if (!user || user.systemRoles.includes('admin')) return item;
-  return { ...item, ...workflowPatch(item, 'reopen', user.id, '') } as T;
+  // the released state is the element before this change
+  return { ...item, ...workflowPatch(before, 'reopen', user.id, '') } as T;
 }
 
 export const useStore = create<State>()(
@@ -86,6 +103,8 @@ export const useStore = create<State>()(
       createEntity: (kind, title = '') => {
         const items = get()[kind];
         const e = blankEntity(kind, nextCode(items, modules[kind].codePrefix), title);
+        // risks and opportunities can be recorded by everybody: remember who did
+        if (kind === 'risk' || kind === 'opportunity') (e as Risk).createdByUserId = get().currentUserId;
         set({ [kind]: [...items, e] } as Partial<State>);
         return e;
       },
@@ -96,7 +115,7 @@ export const useStore = create<State>()(
           const next = (patch as Partial<Role>).incompatibleRoleIds ?? [];
           set((s) => ({
             role: s.role.map((r) => {
-              if (r.id === id) return reopenIfReleased({ ...r, ...(patch as Partial<Role>), updatedAt: now() }, s, patch);
+              if (r.id === id) return reopenIfReleased({ ...r, ...(patch as Partial<Role>), updatedAt: now() }, s, patch, r);
               const has = r.incompatibleRoleIds.includes(id);
               const should = next.includes(r.id);
               if (has === should) return r;
@@ -117,7 +136,7 @@ export const useStore = create<State>()(
                 const next = { ...e, ...patch, updatedAt: now() };
                 // risks have no title field: lists show the first sentence of the description
                 if (kind === 'risk' && 'description' in patch) next.title = riskTitle(String(next.description ?? '')) || next.title;
-                return kind === 'role' || kind === 'position' ? reopenIfReleased(next as WfItem, s, patch) : next;
+                return isWfKind(kind) ? reopenIfReleased(next as WfItem, s, patch, e as WfItem) : next;
               }),
             }) as Partial<State>,
         );
@@ -215,7 +234,7 @@ export const useStore = create<State>()(
       },
 
       updateProcess: (id, patch) =>
-        set((s) => ({ processes: s.processes.map((p) => (p.id === id ? reopenIfReleased({ ...p, ...patch, updatedAt: now() }, s, patch) : p)) })),
+        set((s) => ({ processes: s.processes.map((p) => (p.id === id ? reopenIfReleased({ ...p, ...patch, updatedAt: now() }, s, patch, p) : p)) })),
 
       workflowAction: (kind, id, action, comment = '', status) =>
         set((s) => {
@@ -225,6 +244,11 @@ export const useStore = create<State>()(
           );
           return { [kind]: next } as Partial<State>;
         }),
+
+      mandateAction: (id, action, comment = '') =>
+        set((s) => ({
+          mandate: s.mandate.map((m) => (m.id === id ? { ...m, ...mandatePatch(m, action, s.currentUserId, comment), updatedAt: now() } : m)),
+        })),
 
       deleteProcess: (id) =>
         set((s) => ({
@@ -249,6 +273,8 @@ export const useStore = create<State>()(
                     return a[key].includes(entityId) ? a : { ...a, [key]: [...a[key], entityId] };
                   }),
                   s,
+                  {},
+                  p,
                 ),
           ),
         })),
@@ -265,6 +291,8 @@ export const useStore = create<State>()(
                       : { ...a, [assignmentKey[kind]]: a[assignmentKey[kind]].filter((x) => x !== entityId) },
                   ),
                   s,
+                  {},
+                  p,
                 ),
           ),
         })),
@@ -277,6 +305,8 @@ export const useStore = create<State>()(
               : reopenIfReleased(
                   updateStep(p, elementId, (a) => ({ ...a, roles: a.roles.map((r) => (r.roleId === roleId ? { ...r, raci } : r)) })),
                   s,
+                  {},
+                  p,
                 ),
           ),
         })),
@@ -289,6 +319,8 @@ export const useStore = create<State>()(
               : reopenIfReleased(
                   updateStep(p, elementId, (a) => ({ ...a, note })),
                   s,
+                  {},
+                  p,
                 ),
           ),
         })),
@@ -306,7 +338,7 @@ export const useStore = create<State>()(
     }),
     {
       name: 'grc-prototype-v1',
-      version: 9,
+      version: 10,
       // v1 had no users and free-text role holders
       migrate: (persisted) => ({ ...normalizeData(persisted as Partial<State>), loggedIn: false }),
       onRehydrateStorage: () => (_state, error) => {
@@ -369,11 +401,36 @@ function normalizeData(data: Partial<State>): Partial<State> {
       : migrateMandates(data.role ?? [], { role: roles, position: positions, user: users }, seed.mandate)
     ).map((m: Partial<Mandate>) => normalizeMandate(m)),
     // v8: risk register fields and 4×4 matrix
-    risk: (data.risk ?? seed.risk).map((r) => normalizeRisk(r, seed.risk, { role: roles, position: positions, user: users })),
+    risk: (data.risk ?? seed.risk).map((r) => {
+      const n = normalizeRisk(r, seed.risk, { role: roles, position: positions, user: users });
+      // v10: approval workflow (before, `status` held the treatment progress)
+      return (r as Partial<Risk>).treatmentStatus === undefined ? withApproval(n, seed.risk, r.status, 'treatmentStatus') : n;
+    }),
+    opportunity: (data.opportunity ?? seed.opportunity).map((o) => {
+      const n = normalizeOpportunity(o);
+      return (o as Partial<Opportunity>).progressStatus === undefined ? withApproval(n, seed.opportunity, o.status, 'progressStatus') : n;
+    }),
     // v3 added audits: older data gets the demo audits
     audit: (data.audit ?? seed.audit).map((a: Partial<Audit>) => normalizeAudit(a)),
     currentUserId: data.currentUserId && users.some((u) => u.id === data.currentUserId) ? data.currentUserId : (users[0]?.id ?? ''),
   };
+}
+
+/**
+ * v10: risks and opportunities get the approval workflow. Their former status describes the progress
+ * (treatment / realisation); existing elements count as released (demo elements get their demo state).
+ */
+function withApproval<T extends Risk | Opportunity>(x: T, demo: T[], oldStatus: string | undefined, key: 'treatmentStatus' | 'progressStatus'): T {
+  const d = demo.find((e) => e.id === x.id);
+  const out = { ...x, [key]: oldStatus || 'Identifiziert' } as Record<string, unknown>;
+  if (d) Object.assign(out, { status: d.status, version: d.version, workflow: d.workflow ?? [], createdByUserId: d.createdByUserId });
+  else Object.assign(out, { status: 'Freigegeben', version: '1.0', workflow: [] });
+  return out as T;
+}
+
+function normalizeOpportunity(o: Partial<Opportunity>): Opportunity {
+  const base = blankEntity('opportunity', o.code ?? '', o.title ?? '');
+  return { ...base, ...o } as Opportunity;
 }
 
 /** fields of risks before v9 */
