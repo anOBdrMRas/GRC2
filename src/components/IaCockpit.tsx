@@ -1,4 +1,4 @@
-// I&A cockpit: quality approval queue and quality overview for processes, roles and positions.
+// I&A cockpit: quality approval queue, quality overview and the GRC status (former GRC cockpit content).
 import { useState } from 'react';
 import type { EntityKind } from '../types';
 import { useStore } from '../store';
@@ -9,6 +9,7 @@ import { ownersOf } from '../ownership';
 import { imsChecks, qualityGrade, workflowCounts, type Check, type CheckItem } from '../quality';
 import { daysSince, lastStep, openRejection, stageOf, type WfItem, type WfKind } from '../workflow';
 import { fmtTime } from './WorkflowBar';
+import { CockpitActions, CockpitCharts, CockpitStats } from './Dashboard';
 import { t } from '../i18n';
 
 const kindLabel = (k: WfKind) => (k === 'processes' ? 'Prozess' : modules[k].label);
@@ -58,6 +59,24 @@ export function CheckTiles({ checks, columns = 3 }: { checks: Check[]; columns?:
   );
 }
 
+export interface Segment {
+  label: string;
+  color: string;
+  n: number;
+}
+
+/** Stacked bar of any distribution. */
+export function SegBar({ segments }: { segments: Segment[] }) {
+  const total = segments.reduce((n, x) => n + x.n, 0);
+  return (
+    <div className="wf-statusbar" title={segments.map((x) => `${t(x.label)} ${x.n}`).join(' · ')}>
+      {segments.map((x) => (
+        <span key={x.label} className="seg" style={{ width: `${total ? (x.n / total) * 100 : 0}%`, background: x.color }} />
+      ))}
+    </div>
+  );
+}
+
 /** Stacked bar of the workflow status of one module. */
 export function StatusBar({ c }: { c: { draft: number; review: number; released: number; archived: number; total: number } }) {
   const pct = (n: number) => `${c.total ? (n / c.total) * 100 : 0}%`;
@@ -97,6 +116,35 @@ export function IaCockpit() {
     .slice(0, 10);
   const checks = imsChecks(d);
   const grade = qualityGrade(d, checks);
+  const go = useUi((s) => s.go);
+  const seg = (values: string[], colors: string[], actual: string[]) =>
+    values.map((v, i) => ({ label: v, color: colors[i], n: actual.filter((a) => a === v).length }));
+  const lifecycles: { kind: 'risk' | 'opportunity' | 'control'; segments: Segment[] }[] = [
+    {
+      kind: 'risk',
+      segments: seg(
+        ['Geschlossen', 'Akzeptiert', 'In Behandlung', 'Bewertet', 'Identifiziert'],
+        ['#40c057', '#94d82d', '#15aabf', '#fab005', '#fa5252'],
+        d.risk.map((r) => r.status),
+      ),
+    },
+    {
+      kind: 'opportunity',
+      segments: seg(
+        ['Realisiert', 'In Umsetzung', 'Bewertet', 'Identifiziert', 'Verworfen'],
+        ['#40c057', '#15aabf', '#fab005', '#ffa94d', '#adb5bd'],
+        d.opportunity.map((o) => o.status),
+      ),
+    },
+    {
+      kind: 'control',
+      segments: seg(
+        ['Wirksam', 'Eingeschränkt wirksam', 'Nicht wirksam', 'Nicht geprüft'],
+        ['#40c057', '#fab005', '#fa5252', '#adb5bd'],
+        d.control.map((c) => c.operatingEffectiveness),
+      ),
+    },
+  ];
   const counts = workflowCounts(d);
   const owners = (kind: WfKind, item: WfItem) => ownersOf(kind, item, d).map(name).join(', ') || '–';
   const key = (kind: WfKind, id: string) => kind + id;
@@ -108,6 +156,9 @@ export function IaCockpit() {
         <span className="small muted">{t('Integrity & Assurance: Qualitätsfreigabe von Prozessen, Rollen und Stellen')}</span>
       </div>
 
+      <CockpitStats />
+
+      <h3 className="ia-heading">{t('Qualitätsübersicht')}</h3>
       <div className="ia-kpis">
         {(['processes', 'role', 'position'] as WfKind[]).map((k) => (
           <div key={k} className="ia-kpi" style={{ borderTopColor: kindColor(k) }}>
@@ -119,6 +170,28 @@ export function IaCockpit() {
             <div className="small muted">
               {t('{a} von {b} freigegeben', { a: counts[k].released, b: counts[k].total })} · {t('{n} im I&A-Review', { n: counts[k].review })} ·{' '}
               {t('{n} im Entwurf', { n: counts[k].draft })}
+            </div>
+          </div>
+        ))}
+        {lifecycles.map(({ kind, segments }) => (
+          <div key={kind} className="ia-kpi" style={{ borderTopColor: modules[kind].color }}>
+            <div className="row space">
+              <b className="link" onClick={() => go(kind)}>
+                {t(modules[kind].plural)}
+              </b>
+              <span className={`grade ${grade[kind] >= 80 ? 'good' : grade[kind] >= 50 ? 'mid' : 'bad'}`}>
+                {t('Qualität {n} %', { n: grade[kind] })}
+              </span>
+            </div>
+            <SegBar segments={segments} />
+            <div className="small muted seg-legend">
+              {segments
+                .filter((x) => x.n)
+                .map((x) => (
+                  <span key={x.label}>
+                    <i style={{ background: x.color }} /> {t(x.label)} {x.n}
+                  </span>
+                ))}
             </div>
           </div>
         ))}
@@ -250,11 +323,22 @@ export function IaCockpit() {
 
       <section className="ia-section">
         <h3>{t('Qualitätsprüfungen')}</h3>
-        <p className="small muted">
-          {t('Automatische Prüfungen über Prozesse, Rollen und Stellen. Klick auf eine Kachel zeigt die betroffenen Elemente.')}
-        </p>
+        <p className="small muted">{t('Automatische Prüfungen. Klick auf eine Kachel zeigt die betroffenen Elemente.')}</p>
+        <h4 className="ia-sub">{t('Prozesse & Organisation')}</h4>
         <CheckTiles checks={checks.filter((c) => c.module === 'processes' || c.module === 'role' || c.module === 'position' || c.key === 'review')} />
+        <h4 className="ia-sub">{t('Risiken, Chancen & Controls')}</h4>
+        <CheckTiles checks={checks.filter((c) => c.module === 'risk' || c.module === 'opportunity' || c.module === 'control')} />
       </section>
+
+      <h3 className="ia-heading">{t('GRC-Lagebild')}</h3>
+      <div className="dashboard embedded">
+        <CockpitCharts />
+      </div>
+
+      <h3 className="ia-heading">{t('Handlungsbedarf')}</h3>
+      <div className="dashboard embedded">
+        <CockpitActions />
+      </div>
     </div>
   );
 }

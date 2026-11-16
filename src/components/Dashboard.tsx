@@ -23,9 +23,11 @@ import { Heatmap } from './Heatmap';
 import { FindingLine, auditTypeColor } from './AuditViews';
 import { findingTypes } from '../schema';
 import { t } from '../i18n';
+import { useRights } from '../useRights';
 import { LevelBadge, TrafficLight } from './common';
 
-export function Dashboard() {
+/** Figures of the GRC cockpit (also shown in the I&A cockpit). */
+function useCockpit() {
   const store = useStore();
   const go = useUi((s) => s.go);
   const openStep = useUi((s) => s.openStep);
@@ -89,22 +91,58 @@ export function Dashboard() {
     n: store.control.filter((c) => c.operatingEffectiveness === v).length,
   }));
 
+  return {
+    store,
+    go,
+    openStep,
+    now,
+    risksWithoutControl,
+    highResidual,
+    weakControls,
+    overdue,
+    steps,
+    withoutRole,
+    coverage,
+    roleIssues,
+    upcomingAudits,
+    openFindings,
+    overdueFindings,
+    expiringCerts,
+    positionIssues,
+    legalIssues,
+    effectiveness,
+  };
+}
+
+/** Counts per module (clickable). */
+export function CockpitStats() {
+  const { store, go, steps } = useCockpit();
+  const { canRead } = useRights();
   return (
-    <div className="dashboard">
-      <h2>{t('GRC-Cockpit')}</h2>
+    <>
       <div className="stat-grid wide">
         <div className="stat clickable" onClick={() => go('processes')}>
           <div className="stat-num">{store.processes.length}</div>
           <div className="stat-label">{t('Prozesse · {n} Aktivitäten', { n: steps.length })}</div>
         </div>
-        {(['risk', 'opportunity', 'control', 'role', 'position', 'mandate', 'kpi', 'audit', 'user'] as EntityKind[]).map((k) => (
-          <div key={k} className="stat clickable" style={{ borderColor: modules[k].color }} onClick={() => go(k)}>
-            <div className="stat-num">{store[k].length}</div>
-            <div className="stat-label">{t(modules[k].plural)}</div>
-          </div>
-        ))}
+        {(['risk', 'opportunity', 'control', 'role', 'position', 'mandate', 'kpi', 'audit', 'user'] as EntityKind[])
+          .filter((k) => canRead(k))
+          .map((k) => (
+            <div key={k} className="stat clickable" style={{ borderColor: modules[k].color }} onClick={() => go(k)}>
+              <div className="stat-num">{store[k].length}</div>
+              <div className="stat-label">{t(modules[k].plural)}</div>
+            </div>
+          ))}
       </div>
+    </>
+  );
+}
 
+/** Risk matrices, ICS effectiveness, role coverage, KPI traffic lights, audit findings. */
+export function CockpitCharts() {
+  const { store, go, coverage, effectiveness, openFindings, overdueFindings } = useCockpit();
+  return (
+    <>
       <div className="dash-grid">
         <div className="card">
           <h3>{t('Risikomatrix brutto')}</h3>
@@ -176,8 +214,29 @@ export function Dashboard() {
           </div>
         </div>
       </div>
+    </>
+  );
+}
 
-      <h3>{t('Handlungsbedarf')}</h3>
+/** Cards with the action required. */
+export function CockpitActions() {
+  const {
+    go,
+    openStep,
+    risksWithoutControl,
+    highResidual,
+    weakControls,
+    overdue,
+    withoutRole,
+    roleIssues,
+    upcomingAudits,
+    overdueFindings,
+    expiringCerts,
+    positionIssues,
+    legalIssues,
+  } = useCockpit();
+  return (
+    <>
       <div className="dash-grid">
         <Finding title="Risiken ohne Kontrolle" count={risksWithoutControl.length}>
           {risksWithoutControl.map((r) => (
@@ -259,6 +318,18 @@ export function Dashboard() {
           ))}
         </Finding>
       </div>
+    </>
+  );
+}
+
+export function Dashboard() {
+  return (
+    <div className="dashboard">
+      <h2>{t('GRC-Cockpit')}</h2>
+      <CockpitStats />
+      <CockpitCharts />
+      <h3>{t('Handlungsbedarf')}</h3>
+      <CockpitActions />
     </div>
   );
 }

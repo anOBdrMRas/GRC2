@@ -2478,3 +2478,31 @@ table.program tbody tr:hover {
   flex-wrap: wrap;
   gap: 8px;
 }
+
+/* ---------- I&A cockpit with GRC status ---------- */
+.ia-heading {
+  margin: 4px 0 0;
+}
+.ia-sub {
+  margin: 4px 0 0;
+  font-size: 13px;
+  color: var(--muted);
+}
+.dashboard.embedded {
+  padding: 0;
+}
+.dashboard.embedded > .dash-grid {
+  margin-top: 0;
+}
+.seg-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 10px;
+}
+.seg-legend i {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 2px;
+  margin-right: 2px;
+}

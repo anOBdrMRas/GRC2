@@ -1,6 +1,16 @@
 // Quality checks and open points of the integrated management system (I&A cockpit, admin start page).
 import type { EntityKind } from './types';
-import { activityTypes, orgIssues, parseElements, personSodConflicts, positionHolders, positionSodConflicts, roleHolders, today } from './logic';
+import {
+  activityTypes,
+  orgIssues,
+  residualScore,
+  parseElements,
+  personSodConflicts,
+  positionHolders,
+  positionSodConflicts,
+  roleHolders,
+  today,
+} from './logic';
 import type { OwnershipData } from './ownership';
 import { t } from './i18n';
 import { stageOf, type WfKind } from './workflow';
@@ -18,7 +28,7 @@ export interface Check {
   key: string;
   label: string;
   /** module the check belongs to (for the quality grade) */
-  module: WfKind | 'mandate' | 'user' | 'other';
+  module: WfKind | 'risk' | 'opportunity' | 'control' | 'mandate' | 'user' | 'other';
   items: CheckItem[];
 }
 
@@ -122,6 +132,85 @@ export function imsChecks(d: OwnershipData): Check[] {
         .filter((u) => u.status === 'Aktiv' && u.positionId && !u.jobDescriptionAckAt)
         .map((u) => ({ kind: 'user', id: u.id, label: u.title, detail: d.position.find((p) => p.id === u.positionId)?.title })),
     },
+    // risks
+    {
+      key: 'risk-owner',
+      label: 'Risiken ohne Risikoeigner',
+      module: 'risk',
+      items: d.risk.filter((r) => !r.ownerRoleId).map((r) => ({ kind: 'risk', id: r.id, label: label(r) })),
+    },
+    {
+      key: 'risk-control',
+      label: 'Risiken ohne mitigierende Kontrolle',
+      module: 'risk',
+      items: d.risk
+        .filter((r) => r.status !== 'Geschlossen' && !d.control.some((c) => c.mitigatesRiskIds.includes(r.id)))
+        .map((r) => ({ kind: 'risk', id: r.id, label: label(r) })),
+    },
+    {
+      key: 'risk-high',
+      label: 'Hohe Restrisiken (≥ 10)',
+      module: 'risk',
+      items: d.risk.filter((r) => residualScore(r) >= 10).map((r) => ({ kind: 'risk', id: r.id, label: label(r), detail: String(residualScore(r)) })),
+    },
+    {
+      key: 'risk-content',
+      label: 'Risiken ohne Ursache oder Auswirkung',
+      module: 'risk',
+      items: d.risk.filter((r) => !filled(r.cause) || !filled(r.consequence)).map((r) => ({ kind: 'risk', id: r.id, label: label(r) })),
+    },
+    {
+      key: 'risk-accept',
+      label: 'Akzeptierte Risiken ohne Akzeptanznachweis',
+      module: 'risk',
+      items: d.risk
+        .filter((r) => (r.status === 'Akzeptiert' || r.treatment === 'Akzeptieren') && (!filled(r.acceptedBy) || !r.acceptedAt))
+        .map((r) => ({ kind: 'risk', id: r.id, label: label(r) })),
+    },
+    // opportunities
+    {
+      key: 'opp-owner',
+      label: 'Chancen ohne Verantwortlichen',
+      module: 'opportunity',
+      items: d.opportunity.filter((o) => !o.ownerRoleId).map((o) => ({ kind: 'opportunity', id: o.id, label: label(o) })),
+    },
+    {
+      key: 'opp-measures',
+      label: 'Chancen ohne Maßnahmen zur Nutzung',
+      module: 'opportunity',
+      items: d.opportunity
+        .filter((o) => o.status !== 'Verworfen' && !filled(o.measures))
+        .map((o) => ({ kind: 'opportunity', id: o.id, label: label(o) })),
+    },
+    // controls
+    {
+      key: 'ctl-owner',
+      label: 'Controls ohne Kontrollverantwortlichen',
+      module: 'control',
+      items: d.control.filter((c) => !c.ownerRoleId).map((c) => ({ kind: 'control', id: c.id, label: label(c) })),
+    },
+    {
+      key: 'ctl-risk',
+      label: 'Controls ohne adressiertes Risiko',
+      module: 'control',
+      items: d.control.filter((c) => c.mitigatesRiskIds.length === 0).map((c) => ({ kind: 'control', id: c.id, label: label(c) })),
+    },
+    {
+      key: 'ctl-weak',
+      label: 'Controls nicht (voll) wirksam oder ungeprüft',
+      module: 'control',
+      items: d.control
+        .filter((c) => c.operatingEffectiveness !== 'Wirksam')
+        .map((c) => ({ kind: 'control', id: c.id, label: label(c), detail: t(c.operatingEffectiveness) })),
+    },
+    {
+      key: 'ctl-key',
+      label: 'Schlüsselkontrollen nicht wirksam',
+      module: 'control',
+      items: d.control
+        .filter((c) => c.keyControl && c.operatingEffectiveness !== 'Wirksam')
+        .map((c) => ({ kind: 'control', id: c.id, label: label(c), detail: t(c.operatingEffectiveness) })),
+    },
     // reviews
     {
       key: 'review',
@@ -177,9 +266,11 @@ export function workflowCounts(d: OwnershipData) {
   return { processes: count(d.processes), role: count(d.role), position: count(d.position) };
 }
 
-/** Share of elements without quality findings, per workflow module. */
-export function qualityGrade(d: OwnershipData, checks = imsChecks(d)) {
-  const grade = (module: WfKind, ids: string[]) => {
+export type GradeModule = WfKind | 'risk' | 'opportunity' | 'control';
+
+/** Share of elements without quality findings, per module. */
+export function qualityGrade(d: OwnershipData, checks = imsChecks(d)): Record<GradeModule, number> {
+  const grade = (module: GradeModule, ids: string[]) => {
     const hit = new Set(
       checks.filter((c) => c.module === module || c.key === 'review').flatMap((c) => c.items.filter((i) => i.kind === module).map((i) => i.id)),
     );
@@ -197,6 +288,18 @@ export function qualityGrade(d: OwnershipData, checks = imsChecks(d)) {
     position: grade(
       'position',
       d.position.map((p) => p.id),
+    ),
+    risk: grade(
+      'risk',
+      d.risk.map((r) => r.id),
+    ),
+    opportunity: grade(
+      'opportunity',
+      d.opportunity.map((o) => o.id),
+    ),
+    control: grade(
+      'control',
+      d.control.map((c) => c.id),
     ),
   };
 }
