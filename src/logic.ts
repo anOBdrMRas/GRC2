@@ -26,12 +26,19 @@ export function riskScore(likelihood: number, impact: number) {
 
 export type Level = 'low' | 'medium' | 'high' | 'critical';
 
+/** 4×4 risk matrix: score = likelihood × impact (1..16) */
+export const RISK_SCALE = 4;
+/** "higher risk" (Risk Register): score above this value */
+export const HIGH_RISK_ABOVE = 8;
+export const MEDIUM_FROM = 4;
+
 export function riskLevel(score: number): Level {
-  if (score >= 15) return 'critical';
-  if (score >= 10) return 'high';
-  if (score >= 5) return 'medium';
+  if (score > HIGH_RISK_ABOVE) return 'high';
+  if (score >= MEDIUM_FROM) return 'medium';
   return 'low';
 }
+
+export const isHighRisk = (score: number) => score > HIGH_RISK_ABOVE;
 
 export const levelLabel: Record<Level, string> = {
   low: 'Gering',
@@ -85,12 +92,23 @@ export function blankEntity<K extends EntityKind>(kind: K, code: string, title =
       complianceObligation: '',
       interestedParties: '',
       ownerRoleId: '',
-      likelihood: 3,
-      impact: 3,
+      likelihood: 2,
+      impact: 2,
       treatment: 'Reduzieren',
       treatmentPlan: '',
       residualLikelihood: 2,
       residualImpact: 2,
+      department: '',
+      activity: '',
+      processIds: [],
+      assessmentReason: '',
+      consequenceType: '',
+      likelihoodReason: '',
+      impactReason: '',
+      actionOwnerUserId: '',
+      reviewNote: '',
+      entity: '',
+      sourceRef: '',
       acceptedBy: '',
       acceptedAt: '',
       status: 'Identifiziert',

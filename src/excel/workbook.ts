@@ -1,8 +1,34 @@
 // Excel export and import for all modules (administrators only; see the buttons in the modules and the sidebar).
 import type { Workbook, Worksheet } from 'exceljs';
-import type { AnyEntity, Audit, AuditFinding, EntityKind, EntityMap, Kpi, Mandate, ProcessModel, Raci, Role, StepAssignment, User } from '../types';
+import type {
+  AnyEntity,
+  Audit,
+  AuditFinding,
+  EntityKind,
+  EntityMap,
+  Kpi,
+  Mandate,
+  ProcessModel,
+  Raci,
+  Risk,
+  Role,
+  StepAssignment,
+  User,
+} from '../types';
 import { modules, kindOrder } from '../schema';
-import { blankEntity, blankFinding, emptyAssignment, mandateState, mandateStateLabel, now, parseElements, uid } from '../logic';
+import {
+  blankEntity,
+  blankFinding,
+  emptyAssignment,
+  isHighRisk,
+  mandateState,
+  mandateStateLabel,
+  now,
+  parseElements,
+  residualScore,
+  riskScore,
+  uid,
+} from '../logic';
 import { emptyDiagram } from '../bpmn/templates';
 import { t, useLang } from '../i18n';
 import {
@@ -140,6 +166,11 @@ function entitySpec(kind: EntityKind, d: Data, lk: Lookup): SheetSpec {
     const rec = e as unknown as Record<string, unknown>;
     return cols.map((c) => {
       if (c.key === '#state') return t(mandateStateLabel[mandateState(e as Mandate)]);
+      if (c.key.startsWith('#gross') || c.key.startsWith('#net')) {
+        const r = e as Risk;
+        const score = c.key.startsWith('#gross') ? riskScore(r.likelihood, r.impact) : residualScore(r);
+        return c.key.endsWith('Score') ? score : isHighRisk(score) ? t('Ja') : t('Nein');
+      }
       const m = c.key.match(/^roles\[(\d)\]\.(roleId|comment)$/);
       if (m) {
         const pr = (rec.roles as { roleId: string; comment: string }[])[Number(m[1])];

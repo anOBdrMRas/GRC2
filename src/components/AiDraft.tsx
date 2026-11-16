@@ -257,7 +257,7 @@ export function AiProcessDraft({ onClose }: { onClose: () => void }) {
 const suggestable: Partial<Record<EntityKind, string[]>> = {
   role: ['description', 'responsibilities', 'authorities', 'competencies', 'trainings'],
   position: ['description', 'purpose', 'tasks', 'authorities', 'qualification', 'experience', 'competencies', 'trainings'],
-  risk: ['description', 'cause', 'consequence', 'affectedAssets', 'treatmentPlan'],
+  risk: ['description', 'activity', 'complianceObligation', 'cause', 'consequence', 'likelihoodReason', 'impactReason', 'treatmentPlan'],
   control: ['description', 'objective', 'evidence', 'testResult'],
   mandate: ['description', 'scope', 'powers', 'supervision'],
 };

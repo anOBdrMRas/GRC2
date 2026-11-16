@@ -3,7 +3,9 @@ import type { EntityKind } from './types';
 import {
   activityTypes,
   orgIssues,
+  isHighRisk,
   residualScore,
+  riskScore,
   parseElements,
   personSodConflicts,
   positionHolders,
@@ -149,15 +151,35 @@ export function imsChecks(d: OwnershipData): Check[] {
     },
     {
       key: 'risk-high',
-      label: 'Hohe Restrisiken (≥ 10)',
+      label: 'Hohe Restrisiken (> 8)',
       module: 'risk',
-      items: d.risk.filter((r) => residualScore(r) >= 10).map((r) => ({ kind: 'risk', id: r.id, label: label(r), detail: String(residualScore(r)) })),
+      items: d.risk
+        .filter((r) => isHighRisk(residualScore(r)))
+        .map((r) => ({ kind: 'risk', id: r.id, label: label(r), detail: String(residualScore(r)) })),
     },
     {
       key: 'risk-content',
       label: 'Risiken ohne Ursache oder Auswirkung',
       module: 'risk',
       items: d.risk.filter((r) => !filled(r.cause) || !filled(r.consequence)).map((r) => ({ kind: 'risk', id: r.id, label: label(r) })),
+    },
+    {
+      key: 'risk-reason',
+      label: 'Risiken ohne Bereich oder Bewertungsbegründung',
+      module: 'risk',
+      items: d.risk
+        .filter((r) => !filled(r.department) || !filled(r.likelihoodReason) || !filled(r.impactReason))
+        .map((r) => ({ kind: 'risk', id: r.id, label: label(r) })),
+    },
+    {
+      key: 'risk-treat',
+      label: 'Höhere Risiken (> 8) ohne Maßnahmen oder Maßnahmenverantwortliche',
+      module: 'risk',
+      items: d.risk
+        .filter(
+          (r) => isHighRisk(riskScore(r.likelihood, r.impact)) && r.treatment !== 'Akzeptieren' && (!filled(r.treatmentPlan) || !r.actionOwnerUserId),
+        )
+        .map((r) => ({ kind: 'risk', id: r.id, label: label(r), detail: String(riskScore(r.likelihood, r.impact)) })),
     },
     {
       key: 'risk-accept',

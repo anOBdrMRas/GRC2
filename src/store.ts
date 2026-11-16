@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import type { AssignableKind, Audit, EntityKind, EntityMap, Mandate, Position, ProcessModel, Raci, Role, StepAssignment, User } from './types';
+import type { AssignableKind, Audit, EntityKind, EntityMap, Mandate, Position, ProcessModel, Raci, Risk, Role, StepAssignment, User } from './types';
 import {
   assignmentKey,
   blankEntity,
@@ -152,6 +152,7 @@ export const useStore = create<State>()(
               mandate,
               user: s.user.filter((u) => u.id !== id),
               role: s.role.map((r) => ({ ...r, roleOwnerUserId: clear(r.roleOwnerUserId) })),
+              risk: s.risk.map((r) => (r.actionOwnerUserId === id ? { ...r, actionOwnerUserId: '' } : r)),
             };
           }
           // Remove the entity and all references to it.
@@ -222,6 +223,7 @@ export const useStore = create<State>()(
             .filter((p) => p.id !== id)
             .map((p) => ({ ...p, callLinks: Object.fromEntries(Object.entries(p.callLinks).filter(([, v]) => v !== id)) })),
           audit: scrubAudits(s.audit, 'process', id),
+          risk: s.risk.map((r) => (r.processIds.includes(id) ? { ...r, processIds: r.processIds.filter((x) => x !== id) } : r)),
         })),
 
       assign: (processId, elementId, kind, entityId) =>
@@ -295,9 +297,12 @@ export const useStore = create<State>()(
     }),
     {
       name: 'grc-prototype-v1',
-      version: 7,
+      version: 8,
       // v1 had no users and free-text role holders
       migrate: (persisted) => ({ ...normalizeData(persisted as Partial<State>), loggedIn: false }),
+      onRehydrateStorage: () => (_state, error) => {
+        if (error) console.error('Gespeicherte Daten konnten nicht geladen werden', error);
+      },
     },
   ),
 );
@@ -354,10 +359,49 @@ function normalizeData(data: Partial<State>): Partial<State> {
       ? addMissing(data.mandate, seed.mandate)
       : migrateMandates(data.role ?? [], { role: roles, position: positions, user: users }, seed.mandate)
     ).map((m: Partial<Mandate>) => normalizeMandate(m)),
+    // v8: risk register fields and 4×4 matrix
+    risk: (data.risk ?? seed.risk).map((r) => normalizeRisk(r, seed.risk)),
     // v3 added audits: older data gets the demo audits
     audit: (data.audit ?? seed.audit).map((a: Partial<Audit>) => normalizeAudit(a)),
     currentUserId: data.currentUserId && users.some((u) => u.id === data.currentUserId) ? data.currentUserId : (users[0]?.id ?? ''),
   };
+}
+
+/**
+ * v8: risks follow the Risk Register template. Data from before (no `department` field yet) is moved
+ * from the 5-level to the 4-level scale (5 → 4) once; demo risks get their register details.
+ */
+export function normalizeRisk(r: Partial<Risk>, demo: Risk[] = []): Risk {
+  // (inside the function: the store hydrates while this module is still initialising)
+  const registerFields = [
+    'department',
+    'activity',
+    'processIds',
+    'assessmentReason',
+    'consequenceType',
+    'likelihoodReason',
+    'impactReason',
+    'actionOwnerUserId',
+    'reviewNote',
+    'entity',
+    'sourceRef',
+  ] as const;
+  const legacy = r.department === undefined;
+  const to4 = (v: unknown) => Math.min(4, Math.max(1, Math.round(Number(v) || 1)));
+  const base = blankEntity('risk', r.code ?? '', r.title ?? '');
+  const d = legacy ? demo.find((x) => x.id === r.id) : undefined;
+  const fromDemo = d ? Object.fromEntries(registerFields.map((k) => [k, d[k]])) : {};
+  const out = { ...base, ...fromDemo, ...r } as Risk;
+  for (const k of registerFields) if (out[k] === undefined) (out as unknown as Record<string, unknown>)[k] = base[k];
+  if (!Array.isArray(out.processIds)) out.processIds = [];
+  if (legacy) {
+    out.likelihood = to4(out.likelihood);
+    out.impact = to4(out.impact);
+    out.residualLikelihood = to4(out.residualLikelihood);
+    out.residualImpact = to4(out.residualImpact);
+    if (out.category === 'Datenschutz') out.category = 'Compliance';
+  }
+  return out;
 }
 
 /** Removes references to a deleted entity (or process) from audits and their findings. */

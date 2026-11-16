@@ -9,6 +9,7 @@ import {
   allFindings,
   auditDate,
   findUsages,
+  isHighRisk,
   isOpenFinding,
   isOverdueFinding,
   kpiStatus,
@@ -50,6 +51,7 @@ function useColumns(kind: EntityKind): Column[] {
   switch (kind) {
     case 'risk':
       return [
+        { label: 'Bereich / Funktion', render: (e) => (e as Risk).department || '–', sort: (e) => (e as Risk).department },
         { label: 'Kategorie', render: (e) => t((e as Risk).category), sort: (e) => (e as Risk).category },
         { label: 'Eigner', render: (e) => roleName((e as Risk).ownerRoleId) },
         {
@@ -67,6 +69,11 @@ function useColumns(kind: EntityKind): Column[] {
             return <LevelBadge level={riskLevel(s)} score={s} />;
           },
           sort: (e) => -residualScore(e as Risk),
+        },
+        {
+          label: 'Höheres Risiko',
+          render: (e) => (isHighRisk(riskScore((e as Risk).likelihood, (e as Risk).impact)) ? <b className="warn">{t('Ja')}</b> : t('Nein')),
+          sort: (e) => (isHighRisk(riskScore((e as Risk).likelihood, (e as Risk).impact)) ? 0 : 1),
         },
         { label: 'Controls', render: (e) => controls.filter((c) => c.mitigatesRiskIds.includes(e.id)).length || <span className="warn">0</span> },
         { label: 'Status', render: (e) => t((e as Risk).status) },
@@ -220,6 +227,7 @@ export function EntityModule({ kind }: { kind: EntityKind }) {
   const [heatCell, setHeatCell] = useState<string | null>(null);
   const [sortCol, setSortCol] = useState<number | null>(null);
   const [roleType, setRoleType] = useState<string>('');
+  const [riskDept, setRiskDept] = useState('');
   const [mandatoryOnly, setMandatoryOnly] = useState(false);
   const [userTab, setUserTab] = useState<'users' | 'matrix'>('users');
   const [auditTab, setAuditTab] = useState<'audits' | 'findings' | 'program'>('audits');
@@ -241,6 +249,7 @@ export function EntityModule({ kind }: { kind: EntityKind }) {
         return key === heatCell;
       });
     }
+    if (kind === 'risk' && riskDept) list = list.filter((e) => (e as Risk).department === riskDept);
     if (kind === 'audit' && auditType) list = list.filter((e) => (e as Audit).auditType === auditType);
     if (kind === 'role') {
       list = list.filter((e) => (!roleType || (e as Role).roleType === roleType) && (!mandatoryOnly || (e as Role).mandatory));
@@ -248,7 +257,7 @@ export function EntityModule({ kind }: { kind: EntityKind }) {
     const sorter = sortCol !== null ? columns[sortCol].sort : undefined;
     if (sorter) list = [...list].sort((a, b) => (sorter(a) < sorter(b) ? -1 : sorter(a) > sorter(b) ? 1 : 0));
     return list;
-  }, [items, q, kind, heatCell, heatMode, sortCol, columns, roleType, mandatoryOnly, auditType, mineOnly, isOwnerOf]);
+  }, [items, q, kind, heatCell, heatMode, sortCol, columns, roleType, mandatoryOnly, auditType, mineOnly, isOwnerOf, riskDept]);
 
   const selected = items.find((e) => e.id === selectedId);
   if (!canRead(kind)) return <Empty>{t('Ihre Systemrollen erlauben keinen Zugriff auf {name}.', { name: t(def.plural) })}</Empty>;
@@ -357,6 +366,18 @@ export function EntityModule({ kind }: { kind: EntityKind }) {
               </div>
             </div>
             <Heatmap risks={items as Risk[]} mode={heatMode} selected={heatCell} onSelect={setHeatCell} />
+          </div>
+        )}
+        {kind === 'risk' && (
+          <div className="filter-bar">
+            <select value={riskDept} onChange={(e) => setRiskDept(e.target.value)} aria-label={t('Bereich / Funktion')}>
+              <option value="">{t('Alle Bereiche')}</option>
+              {[...new Set((items as Risk[]).map((r) => r.department).filter(Boolean))].sort().map((d) => (
+                <option key={d} value={d}>
+                  {d}
+                </option>
+              ))}
+            </select>
           </div>
         )}
         <input className="search" placeholder={t('Filtern…')} value={q} onChange={(e) => setQ(e.target.value)} />

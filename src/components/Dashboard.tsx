@@ -14,6 +14,7 @@ import {
   personSodConflicts,
   positionHolders,
   positionSodConflicts,
+  isHighRisk,
   residualScore,
   riskLevel,
   roleHolders,
@@ -34,7 +35,7 @@ function useCockpit() {
   const now = today();
 
   const risksWithoutControl = store.risk.filter((r) => !store.control.some((c) => c.mitigatesRiskIds.includes(r.id)));
-  const highResidual = store.risk.filter((r) => residualScore(r) >= 10);
+  const highResidual = store.risk.filter((r) => isHighRisk(residualScore(r)));
   const weakControls = store.control.filter((c) => c.operatingEffectiveness !== 'Wirksam');
   const overdue = [
     ...store.risk.filter((r) => r.nextReview && r.nextReview < now).map((r) => ({ kind: 'risk' as EntityKind, e: r })),
@@ -245,7 +246,7 @@ export function CockpitActions() {
             </div>
           ))}
         </Finding>
-        <Finding title="Hohe Restrisiken (≥ 10)" count={highResidual.length}>
+        <Finding title="Hohe Restrisiken (> 8)" count={highResidual.length}>
           {highResidual.map((r) => (
             <div key={r.id} className="link small row gap-s" onClick={() => go('risk', r.id)}>
               <LevelBadge level={riskLevel(residualScore(r))} score={residualScore(r)} /> {r.code} {r.title}

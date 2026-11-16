@@ -3,6 +3,7 @@ import type { FieldDef } from '../schema';
 import { modules } from '../schema';
 import type { AnyEntity, AuditFinding, Measurement, PositionRole } from '../types';
 import { PositionHolders, PositionRoles, RoleRelations } from './OrgViews';
+import { RiskEval, RiskScaleButton } from './RiskViews';
 import { FindingsEditor, ProcessRefs } from './AuditViews';
 import { MandateList } from './MandateViews';
 import { systemRoleConflicts, systemRoles } from '../permissions';
@@ -35,8 +36,10 @@ export function Field({
   /** field only administrators may change; a string gives the reason */
   locked?: boolean | string;
 }) {
+  // computed displays and buttons must not sit inside a <label> (a click on the label would trigger them)
+  const Wrap = def.type === 'riskEval' || def.type === 'riskGuide' ? 'div' : 'label';
   return (
-    <label className={`field ${def.wide || def.type === 'textarea' ? 'wide' : ''}`}>
+    <Wrap className={`field ${def.wide || def.type === 'textarea' ? 'wide' : ''}`}>
       <span className="field-label">
         {t(def.label)}
         {def.hint && <span className="hint"> · {t(def.hint)}</span>}
@@ -49,7 +52,7 @@ export function Field({
       ) : (
         <FieldInput def={def} value={value} onChange={onChange} entityId={entityId} />
       )}
-    </label>
+    </Wrap>
   );
 }
 
@@ -77,7 +80,7 @@ function FieldInput({ def, value, onChange, entityId }: { def: FieldDef; value: 
         <select value={(value as string) ?? ''} onChange={(e) => onChange(e.target.value)}>
           {def.options!.map((o) => (
             <option key={o} value={o}>
-              {o === 'higher' ? t('Höher ist besser') : o === 'lower' ? t('Niedriger ist besser') : t(o)}
+              {o === 'higher' ? t('Höher ist besser') : o === 'lower' ? t('Niedriger ist besser') : o === '' ? t('— bitte wählen —') : t(o)}
             </option>
           ))}
         </select>
@@ -85,11 +88,18 @@ function FieldInput({ def, value, onChange, entityId }: { def: FieldDef; value: 
     case 'scale':
       return (
         <div className="scale">
-          {[1, 2, 3, 4, 5].map((n) => (
-            <button key={n} type="button" className={value === n ? 'active' : ''} onClick={() => onChange(n)}>
+          {Array.from({ length: def.max ?? 5 }, (_, i) => i + 1).map((n) => (
+            <button
+              key={n}
+              type="button"
+              className={value === n ? 'active' : ''}
+              title={def.levels ? `${n} = ${t(def.levels[n - 1])}` : undefined}
+              onClick={() => onChange(n)}
+            >
               {n}
             </button>
           ))}
+          {def.levels && typeof value === 'number' && def.levels[value - 1] && <span className="scale-name">{t(def.levels[value - 1])}</span>}
         </div>
       );
     case 'multiselect': {
@@ -181,6 +191,10 @@ function FieldInput({ def, value, onChange, entityId }: { def: FieldDef; value: 
       return <FindingsEditor value={(value as AuditFinding[]) ?? []} auditId={entityId} onChange={onChange} />;
     case 'roleList':
       return <RoleList value={(value as string[]) ?? []} selfId={entityId} onChange={onChange} />;
+    case 'riskEval':
+      return <RiskEval riskId={entityId ?? ''} net={def.key === '#net'} />;
+    case 'riskGuide':
+      return <RiskScaleButton riskId={entityId ?? ''} />;
     case 'systemRoles':
       return <SystemRolePicker value={(value as string[]) ?? []} onChange={onChange} />;
   }

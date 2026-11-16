@@ -1,8 +1,10 @@
 import type { Risk } from '../types';
-import { riskLevel } from '../logic';
+import { RISK_SCALE, riskLevel } from '../logic';
 import { t } from '../i18n';
 
-/** 5×5 risk matrix (likelihood × impact). */
+const levels = Array.from({ length: RISK_SCALE }, (_, i) => i + 1);
+
+/** 4×4 risk matrix (likelihood × impact). */
 export function Heatmap({
   risks,
   mode,
@@ -24,8 +26,8 @@ export function Heatmap({
     <div className="heatmap">
       <div className="heat-y">{t('Wahrscheinlichkeit')} →</div>
       <div className="heat-grid">
-        {[5, 4, 3, 2, 1].map((l) =>
-          [1, 2, 3, 4, 5].map((i) => {
+        {[...levels].reverse().map((l) =>
+          levels.map((i) => {
             const key = `${l}-${i}`;
             const n = counts.get(key) ?? 0;
             return (

@@ -1,6 +1,7 @@
 // Declarative field definitions that drive the generic module editors.
 import { mandateTypes, type EntityKind } from './types';
 import { orgUnits } from './logic';
+import { assessmentReasons, consequenceTypes, impactNames, likelihoodLevels, riskCategories, riskDepartments, treatmentOptions } from './riskScale';
 
 export const auditTypes = ['Internes Audit', 'Zertifizierungsaudit', 'Systemaudit', 'Kundenaudit', 'Lieferantenaudit'];
 export const auditStatuses = ['Geplant', 'In Vorbereitung', 'Durchgeführt', 'Bericht erstellt', 'Maßnahmen offen', 'Abgeschlossen', 'Abgesagt'];
@@ -15,7 +16,9 @@ export type FieldType =
   | 'bool'
   | 'select'
   | 'multiselect'
-  | 'scale' // 1..5
+  | 'scale' // 1..max (default 5)
+  | 'riskEval' // read-only: score, level and "higher risk" (key '#gross' or '#net')
+  | 'riskGuide' // button: opens the assessment scale
   | 'ref' // single reference to another entity
   | 'refs' // multiple references
   | 'iso' // ISO clause references
@@ -43,6 +46,10 @@ export interface FieldDef {
   showIf?: (values: Record<string, unknown>) => boolean;
   hint?: string;
   wide?: boolean;
+  /** scale: highest level (default 5) */
+  max?: number;
+  /** scale: name of each level (tooltip), index 0 = level 1 */
+  levels?: string[];
 }
 
 export interface SectionDef {
@@ -79,54 +86,85 @@ export const modules: Record<EntityKind, ModuleDef> = {
     color: '#d64545',
     sections: [
       {
-        ...base,
+        title: '1 Identifizieren',
         fields: [
-          ...base.fields,
+          { key: 'code', label: 'ID', type: 'text' },
+          { key: 'title', label: 'Bezeichnung', type: 'text' },
+          { key: 'department', label: 'Bereich / Funktion', type: 'select', options: ['', ...riskDepartments] },
+          { key: 'category', label: 'Risikokategorie', type: 'select', options: riskCategories },
+          { key: 'activity', label: 'Aktivität, Prozess, Produkt oder Service', type: 'text', wide: true },
+          { key: 'processIds', label: 'Verknüpfte Prozesse', type: 'processRefs', wide: true },
           {
-            key: 'category',
-            label: 'Risikokategorie',
-            type: 'select',
-            options: ['Qualität', 'Informationssicherheit', 'Compliance', 'Operativ', 'Finanziell', 'Strategisch', 'Datenschutz'],
+            key: 'complianceObligation',
+            label: 'Rechtsgebiet / Verpflichtung',
+            type: 'text',
+            hint: 'Gesetz, Vertrag, Kundenanforderung, Kodex · ISO 37301 4.5',
+            wide: true,
           },
-          { key: 'status', label: 'Status', type: 'select', options: ['Identifiziert', 'Bewertet', 'In Behandlung', 'Akzeptiert', 'Geschlossen'] },
+          { key: 'description', label: 'Risikobeschreibung', type: 'textarea', wide: true },
+          { key: 'cause', label: 'Ursache', type: 'textarea' },
+          { key: 'consequence', label: 'Auswirkung', type: 'textarea' },
           { key: 'ownerRoleId', label: 'Risikoeigner', type: 'ref', refKind: 'role', hint: 'ISO 27001 6.1.2 c) 2)' },
+          { key: 'status', label: 'Status', type: 'select', options: ['Identifiziert', 'Bewertet', 'In Behandlung', 'Akzeptiert', 'Geschlossen'] },
+          { key: 'assessmentReason', label: 'Anlass der Bewertung', type: 'select', options: ['', ...assessmentReasons], hint: 'ISO 37301 A.4.6' },
         ],
       },
       {
-        title: 'Risikoidentifikation',
+        title: '2 Analysieren',
         fields: [
-          { key: 'cause', label: 'Ursache / Bedrohung / Schwachstelle', type: 'textarea' },
-          { key: 'consequence', label: 'Auswirkung', type: 'textarea' },
+          { key: 'consequenceType', label: 'Hauptsächliche Auswirkungsart', type: 'select', options: ['', ...consequenceTypes] },
+          { key: '#scaleGuide', label: 'Bewertungsskala', type: 'riskGuide' },
+          {
+            key: 'likelihood',
+            label: 'Eintrittswahrscheinlichkeit',
+            type: 'scale',
+            max: 4,
+            levels: likelihoodLevels.map(([n]) => n),
+            hint: '1 = sehr gering … 4 = hoch',
+          },
+          { key: 'likelihoodReason', label: 'Begründung der Wahrscheinlichkeit', type: 'textarea' },
+          { key: 'impact', label: 'Schadensausmaß', type: 'scale', max: 4, levels: impactNames, hint: '1 = unbedeutend … 4 = schwerwiegend' },
+          { key: 'impactReason', label: 'Begründung des Ausmaßes', type: 'textarea' },
+        ],
+      },
+      {
+        title: '3 Bewerten',
+        fields: [{ key: '#gross', label: 'Risiko-Score (brutto)', type: 'riskEval', wide: true }],
+      },
+      {
+        title: '4 Behandeln',
+        fields: [
+          { key: 'treatment', label: 'Behandlungsoption', type: 'select', options: treatmentOptions, hint: 'ISO 27001 6.1.3' },
+          { key: 'actionOwnerUserId', label: 'Maßnahmenverantwortliche/r', type: 'ref', refKind: 'user' },
+          { key: 'treatmentPlan', label: 'Behandlungsmaßnahmen', type: 'textarea', wide: true },
+          { key: 'residualLikelihood', label: 'Rest-Wahrscheinlichkeit', type: 'scale', max: 4, levels: likelihoodLevels.map(([n]) => n) },
+          { key: 'residualImpact', label: 'Rest-Ausmaß', type: 'scale', max: 4, levels: impactNames },
+          { key: '#net', label: 'Restrisiko (netto)', type: 'riskEval', wide: true },
+          { key: 'acceptedBy', label: 'Restrisiko akzeptiert von', type: 'text', hint: 'ISO 27001 6.1.3 f)' },
+          { key: 'acceptedAt', label: 'Akzeptiert am', type: 'date' },
+        ],
+      },
+      {
+        title: '5 Überwachen',
+        fields: [
+          { key: 'lastAssessment', label: 'Bewertungsdatum', type: 'date' },
+          { key: 'nextReview', label: 'Nächste Überprüfung', type: 'date', hint: 'Regelintervall 12 Monate' },
+          { key: 'reviewNote', label: 'Kommentar / Review-Notiz', type: 'textarea', wide: true },
+        ],
+      },
+      {
+        title: 'Informationssicherheit (optional)',
+        fields: [
           { key: 'affectedAssets', label: 'Betroffene Werte (Assets)', type: 'text', hint: 'ISO 27001 A.5.9' },
           { key: 'protectionGoals', label: 'Schutzziele', type: 'multiselect', options: ['Vertraulichkeit', 'Integrität', 'Verfügbarkeit'] },
-          { key: 'complianceObligation', label: 'Compliance-Verpflichtung', type: 'text', hint: 'ISO 37301 4.5 (Gesetz, Vertrag, Norm)' },
           { key: 'interestedParties', label: 'Interessierte Parteien', type: 'text', hint: 'ISO 9001 / 37301 4.2' },
         ],
       },
       {
-        title: 'Bewertung (brutto)',
+        title: 'Herkunft',
         fields: [
-          { key: 'likelihood', label: 'Eintrittswahrscheinlichkeit', type: 'scale', hint: scaleHint },
-          { key: 'impact', label: 'Schadensausmaß', type: 'scale', hint: scaleHint },
-          { key: 'lastAssessment', label: 'Letzte Bewertung', type: 'date' },
-          { key: 'nextReview', label: 'Nächste Überprüfung', type: 'date' },
-        ],
-      },
-      {
-        title: 'Behandlung & Restrisiko (netto)',
-        fields: [
-          {
-            key: 'treatment',
-            label: 'Behandlungsoption',
-            type: 'select',
-            options: ['Vermeiden', 'Reduzieren', 'Übertragen', 'Akzeptieren'],
-            hint: 'ISO 27001 6.1.3',
-          },
-          { key: 'treatmentPlan', label: 'Behandlungsplan / Maßnahmen', type: 'textarea', wide: true },
-          { key: 'residualLikelihood', label: 'Rest-Wahrscheinlichkeit', type: 'scale', hint: scaleHint },
-          { key: 'residualImpact', label: 'Rest-Ausmaß', type: 'scale', hint: scaleHint },
-          { key: 'acceptedBy', label: 'Restrisiko akzeptiert von', type: 'text', hint: 'ISO 27001 6.1.3 f)' },
-          { key: 'acceptedAt', label: 'Akzeptiert am', type: 'date' },
+          { key: 'entity', label: 'Gesellschaft', type: 'text' },
+          { key: 'sourceRef', label: 'Quellenangabe', type: 'text', hint: 'z. B. Workshop-Protokoll, Auditbericht, Hinweis' },
         ],
       },
       { title: 'Normbezug', fields: [{ key: 'isoRefs', label: 'Normreferenzen', type: 'iso', wide: true }] },

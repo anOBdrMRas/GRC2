@@ -17,6 +17,8 @@ export interface Col {
   refKind?: EntityKind | 'processes';
   allowNA?: boolean;
   options?: string[];
+  /** number: allowed range 1..max (scales) */
+  max?: number;
   required?: boolean;
   hint?: string;
   width: number;
@@ -39,14 +41,15 @@ function fieldCols(f: FieldDef, section: string): Col[] {
     case 'textarea':
       return c('long');
     case 'number':
-    case 'scale':
       return c('number');
+    case 'scale':
+      return c('number', { max: f.max ?? 5, hint: f.hint ?? `1–${f.max ?? 5}` });
     case 'date':
       return c('date');
     case 'bool':
       return c('bool');
     case 'select':
-      return c('select', { options: f.options });
+      return c('select', { options: f.options?.filter(Boolean) });
     case 'ref':
       return c('ref', { refKind: f.refKind, allowNA: f.allowNA, width: f.refKind === 'user' ? 22 : 16 });
     case 'refs':
@@ -98,6 +101,22 @@ export function columnsOf(kind: EntityKind): Col[] {
   const cols = modules[kind].sections.flatMap((s) => s.fields.flatMap((f) => fieldCols(f, s.title)));
   // the ID always comes first
   cols.sort((a, b) => (a.kind === 'id' ? -1 : 0) - (b.kind === 'id' ? -1 : 0));
+  if (kind === 'risk')
+    cols.push(
+      ...(['#grossScore', '#grossHigh', '#netScore', '#netHigh'] as const).map((key) => ({
+        key,
+        label: {
+          '#grossScore': 'Risiko-Score (brutto)',
+          '#grossHigh': 'Höheres Risiko? (brutto)',
+          '#netScore': 'Restrisiko-Score (netto)',
+          '#netHigh': 'Höheres Risiko? (netto)',
+        }[key],
+        section: 'Ergebnis (berechnet)',
+        kind: 'computed' as ColKind,
+        width: 14,
+        hint: 'Wird berechnet – beim Import ignoriert.',
+      })),
+    );
   if (kind === 'mandate')
     cols.push({
       key: '#state',

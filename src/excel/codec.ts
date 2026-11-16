@@ -154,7 +154,13 @@ export function fromCell(c: Col, raw: unknown, lk: Lookup, warn: (msg: string) =
                 .replace(/\.(?=\d{3}\b)/g, '')
                 .replace(',', '.'),
             );
-      if (Number.isFinite(n)) return n;
+      if (Number.isFinite(n)) {
+        if (c.max && (!Number.isInteger(n) || n < 1 || n > c.max)) {
+          warn(t('„{col}“: {value} liegt außerhalb der Skala 1–{max}.', { col: label, value: s, max: c.max }));
+          return undefined;
+        }
+        return n;
+      }
       warn(t('„{col}“: „{value}“ ist keine Zahl.', { col: label, value: s }));
       return 0;
     }

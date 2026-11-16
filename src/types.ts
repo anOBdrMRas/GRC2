@@ -24,10 +24,22 @@ export interface Risk extends BaseEntity {
   complianceObligation: string;
   interestedParties: string;
   ownerRoleId: string;
-  likelihood: number; // 1..5 gross
-  impact: number; // 1..5 gross
+  likelihood: number; // 1..4 gross
+  impact: number; // 1..4 gross
   treatment: string;
   treatmentPlan: string;
+  /** Risk Register (ISO 37301 4.6): department / function, activity, linked processes */
+  department: string;
+  activity: string;
+  processIds: string[];
+  assessmentReason: string;
+  consequenceType: string;
+  likelihoodReason: string;
+  impactReason: string;
+  actionOwnerUserId: string;
+  reviewNote: string;
+  entity: string;
+  sourceRef: string;
   residualLikelihood: number;
   residualImpact: number;
   acceptedBy: string;

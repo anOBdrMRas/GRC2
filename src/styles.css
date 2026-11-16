@@ -10,7 +10,7 @@
   --warn: #d9480f;
   --low: #d3f9d8;
   --medium: #fff3bf;
-  --high: #ffd8a8;
+  --high: #ffa8a8;
   --critical: #ffc9c9;
   font-family:
     Inter,
@@ -571,9 +571,20 @@ legend {
 }
 .heat-grid {
   display: grid;
-  grid-template-columns: repeat(5, 38px);
-  grid-template-rows: repeat(5, 30px);
+  grid-template-columns: repeat(4, 44px);
+  grid-template-rows: repeat(4, 32px);
   gap: 3px;
+}
+.heat-grid.mini {
+  grid-template-columns: repeat(4, 30px);
+  grid-template-rows: repeat(4, 22px);
+  flex: none;
+}
+.heat-grid.mini .heat-cell {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
 }
 .heat-cell {
   border: none;
@@ -2505,4 +2516,58 @@ table.program tbody tr:hover {
   height: 8px;
   border-radius: 2px;
   margin-right: 2px;
+}
+
+/* ---------- risk register ---------- */
+.scale-name {
+  margin-left: 8px;
+  font-size: 12px;
+  color: var(--muted);
+  align-self: center;
+}
+.risk-eval {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  padding: 6px 10px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+}
+.risk-high.yes b {
+  color: #c92a2a;
+}
+.risk-high.no b {
+  color: #2b8a3e;
+}
+.modal.risk-scale {
+  max-width: 980px;
+  width: calc(100vw - 32px);
+}
+.scale-table {
+  table-layout: fixed;
+  width: 100%;
+}
+.scale-table td,
+.scale-table th {
+  overflow-wrap: anywhere;
+  white-space: normal;
+  vertical-align: top;
+  font-size: 12px;
+}
+.scale-table td:first-child,
+.scale-table th:first-child {
+  width: 130px;
+}
+.scale-table.lik td:first-child {
+  width: 24px;
+}
+.scale-table.lik td:nth-child(2) {
+  width: 110px;
+}
+.scale-table .scale-current {
+  background: #fff4e6;
+}
+.scale-legend {
+  align-items: flex-start;
 }
