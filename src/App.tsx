@@ -8,7 +8,7 @@ import { EntityModule } from './components/EntityModule';
 import { OrgChart } from './components/OrgViews';
 import { Login } from './components/Login';
 import { Home } from './components/Home';
-import { ProcessLandscape } from './components/ProcessLandscape';
+import { IaCockpit } from './components/IaCockpit';
 import { AssistantChat } from './components/AssistantChat';
 import { ExcelTools } from './components/ExcelTools';
 import { ConfirmButton, Empty, ExportDialog, Notice, download } from './components/common';
@@ -18,9 +18,9 @@ import { systemRoleById, type ModuleKey } from './permissions';
 
 const nav: { view: View; label: string; icon: string; color?: string }[] = [
   { view: 'home', label: 'Startseite', icon: '⌂' },
-  { view: 'landscape', label: 'Prozesslandschaft', icon: '▦' },
-  { view: 'processes', label: 'Prozesse (BPMN)', icon: '⇄' },
+  { view: 'processes', label: 'Prozesse', icon: '▦' },
   { view: 'dashboard', label: 'GRC-Cockpit', icon: '◧' },
+  { view: 'ia', label: 'I&A-Cockpit', icon: '✓', color: '#0c8599' },
   ...kindOrder.flatMap((k) => {
     const item = {
       view: k as View,
@@ -34,8 +34,8 @@ const nav: { view: View; label: string; icon: string; color?: string }[] = [
 ];
 
 /** Rights module that governs a navigation entry. */
-const moduleOf = (v: View): ModuleKey => (v === 'orgchart' ? 'position' : v === 'landscape' ? 'processes' : (v as ModuleKey));
-const open = (v: View) => v === 'home' || v === 'dashboard';
+const moduleOf = (v: View): ModuleKey => (v === 'orgchart' ? 'position' : (v as ModuleKey));
+const open = (v: View) => v === 'home' || v === 'dashboard' || v === 'ia';
 
 export default function App() {
   const view = useUi((s) => s.view);
@@ -46,10 +46,11 @@ export default function App() {
   const loggedIn = useStore((s) => s.loggedIn);
   const logout = useStore((s) => s.logout);
   const positions = useStore((s) => s.position);
-  const { canRead, isAdmin, user } = useRights();
+  const { canRead, isAdmin, canReview, user } = useRights();
+  const select = useUi((s) => s.select);
   const lang = useLang((s) => s.lang);
   const setLang = useLang((s) => s.setLang);
-  const visibleNav = nav.filter((n) => open(n.view) || canRead(moduleOf(n.view)));
+  const visibleNav = nav.filter((n) => (n.view === 'ia' ? canReview : open(n.view) || canRead(moduleOf(n.view))));
   if (!loggedIn || !user) return <Login key={lang} />;
 
   const exportAll = () => {
@@ -70,16 +71,17 @@ export default function App() {
             GRC<span>Studio</span>
             <div className="brand-sub">{t('Prototyp')}</div>
           </div>
-          <div className="lang-switch" role="group" aria-label={t('Sprache')}>
-            {(['de', 'en'] as const).map((l) => (
-              <button key={l} className={lang === l ? 'active' : ''} aria-pressed={lang === l} onClick={() => setLang(l)}>
-                {l.toUpperCase()}
-              </button>
-            ))}
-          </div>
         </div>
         {visibleNav.map((n) => (
-          <button key={n.view} className={`nav-item ${view === n.view ? 'active' : ''}`} onClick={() => go(n.view)}>
+          <button
+            key={n.view}
+            className={`nav-item ${view === n.view ? 'active' : ''}`}
+            onClick={() => {
+              // the process module always starts with the landscape
+              if (n.view === 'processes') select('processes', undefined);
+              go(n.view);
+            }}
+          >
             <span className="nav-icon" style={n.color ? { color: n.color } : undefined}>
               {n.icon}
             </span>
@@ -87,28 +89,6 @@ export default function App() {
           </button>
         ))}
         <div className="sidebar-foot">
-          <div className="user-menu">
-            <div className="user-avatar">
-              {user.title
-                .split(' ')
-                .map((w) => w[0])
-                .slice(0, 2)
-                .join('')}
-            </div>
-            <div className="user-info">
-              <b>{user.title}</b>
-              <span>{positions.find((p) => p.id === user.positionId)?.title ?? user.jobTitle}</span>
-              <span className="login-roles">{user.systemRoles.map((id) => t(systemRoleById.get(id)?.name ?? id)).join(', ')}</span>
-            </div>
-          </div>
-          <button
-            onClick={() => {
-              logout();
-              go('home');
-            }}
-          >
-            ⏻ {t('Abmelden')}
-          </button>
           <div className="muted small">ISO 9001 · ISO 27001 · ISO 37301</div>
           {isAdmin && (
             <>
@@ -138,16 +118,55 @@ export default function App() {
           />
         </div>
       </nav>
-      <main className="main">
-        {view === 'home' && <Home />}
-        {view === 'landscape' && <ProcessLandscape />}
-        {view === 'dashboard' && <Dashboard />}
-        {view === 'processes' && canRead('processes') && <ProcessView />}
-        {view === 'orgchart' && canRead('position') && <OrgChart />}
-        {!open(view) && !canRead(moduleOf(view)) && <Empty>{t('Ihre Systemrollen erlauben keinen Zugriff auf diesen Bereich.')}</Empty>}
-        {kindOrder.includes(view as never) && canRead(view as ModuleKey) && <EntityModule key={view} kind={view as (typeof kindOrder)[number]} />}
-      </main>
-      {view !== 'home' && <AssistantChat floating />}
+      <div className="main-col">
+        <header className="topbar">
+          <div className="topbar-title">{t(nav.find((n) => n.view === view)?.label ?? 'GRC Studio')}</div>
+          <div className="topbar-right">
+            <div className="lang-switch light" role="group" aria-label={t('Sprache')}>
+              {(['de', 'en'] as const).map((l) => (
+                <button key={l} className={lang === l ? 'active' : ''} aria-pressed={lang === l} onClick={() => setLang(l)}>
+                  {l.toUpperCase()}
+                </button>
+              ))}
+            </div>
+            <div className="topbar-user" title={user.email}>
+              <div className="user-avatar">
+                {user.title
+                  .split(' ')
+                  .map((w) => w[0])
+                  .slice(0, 2)
+                  .join('')}
+              </div>
+              <div className="topbar-user-info">
+                <b>{user.title}</b>
+                <span>
+                  {user.systemRoles.map((id) => t(systemRoleById.get(id)?.name ?? id)).join(' · ')}
+                  {positions.find((p) => p.id === user.positionId) && ` · ${positions.find((p) => p.id === user.positionId)!.title}`}
+                </span>
+              </div>
+            </div>
+            <button
+              className="logout-btn"
+              onClick={() => {
+                logout();
+                go('home');
+              }}
+            >
+              ⏻ {t('Abmelden')}
+            </button>
+          </div>
+        </header>
+        <main className="main">
+          {view === 'home' && <Home />}
+          {view === 'ia' && canReview && <IaCockpit />}
+          {view === 'dashboard' && <Dashboard />}
+          {view === 'processes' && canRead('processes') && <ProcessView />}
+          {view === 'orgchart' && canRead('position') && <OrgChart />}
+          {!open(view) && !canRead(moduleOf(view)) && <Empty>{t('Ihre Systemrollen erlauben keinen Zugriff auf diesen Bereich.')}</Empty>}
+          {kindOrder.includes(view as never) && canRead(view as ModuleKey) && <EntityModule key={view} kind={view as (typeof kindOrder)[number]} />}
+        </main>
+      </div>
+      {(view !== 'home' || isAdmin) && <AssistantChat floating />}
       <ExportDialog />
       <Notice />
     </div>

@@ -24,6 +24,8 @@ import { ConfirmButton, Empty, LevelBadge, StatusPill, Tag, TrafficLight } from 
 import { useRights } from '../useRights';
 import { AiFieldSuggest, canSuggest } from './AiDraft';
 import { ExcelTools } from './ExcelTools';
+import { WorkflowBar } from './WorkflowBar';
+import { isWfKind } from '../workflow';
 import { useSample } from '../ai';
 import { dateLocale, t } from '../i18n';
 import { systemRoleById } from '../permissions';
@@ -441,6 +443,7 @@ function EntityEditor({ kind, entity }: { kind: EntityKind; entity: AnyEntity })
           )}
         </div>
       </div>
+      {(kind === 'role' || kind === 'position') && <WorkflowBar kind={kind} item={entity as Role | Position} />}
       {suggest && <AiFieldSuggest kind={kind} entity={entity} onClose={() => setSuggest(false)} />}
       {kind === 'role' && showProfile && <RoleProfile role={entity as Role} onClose={() => setShowProfile(false)} />}
       {kind === 'position' && showProfile && <PositionProfile position={entity as Position} onClose={() => setShowProfile(false)} />}
@@ -470,7 +473,11 @@ function EntityEditor({ kind, entity }: { kind: EntityKind; entity: AnyEntity })
                     def={f}
                     value={values[f.key]}
                     entityId={entity.id}
-                    locked={editable && !canEditField(kind, f.key)}
+                    locked={
+                      editable &&
+                      !canEditField(kind, f.key) &&
+                      (f.key === 'status' && isWfKind(kind) ? 'wird über den Freigabe-Workflow gesetzt' : true)
+                    }
                     onChange={(v) => update(kind, entity.id, { [f.key]: v })}
                   />
                 ))}

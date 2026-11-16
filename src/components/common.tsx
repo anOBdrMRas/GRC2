@@ -256,5 +256,6 @@ const statusTone: Record<string, string> = {
 };
 
 export function StatusPill({ status }: { status: string }) {
-  return <span className={`pill pill-${statusTone[status] ?? 'neutral'}`}>{t(status)}</span>;
+  // "In Prüfung" of processes, roles and positions means: waiting for the I&A review
+  return <span className={`pill pill-${statusTone[status] ?? 'neutral'}`}>{t(status === 'In Prüfung' ? 'I&A-Review' : status)}</span>;
 }

@@ -206,7 +206,7 @@ export function seedData() {
       email: 'm.lang@example.com',
       department: 'Qualitätsmanagement',
       jobTitle: 'Qualitätsmanagerin',
-      systemRoles: ['employee'],
+      systemRoles: ['employee', 'ia'],
       positionId: 'ST-012',
       positionSince: '2021-01-01',
       employer: 'Muster GmbH',
@@ -453,6 +453,15 @@ export function seedData() {
       isoRefs: ['9001:5.3'],
     }),
     make('role', 'RO-012', 'Datenschutzbeauftragter', {
+      workflow: [
+        {
+          step: 'submitted',
+          byUserId: 'U-007',
+          at: '2026-11-03T09:15:00.000Z',
+          comment: 'Aufgaben nach Art. 39 DSGVO ergänzt, bitte prüfen.',
+          status: 'In Prüfung',
+        },
+      ],
       version: '0.9',
       status: 'In Prüfung',
       nextReview: '2026-11-30',
@@ -489,6 +498,10 @@ export function seedData() {
       isoRefs: ['37301:9.3', '37301:5.1'],
     }),
     make('role', 'RO-015', 'Trade Compliance Beauftragter', {
+      workflow: [
+        { step: 'submitted', byUserId: 'U-010', at: '2026-11-04T08:00:00.000Z', comment: '', status: 'In Prüfung' },
+        { step: 'approved', byUserId: 'U-013', at: '2026-11-05T09:30:00.000Z', comment: 'Geprüft, Normbezug vollständig.', status: 'Freigegeben' },
+      ],
       ...reviewed,
       roleType: 'Beauftragter',
       orgUnit: 'Business Enablement',
@@ -505,7 +518,20 @@ export function seedData() {
       isoRefs: ['37301:4.5', '37301:5.3'],
     }),
     make('role', 'RO-016', 'Exportkontroll-Sachbearbeiter', {
+      workflow: [
+        { step: 'approved', byUserId: 'U-013', at: '2026-01-15T10:00:00.000Z', comment: '', status: 'Freigegeben' },
+        { step: 'reopened', byUserId: 'U-015', at: '2026-10-18T08:30:00.000Z', comment: '', status: 'Entwurf' },
+        { step: 'submitted', byUserId: 'U-015', at: '2026-10-20T14:05:00.000Z', comment: 'Befugnisse überarbeitet.', status: 'In Prüfung' },
+        {
+          step: 'rejected',
+          byUserId: 'U-013',
+          at: '2026-10-22T11:40:00.000Z',
+          comment: 'Befugnisse unvollständig: Freigabegrenze für Standard-Ausfuhranmeldungen fehlt; bitte mit der Stelle ST-017 abstimmen.',
+          status: 'Entwurf',
+        },
+      ],
       ...reviewed,
+      status: 'Entwurf',
       orgUnit: 'Business Enablement',
       description: 'Bearbeitet Exportvorgänge im Team Export Control & Customs.',
       responsibilities:
@@ -709,6 +735,9 @@ export function seedData() {
       roles: [pr('RO-011', 'Bestellung durch GF'), pr('RO-014', 'Mitglied')],
     }),
     make('position', 'ST-013', 'Datenschutzbeauftragte/r (extern)', {
+      workflow: [
+        { step: 'submitted', byUserId: 'U-001', at: '2026-11-06T13:20:00.000Z', comment: 'Vertrag bis 12/2027 verlängert.', status: 'In Prüfung' },
+      ],
       version: '0.9',
       status: 'In Prüfung',
       nextReview: '2026-11-30',
@@ -721,6 +750,10 @@ export function seedData() {
       isoRefs: ['27001:A.5.34'],
     }),
     make('position', 'ST-014', 'Director Export Control & Customs', {
+      workflow: [
+        { step: 'submitted', byUserId: 'U-016', at: '2026-11-02T15:00:00.000Z', comment: '', status: 'In Prüfung' },
+        { step: 'approved', byUserId: 'U-013', at: '2026-11-04T10:10:00.000Z', comment: '', status: 'Freigegeben' },
+      ],
       signingAuthority: 'Keine',
       approvalLimit: 50000,
       ...reviewed,
@@ -1662,6 +1695,15 @@ export function seedData() {
     },
     {
       id: 'P-002',
+      workflow: [
+        {
+          step: 'submitted',
+          byUserId: 'U-008',
+          at: '2026-11-07T07:45:00.000Z',
+          comment: 'Rezertifizierung halbjährlich ergänzt.',
+          status: 'In Prüfung',
+        },
+      ],
       code: 'P-002',
       title: 'Berechtigungsmanagement',
       description: 'Vergabe, Änderung und Rezertifizierung von Zugriffsrechten.',

@@ -5,17 +5,19 @@ BPMN-2.0-Prozessmodellierung und integrierten GRC-Modulen.
 
 ## Funktionen
 
-- **Anmeldung und persönliche Startseite**
-  - Anmeldeseite im Stil einer Firmen-SSO (Keycloak im Prototyp nicht verbunden) mit Demo-Personen
-    (Mitarbeiter, Mitarbeiter und Owner, Führungskraft, Administrator)
-  - **Prozesslandschaft** als Prozesshaus: Führungsprozesse, Ende-zu-Ende-Kernprozesse als Pfeilkette,
-    Unterstützungsprozesse; markiert, wo die Person beteiligt ist (R/A) und wo sie Owner ist
-  - **Mir zugewiesen**: Stelle mit Vorgesetzten, Rollen, Prozessschritte mit RACI, Übertragungen,
-    durchgeführte Controls, ausgewertete KPI, offene Audit-Feststellungen, „Für mich zu tun“
-  - **In meiner Verantwortung** (Owner): Prozesse, Stellen des Teams, Rollen, Risiken, Controls, KPI,
-    erteilte Übertragungen und Audits mit Handlungsbedarf und „Bearbeiten“
-  - **Administration**: neue Elemente anlegen, Prozess mit KI entwerfen
-- **Rechtemodell**: zwei Systemrollen (Mitarbeiter, Administrator). Alle lesen alles außer der
+- **Anmeldung und Startseiten je Benutzertyp** (Kopfleiste oben rechts mit Benutzer, Benutzertyp, Sprache und Abmelden)
+  - *Mitarbeiter*: „Mir zugewiesen“ (Stelle, Rollen, Prozessschritte mit RACI, Übertragungen, „Für mich zu tun“) und KI-Assistent
+  - *Owner*: zusätzlich „In meiner Verantwortung“ mit Freigabestatus und den Elementen, die auf die fachliche Freigabe warten
+  - *I&A-Team*: zusätzlich Hinweis auf offene Qualitätsfreigaben
+  - *Administrator*: IMS-Lagebild (Kennzahlen, Freigabe-Workflow, „Wo es hakt“ mit Sprung in die Elemente), Anlegen, Excel
+- **Prozesse**: Einstieg über die Prozesslandschaft (Prozesshaus) mit Prozessliste darunter; Klick öffnet das BPMN-Modell,
+  Brotkrumen führen zurück
+- **Freigabe-Workflow** für Prozesse, Rollen und Stellen: Entwurf → fachliche Freigabe durch den Owner → I&A-Review →
+  freigegeben (Version +0.1); Zurückweisen mit Pflichtkommentar, Vier-Augen-Prinzip, Änderungen an Freigegebenem setzen auf
+  Entwurf zurück, Historie je Element; Administratoren können den Status direkt setzen
+- **I&A-Cockpit** (Systemrolle I&A-Team): Warteschlange mit Freigeben/Zurückweisen, Elemente beim Owner, zuletzt freigegeben,
+  Qualitätsgrad je Modul und automatische Qualitätsprüfungen
+- **Rechtemodell**: Systemrollen Mitarbeiter, I&A-Team und Administrator. Alle lesen alles außer der
   Benutzerverwaltung; bearbeiten darf, wer Owner eines Elements ist (z. B. Rollenverantwortlicher,
   Inhaber der Rolle „Prozessverantwortlicher“, disziplinarischer Vorgesetzter einer Stelle, Delegierender);
   nur Administratoren legen an, löschen und ändern die Owner-Felder

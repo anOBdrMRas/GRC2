@@ -52,6 +52,13 @@ export const systemRoles: SystemRole[] = [
     rights: all('read', { user: 'none' }),
   },
   {
+    id: 'ia',
+    name: 'I&A-Team',
+    description:
+      'Integrity & Assurance: gibt Prozesse, Rollen und Stellen nach der fachlichen Freigabe des Owners qualitativ frei und sieht das I&A-Cockpit.',
+    rights: all('read', { user: 'none' }),
+  },
+  {
     id: 'admin',
     name: 'Administrator',
     description: 'Legt neue Elemente an, löscht und bearbeitet alles, pflegt Benutzer und Systemrollen.',
@@ -61,7 +68,8 @@ export const systemRoles: SystemRole[] = [
 
 /** Maps system roles of earlier versions: administrators stay administrators, everybody else becomes an employee. */
 export function migrateSystemRoles(ids: string[] | undefined): string[] {
-  return ids?.includes('admin') ? ['admin'] : ['employee'];
+  if (ids?.includes('admin')) return ['admin'];
+  return ids?.includes('ia') ? ['employee', 'ia'] : ['employee'];
 }
 
 export const systemRoleById = new Map(systemRoles.map((r) => [r.id, r]));

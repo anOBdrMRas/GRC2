@@ -10,25 +10,27 @@ import { ConfirmButton, Empty, StatusPill, download } from './common';
 import { openFindingsByElement } from './AuditViews';
 import { useRights } from '../useRights';
 import { AiProcessDraft } from './AiDraft';
+import { ProcessLandscape } from './ProcessLandscape';
+import { WorkflowBar } from './WorkflowBar';
+import { stepsOfUser } from '../ownership';
+import { stageLabel, stageOf } from '../workflow';
 import { ExcelTools } from './ExcelTools';
 import { t } from '../i18n';
 
 const categories: ProcessModel['category'][] = ['Führungsprozess', 'Kernprozess', 'Unterstützungsprozess'];
 
-export function ProcessView() {
-  const processes = useStore((s) => s.processes);
+/** Administrator tools of the process module: new process, AI draft, BPMN and Excel import/export. */
+function ProcessAdminTools() {
   const createProcess = useStore((s) => s.createProcess);
   const updateProcess = useStore((s) => s.updateProcess);
-  const selectedId = useUi((s) => s.selected.processes);
   const select = useUi((s) => s.select);
   const fileInput = useRef<HTMLInputElement>(null);
-  const { canCreate, isOwnerOf } = useRights();
-  const editable = canCreate('processes');
+  const { canCreate } = useRights();
   const draftOpen = useUi((s) => s.draftOpen);
   const setDraftOpen = useUi((s) => s.setDraftOpen);
   const [naming, setNaming] = useState(false);
   const [newTitle, setNewTitle] = useState('');
-  const process = processes.find((p) => p.id === selectedId) ?? processes[0];
+  if (!canCreate('processes')) return null;
 
   const importBpmn = async (file: File) => {
     const xml = await file.text();
@@ -38,78 +40,179 @@ export function ProcessView() {
   };
 
   return (
+    <div className="process-tools">
+      <div className="row gap">
+        <button className="primary" onClick={() => setNaming(true)}>
+          {t('+ Prozess')}
+        </button>
+        <button onClick={() => setDraftOpen(true)}>✨ {t('Mit KI entwerfen')}</button>
+        <button onClick={() => fileInput.current?.click()}>⬆ {t('BPMN importieren')}</button>
+        <ExcelTools scope="processes" compact />
+        <input
+          ref={fileInput}
+          type="file"
+          accept=".bpmn,.xml"
+          hidden
+          onChange={(e) => {
+            const f = e.target.files?.[0];
+            if (f) importBpmn(f);
+            e.target.value = '';
+          }}
+        />
+      </div>
+      {draftOpen && <AiProcessDraft onClose={() => setDraftOpen(false)} />}
+      {naming && (
+        <form
+          className="row gap"
+          onSubmit={(e) => {
+            e.preventDefault();
+            const title = newTitle.trim();
+            if (title) select('processes', createProcess(title).id);
+            setNewTitle('');
+            setNaming(false);
+          }}
+        >
+          <input
+            id="new-process-title"
+            autoFocus
+            placeholder={t('Name des Prozesses')}
+            value={newTitle}
+            onChange={(e) => setNewTitle(e.target.value)}
+          />
+          <button type="submit" className="primary" disabled={!newTitle.trim()}>
+            {t('Anlegen')}
+          </button>
+        </form>
+      )}
+    </div>
+  );
+}
+
+/** Process module: the process landscape is the entry; a selected process opens its model. */
+export function ProcessView() {
+  const processes = useStore((s) => s.processes);
+  const selectedId = useUi((s) => s.selected.processes);
+  const select = useUi((s) => s.select);
+  const { isOwnerOf } = useRights();
+  const process = processes.find((p) => p.id === selectedId);
+
+  if (!process) return <ProcessOverview />;
+
+  return (
     <div className="process-view">
       <aside className="process-list">
-        <div className="module-head">
-          <h2>{t('Prozesse')}</h2>
-        </div>
-        {editable ? (
-          <div className="row gap">
-            <button className="primary" onClick={() => setNaming(true)}>
-              {t('+ Prozess')}
-            </button>
-            <button onClick={() => setDraftOpen(true)}>✨ {t('Mit KI entwerfen')}</button>
-            <button onClick={() => fileInput.current?.click()}>{t('BPMN importieren')}</button>
-            <ExcelTools scope="processes" compact />
-            <input
-              ref={fileInput}
-              type="file"
-              accept=".bpmn,.xml"
-              hidden
-              onChange={(e) => {
-                const f = e.target.files?.[0];
-                if (f) importBpmn(f);
-                e.target.value = '';
-              }}
-            />
-          </div>
-        ) : (
-          <span className="small muted">{t('Neue Prozesse legt die Administration an.')}</span>
-        )}
-        {draftOpen && editable && <AiProcessDraft onClose={() => setDraftOpen(false)} />}
-        {naming && (
-          <form
-            className="row gap"
-            onSubmit={(e) => {
-              e.preventDefault();
-              const title = newTitle.trim();
-              if (title) select('processes', createProcess(title).id);
-              setNewTitle('');
-              setNaming(false);
-            }}
-          >
-            <input
-              id="new-process-title"
-              autoFocus
-              placeholder={t('Name des Prozesses')}
-              value={newTitle}
-              onChange={(e) => setNewTitle(e.target.value)}
-            />
-            <button type="submit" className="primary" disabled={!newTitle.trim()}>
-              {t('Anlegen')}
-            </button>
-          </form>
-        )}
+        <button className="back-link" onClick={() => select('processes', undefined)}>
+          ← {t('Prozesslandschaft')}
+        </button>
+        <ProcessAdminTools />
         {categories.map((cat) => (
           <div key={cat} className="proc-group">
             <div className="proc-group-title">{t(cat)}</div>
             {processes
               .filter((p) => p.category === cat)
+              .sort((a, b) => (a.landscapeOrder ?? 99) - (b.landscapeOrder ?? 99))
               .map((p) => (
-                <div key={p.id} className={`proc-item ${p.id === process?.id ? 'selected' : ''}`} onClick={() => select('processes', p.id)}>
+                <div key={p.id} className={`proc-item ${p.id === process.id ? 'selected' : ''}`} onClick={() => select('processes', p.id)}>
                   <div>
                     <span className="mono">{p.code}</span> {p.title}
                     {isOwnerOf('processes', p) && <span className="owner-badge">{t('Owner')}</span>}
                   </div>
                   <div className="muted small">
-                    v{p.version} · {t(p.status)}
+                    v{p.version} · {t(stageLabel[stageOf(p.status)])}
                   </div>
                 </div>
               ))}
           </div>
         ))}
       </aside>
-      {process ? <ProcessWorkspace key={process.id} process={process} /> : <Empty>{t('Noch keine Prozesse vorhanden.')}</Empty>}
+      <ProcessWorkspace key={process.id} process={process} />
+    </div>
+  );
+}
+
+/** Landscape on top, list of all processes below. */
+function ProcessOverview() {
+  const d = useStore();
+  const select = useUi((s) => s.select);
+  const { isOwnerOf } = useRights();
+  const [cat, setCat] = useState<string>('');
+  const [mine, setMine] = useState(false);
+  const [stage, setStage] = useState<string>('');
+  const steps = stepsOfUser(d.currentUserId, d);
+  const involvement = (p: ProcessModel) => new Set(steps.filter((s) => s.process.id === p.id).map((s) => s.elementId)).size;
+  const roleName = (id: string) => d.role.find((r) => r.id === id)?.title ?? '–';
+  const rows = d.processes
+    .filter(
+      (p) => (!cat || p.category === cat) && (!stage || stageOf(p.status) === stage) && (!mine || involvement(p) > 0 || isOwnerOf('processes', p)),
+    )
+    .sort((a, b) => categories.indexOf(a.category) - categories.indexOf(b.category) || (a.landscapeOrder ?? 99) - (b.landscapeOrder ?? 99));
+
+  return (
+    <div className="process-overview">
+      <div className="module-head">
+        <h2>{t('Prozesslandschaft')}</h2>
+        <span className="small muted">{t('Klick auf einen Prozess öffnet das Prozessmodell.')}</span>
+      </div>
+      <ProcessAdminTools />
+      <ProcessLandscape compact />
+      <div className="module-head" style={{ marginTop: 8 }}>
+        <h3>{t('Alle Prozesse ({n})', { n: d.processes.length })}</h3>
+        <div className="filter-bar">
+          {['', ...categories].map((c) => (
+            <button key={c || 'all'} className={`chip ${cat === c ? 'active' : ''}`} onClick={() => setCat(c)}>
+              {c ? t(c) : t('Alle')}
+            </button>
+          ))}
+          <select value={stage} onChange={(e) => setStage(e.target.value)} aria-label={t('Freigabestatus')}>
+            <option value="">{t('Alle Status')}</option>
+            {(['draft', 'review', 'released', 'archived'] as const).map((s) => (
+              <option key={s} value={s}>
+                {t(stageLabel[s])}
+              </option>
+            ))}
+          </select>
+          <label className="checkbox small">
+            <input type="checkbox" checked={mine} onChange={(e) => setMine(e.target.checked)} /> {t('nur meine')}
+          </label>
+        </div>
+      </div>
+      <div className="table-wrap">
+        <table className="list">
+          <thead>
+            <tr>
+              <th>ID</th>
+              <th>{t('Prozess')}</th>
+              <th>{t('Prozesskategorie')}</th>
+              <th>{t('Prozessbereich')}</th>
+              <th>{t('Prozessverantwortlicher')}</th>
+              <th>{t('Freigabestatus')}</th>
+              <th>{t('Meine Beteiligung')}</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((p) => {
+              const n = involvement(p);
+              return (
+                <tr key={p.id} onClick={() => select('processes', p.id)}>
+                  <td className="mono">{p.code}</td>
+                  <td>{p.title}</td>
+                  <td>{t(p.category)}</td>
+                  <td>{p.area ?? '–'}</td>
+                  <td>{roleName(p.ownerRoleId)}</td>
+                  <td>
+                    <StatusPill status={p.status} />
+                  </td>
+                  <td className="small">
+                    {isOwnerOf('processes', p) && <span className="owner-badge">{t('Owner')}</span>}{' '}
+                    {n > 0 ? (n === 1 ? t('1 Schritt') : t('{n} Schritte', { n })) : ''}
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+        {rows.length === 0 && <Empty>{t('Keine Einträge.')}</Empty>}
+      </div>
     </div>
   );
 }
@@ -140,9 +243,13 @@ function ProcessWorkspace({ process }: { process: ProcessModel }) {
     <section className="workspace">
       <div className="workspace-head">
         <div>
-          <div className="muted small">
-            {process.code} · {t(process.category)}
-            {process.area && ` · ${process.area}`} · v{process.version} · {t(process.status)}
+          <div className="breadcrumb small">
+            <span className="link" onClick={() => select('processes', undefined)}>
+              {t('Prozesslandschaft')}
+            </span>
+            {' › '}
+            {t(process.category)}
+            {process.area && ` › ${process.area}`}
           </div>
           <h2>{process.title}</h2>
         </div>
@@ -181,6 +288,12 @@ function ProcessWorkspace({ process }: { process: ProcessModel }) {
         </div>
       </div>
 
+      <div className="workspace-wf">
+        <span className="small muted">
+          {process.code} · v{process.version}
+        </span>
+        <WorkflowBar kind="processes" item={process} />
+      </div>
       {tab === 'model' && (
         <div className="model-area">
           <BpmnEditor
@@ -271,7 +384,12 @@ function ProcessProfile({ process }: { process: ProcessModel }) {
           {text('version', 'Version')}
           <label className="field">
             <span className="field-label">{t('Freigabestatus')}</span>
-            <select value={process.status} onChange={(e) => set({ status: e.target.value })}>
+            <select
+              value={process.status}
+              disabled
+              title={t('wird über den Freigabe-Workflow gesetzt')}
+              onChange={(e) => set({ status: e.target.value })}
+            >
               {['Entwurf', 'In Prüfung', 'Freigegeben', 'Archiviert'].map((s) => (
                 <option key={s} value={s}>
                   {t(s)}

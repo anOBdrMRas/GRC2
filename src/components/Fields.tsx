@@ -32,15 +32,15 @@ export function Field({
   value: unknown;
   onChange: (v: unknown) => void;
   entityId?: string;
-  /** ownership field: only administrators may change it */
-  locked?: boolean;
+  /** field only administrators may change; a string gives the reason */
+  locked?: boolean | string;
 }) {
   return (
     <label className={`field ${def.wide || def.type === 'textarea' ? 'wide' : ''}`}>
       <span className="field-label">
         {t(def.label)}
         {def.hint && <span className="hint"> · {t(def.hint)}</span>}
-        {locked && <span className="hint lock"> · 🔒 {t('legt die Ownership fest – nur Administration')}</span>}
+        {locked && <span className="hint lock"> · 🔒 {t(typeof locked === 'string' ? locked : 'legt die Ownership fest – nur Administration')}</span>}
       </span>
       {locked ? (
         <fieldset className="plain" disabled>

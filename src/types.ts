@@ -90,6 +90,7 @@ export interface Role extends BaseEntity {
   trainings: string;
   incompatibleRoleIds: string[];
   complianceRelevant: boolean;
+  workflow?: WorkflowEntry[];
   // formal transfer to the person (ISO 37301 5.3.2, ISO 27001 5.3): 'Keine' or a MandateType
   requiredMandate: string;
   writtenForm: boolean;
@@ -101,6 +102,18 @@ export interface Role extends BaseEntity {
   lastReview: string;
   nextReview: string;
   isoRefs: string[];
+}
+
+/** One step in the approval workflow of a process, role or position. */
+export interface WorkflowEntry {
+  /** submitted = released by the owner (business approval), approved = I&A quality approval,
+   *  rejected = sent back by I&A, reopened = edited after release, status = set by an administrator */
+  step: 'submitted' | 'approved' | 'rejected' | 'reopened' | 'status';
+  byUserId: string;
+  at: string;
+  comment: string;
+  /** status after the step */
+  status: string;
 }
 
 /** Role held by a position, with a comment on how the position fulfils it. */
@@ -134,6 +147,7 @@ export interface Position extends BaseEntity {
   signingAuthority: string;
   approvalLimit: number;
   roles: PositionRole[];
+  workflow?: WorkflowEntry[];
   // validity & review
   version: string;
   status: string;
@@ -315,6 +329,7 @@ export interface ProcessModel {
   outputs?: string;
   resources?: string;
   xml: string;
+  workflow?: WorkflowEntry[];
   /** BPMN element id -> assignment */
   assignments: Record<string, StepAssignment>;
   /** BPMN call activity id -> linked process id */

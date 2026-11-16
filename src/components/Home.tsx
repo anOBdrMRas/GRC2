@@ -7,7 +7,11 @@ import { positionHolders } from '../logic';
 import { assignmentsOf, ownershipOf, type MyStep } from '../ownership';
 import { useRights } from '../useRights';
 import { systemRoleById } from '../permissions';
-import { ProcessLandscape } from './ProcessLandscape';
+import { CheckTiles, StatusBar } from './IaCockpit';
+import { ExcelTools } from './ExcelTools';
+import { imsChecks, workflowCounts } from '../quality';
+import { openRejection, stageOf, isWfKind, type WfItem, type WfKind } from '../workflow';
+import { StatusPill } from './common';
 import { AssistantChat } from './AssistantChat';
 import { MandateStatePill } from './MandateViews';
 import { FindingLine } from './AuditViews';
@@ -62,9 +66,9 @@ const raciHint = 'R = durchführend · A = verantwortlich · C = konsultiert · 
 export function Home() {
   const d = useStore();
   const go = useUi((s) => s.go);
-  const setDraftOpen = useUi((s) => s.setDraftOpen);
-  const { user, isAdmin } = useRights();
+  const { user, isAdmin, isIa } = useRights();
   if (!user) return null;
+  if (isAdmin) return <AdminHome />;
   const mine = assignmentsOf(user, d);
   const own = ownershipOf(user.id, d);
   const supervisor = mine.position && d.position.find((p) => p.id === mine.position!.reportsToDisciplinaryId);
@@ -119,12 +123,9 @@ export function Home() {
         </div>
       </div>
 
-      <section className="home-section">
-        <ProcessLandscape compact />
-      </section>
-
       <div className="home-grid">
         <div className="home-main">
+          {isIa && <IaWaiting />}
           <section className="home-section assigned">
             <h3>👤 {t('Mir zugewiesen')}</h3>
             <p className="small muted">{t('Diese Elemente betreffen Sie. Sie können sie lesen; bearbeitet werden sie von den Ownern.')}</p>
@@ -194,6 +195,13 @@ export function Home() {
               <p className="small muted">
                 {t('Hier sind Sie Owner. Diese Elemente dürfen Sie bearbeiten – neue anlegen kann nur die Administration.')}
               </p>
+              <OwnerApprovals
+                items={[
+                  ...own.processes.map((item) => ({ kind: 'processes' as WfKind, item })),
+                  ...own.role.map((item) => ({ kind: 'role' as WfKind, item })),
+                  ...own.position.map((item) => ({ kind: 'position' as WfKind, item })),
+                ]}
+              />
               {own.issues.length > 0 && (
                 <Card title="Handlungsbedarf bei meinen Elementen" count={own.issues.length} tone="warn">
                   {own.issues.map((i, n) => (
@@ -214,6 +222,7 @@ export function Home() {
                           <span className="link grow" onClick={() => go(kind, e.id)}>
                             <span className="mono small muted">{e.code}</span> {e.title}
                           </span>
+                          {isWfKind(kind) && <StatusPill status={(e as unknown as WfItem).status} />}
                           {kind === 'position' && (
                             <span className="small muted">
                               {positionHolders(e as never, d.user)
@@ -231,40 +240,175 @@ export function Home() {
               </div>
             </section>
           )}
-
-          {isAdmin && (
-            <section className="home-section admin">
-              <h3>⚙ {t('Administration')}</h3>
-              <p className="small muted">{t('Neue Elemente anlegen – Owner bearbeiten danach die bestehenden.')}</p>
-              <div className="row gap wrap">
-                <button
-                  className="primary"
-                  onClick={() => {
-                    go('processes');
-                    setDraftOpen(true);
-                  }}
-                >
-                  ✨ {t('Prozess mit KI entwerfen')}
-                </button>
-                {(['role', 'position', 'mandate', 'risk', 'control', 'kpi', 'audit', 'user'] as EntityKind[]).map((k) => (
-                  <button
-                    key={k}
-                    onClick={() => {
-                      const e = d.createEntity(k, k === 'user' ? t('Neuer Benutzer') : t('Neue(s) {label}', { label: t(modules[k].label) }));
-                      go(k, e.id);
-                    }}
-                  >
-                    + {t(modules[k].label)}
-                  </button>
-                ))}
-                <button onClick={() => go('dashboard')}>◧ {t('GRC-Cockpit')}</button>
-              </div>
-            </section>
-          )}
         </div>
         <aside className="home-side">
           <AssistantChat />
         </aside>
+      </div>
+    </div>
+  );
+}
+
+/** Owner: drafts waiting for the business approval (and items sent back by I&A). */
+function OwnerApprovals({ items }: { items: { kind: WfKind; item: WfItem }[] }) {
+  const go = useUi((s) => s.go);
+  const drafts = items.filter((x) => stageOf(x.item.status) === 'draft');
+  const review = items.filter((x) => stageOf(x.item.status) === 'review');
+  if (!drafts.length && !review.length) return null;
+  return (
+    <Card title="Freigabe-Workflow" count={drafts.length} tone={drafts.length ? 'warn' : undefined}>
+      {drafts.map(({ kind, item }) => {
+        const rej = openRejection(item);
+        return (
+          <div key={kind + item.id} className="small link" onClick={() => go(kind, item.id)}>
+            ✎ <span className="mono">{item.code}</span> {item.title} – <b>{t('wartet auf Ihre fachliche Freigabe')}</b>
+            {rej && (
+              <span className="warn">
+                {' '}
+                ({t('zurückgewiesen')}: {rej.comment})
+              </span>
+            )}
+          </div>
+        );
+      })}
+      {review.map(({ kind, item }) => (
+        <div key={kind + item.id} className="small link muted" onClick={() => go(kind, item.id)}>
+          ⏳ <span className="mono">{item.code}</span> {item.title} – {t('liegt beim I&A-Team')}
+        </div>
+      ))}
+    </Card>
+  );
+}
+
+/** I&A team member: approvals waiting in the I&A cockpit. */
+function IaWaiting() {
+  const d = useStore();
+  const go = useUi((s) => s.go);
+  const n = [...d.processes, ...d.role, ...d.position].filter((x) => stageOf(x.status) === 'review').length;
+  return (
+    <section className="home-section ia-home">
+      <div className="row space">
+        <h3>✓ {t('I&A-Freigaben')}</h3>
+        <button className="primary" onClick={() => go('ia')}>
+          {t('Zum I&A-Cockpit')}
+        </button>
+      </div>
+      <p className="small">{n ? t('{n} Elemente warten auf Ihre Qualitätsfreigabe.', { n }) : t('Keine offenen Freigaben.')}</p>
+    </section>
+  );
+}
+
+/** Administrator start page: state of the integrated management system and administration. */
+function AdminHome() {
+  const d = useStore();
+  const go = useUi((s) => s.go);
+  const select = useUi((s) => s.select);
+  const setDraftOpen = useUi((s) => s.setDraftOpen);
+  const { user } = useRights();
+  const checks = imsChecks(d);
+  const counts = workflowCounts(d);
+  const open = checks.reduce((n, c) => n + c.items.length, 0);
+  const notReleased =
+    counts.processes.total + counts.role.total + counts.position.total - counts.processes.released - counts.role.released - counts.position.released;
+  const tiles: [string, number, () => void][] = [
+    ['Prozesse', d.processes.length, () => (select('processes', undefined), go('processes'))],
+    ['Rollen', d.role.length, () => go('role')],
+    ['Stellen', d.position.length, () => go('position')],
+    ['Delegationen & Vollmachten', d.mandate.length, () => go('mandate')],
+    ['Benutzer', d.user.filter((u) => u.status === 'Aktiv').length, () => go('user')],
+  ];
+  return (
+    <div className="home admin-home">
+      <div className="home-head">
+        <div className="muted small">{t('Administration')}</div>
+        <h2>{t('Willkommen, {name}', { name: user?.title ?? '' })}</h2>
+        <div className="small muted">{t('Lagebild des integrierten Managementsystems (IMS)')}</div>
+      </div>
+
+      <div className="stat-grid wide">
+        {tiles.map(([label, n, onClick]) => (
+          <div key={label} className="stat clickable" onClick={onClick}>
+            <div className="stat-num">{n}</div>
+            <div className="stat-label">{t(label)}</div>
+          </div>
+        ))}
+        <div className="stat clickable warn-stat" onClick={() => document.getElementById('ims-open')?.scrollIntoView({ behavior: 'smooth' })}>
+          <div className="stat-num">{open}</div>
+          <div className="stat-label">{t('offene Punkte')}</div>
+        </div>
+      </div>
+
+      <section className="home-section">
+        <div className="row space">
+          <h3>{t('Freigabe-Workflow')}</h3>
+          <button onClick={() => go('ia')}>✓ {t('I&A-Cockpit')}</button>
+        </div>
+        <div className="ia-kpis">
+          {(['processes', 'role', 'position'] as WfKind[]).map((k) => (
+            <div key={k} className="ia-kpi">
+              <b>{k === 'processes' ? t('Prozesse') : t(modules[k].plural)}</b>
+              <StatusBar c={counts[k]} />
+              <div className="small muted">
+                {t('{a} von {b} freigegeben', { a: counts[k].released, b: counts[k].total })} · {t('{n} im I&A-Review', { n: counts[k].review })} ·{' '}
+                {t('{n} beim Owner (Entwurf)', { n: counts[k].draft })}
+              </div>
+            </div>
+          ))}
+        </div>
+        <div className="small">{t('{n} Elemente sind noch nicht freigegeben.', { n: notReleased })}</div>
+      </section>
+
+      <section className="home-section" id="ims-open">
+        <h3>{t('Wo es hakt')}</h3>
+        <p className="small muted">{t('Klick auf eine Kachel zeigt die betroffenen Elemente; ein Klick auf ein Element öffnet es.')}</p>
+        <CheckTiles checks={checks} columns={4} />
+      </section>
+
+      <div className="home-grid">
+        <section className="home-section admin">
+          <h3>{t('Anlegen')}</h3>
+          <div className="row gap wrap">
+            <button
+              className="primary"
+              onClick={() => {
+                select('processes', undefined);
+                go('processes');
+                setDraftOpen(true);
+              }}
+            >
+              ✨ {t('Prozess mit KI entwerfen')}
+            </button>
+            <button onClick={() => (select('processes', undefined), go('processes'))}>
+              ⬆ {t('BPMN importieren')} / + {t('Prozess')}
+            </button>
+            {(['role', 'position', 'mandate', 'risk', 'control', 'kpi', 'audit', 'user'] as EntityKind[]).map((k) => (
+              <button
+                key={k}
+                onClick={() => {
+                  const e = d.createEntity(
+                    k,
+                    k === 'user'
+                      ? t('Neuer Benutzer')
+                      : k === 'mandate'
+                        ? t('Neue Übertragung')
+                        : t('Neue(s) {label}', { label: t(modules[k].label) }),
+                  );
+                  go(k, e.id);
+                }}
+              >
+                + {t(modules[k].label)}
+              </button>
+            ))}
+          </div>
+        </section>
+        <section className="home-section admin">
+          <h3>{t('Daten')}</h3>
+          <div className="row gap wrap">
+            <ExcelTools scope="all" />
+            <button onClick={() => go('dashboard')}>◧ {t('GRC-Cockpit')}</button>
+          </div>
+          <p className="small muted">{t('Excel-Import und -Export gibt es zusätzlich in jedem Modul.')}</p>
+        </section>
       </div>
     </div>
   );

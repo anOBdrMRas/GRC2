@@ -18,6 +18,7 @@ import { modules } from './schema';
 import { seedData } from './seed';
 import { migrateSystemRoles } from './permissions';
 import { emptyDiagram } from './bpmn/templates';
+import { stageOf, workflowPatch, type WfAction, type WfItem, type WfKind } from './workflow';
 
 type Collections = { [K in EntityKind]: EntityMap[K][] };
 
@@ -43,6 +44,8 @@ interface State extends Collections {
   unassign: (processId: string, elementId: string, kind: AssignableKind, entityId: string) => void;
   setRaci: (processId: string, elementId: string, roleId: string, raci: Raci) => void;
   setStepNote: (processId: string, elementId: string, note: string) => void;
+  /** approval workflow (processes, roles, positions) */
+  workflowAction: (kind: WfKind, id: string, action: WfAction, comment?: string, status?: string) => void;
 
   importAll: (data: Partial<Collections> & { processes: ProcessModel[] }) => void;
   resetDemo: () => void;
@@ -59,6 +62,17 @@ export function nextCode(items: { code: string }[], prefix: string) {
 function updateStep(p: ProcessModel, elementId: string, fn: (a: StepAssignment) => StepAssignment): ProcessModel {
   const current = p.assignments[elementId] ?? emptyAssignment();
   return { ...p, assignments: { ...p.assignments, [elementId]: fn(current) }, updatedAt: now() };
+}
+
+/**
+ * A released process, role or position that is changed by someone other than an administrator
+ * goes back to draft and needs a new approval.
+ */
+function reopenIfReleased<T extends WfItem>(item: T, s: { user: User[]; currentUserId: string }, patch: object = {}): T {
+  if (stageOf(item.status) !== 'released' || 'status' in patch || 'workflow' in patch) return item;
+  const user = s.user.find((u) => u.id === s.currentUserId);
+  if (!user || user.systemRoles.includes('admin')) return item;
+  return { ...item, ...workflowPatch(item, 'reopen', user.id, '') } as T;
 }
 
 export const useStore = create<State>()(
@@ -79,7 +93,7 @@ export const useStore = create<State>()(
           const next = (patch as Partial<Role>).incompatibleRoleIds ?? [];
           set((s) => ({
             role: s.role.map((r) => {
-              if (r.id === id) return { ...r, ...(patch as Partial<Role>), updatedAt: now() };
+              if (r.id === id) return reopenIfReleased({ ...r, ...(patch as Partial<Role>), updatedAt: now() }, s, patch);
               const has = r.incompatibleRoleIds.includes(id);
               const should = next.includes(r.id);
               if (has === should) return r;
@@ -95,7 +109,11 @@ export const useStore = create<State>()(
         set(
           (s) =>
             ({
-              [kind]: (s[kind] as EntityMap[typeof kind][]).map((e) => (e.id === id ? { ...e, ...patch, updatedAt: now() } : e)),
+              [kind]: (s[kind] as EntityMap[typeof kind][]).map((e) => {
+                if (e.id !== id) return e;
+                const next = { ...e, ...patch, updatedAt: now() };
+                return kind === 'role' || kind === 'position' ? reopenIfReleased(next as WfItem, s, patch) : next;
+              }),
             }) as Partial<State>,
         );
       },
@@ -186,7 +204,17 @@ export const useStore = create<State>()(
         return p;
       },
 
-      updateProcess: (id, patch) => set((s) => ({ processes: s.processes.map((p) => (p.id === id ? { ...p, ...patch, updatedAt: now() } : p)) })),
+      updateProcess: (id, patch) =>
+        set((s) => ({ processes: s.processes.map((p) => (p.id === id ? reopenIfReleased({ ...p, ...patch, updatedAt: now() }, s, patch) : p)) })),
+
+      workflowAction: (kind, id, action, comment = '', status) =>
+        set((s) => {
+          const list = (kind === 'processes' ? s.processes : s[kind]) as WfItem[];
+          const next = list.map((e) =>
+            e.id === id ? ({ ...e, ...workflowPatch(e, action, s.currentUserId, comment, status), updatedAt: now() } as WfItem) : e,
+          );
+          return { [kind]: next } as Partial<State>;
+        }),
 
       deleteProcess: (id) =>
         set((s) => ({
@@ -201,13 +229,16 @@ export const useStore = create<State>()(
           processes: s.processes.map((p) =>
             p.id !== processId
               ? p
-              : updateStep(p, elementId, (a) => {
-                  if (kind === 'role') {
-                    return a.roles.some((r) => r.roleId === entityId) ? a : { ...a, roles: [...a.roles, { roleId: entityId, raci: 'R' }] };
-                  }
-                  const key = assignmentKey[kind];
-                  return a[key].includes(entityId) ? a : { ...a, [key]: [...a[key], entityId] };
-                }),
+              : reopenIfReleased(
+                  updateStep(p, elementId, (a) => {
+                    if (kind === 'role') {
+                      return a.roles.some((r) => r.roleId === entityId) ? a : { ...a, roles: [...a.roles, { roleId: entityId, raci: 'R' }] };
+                    }
+                    const key = assignmentKey[kind];
+                    return a[key].includes(entityId) ? a : { ...a, [key]: [...a[key], entityId] };
+                  }),
+                  s,
+                ),
           ),
         })),
 
@@ -216,10 +247,13 @@ export const useStore = create<State>()(
           processes: s.processes.map((p) =>
             p.id !== processId
               ? p
-              : updateStep(p, elementId, (a) =>
-                  kind === 'role'
-                    ? { ...a, roles: a.roles.filter((r) => r.roleId !== entityId) }
-                    : { ...a, [assignmentKey[kind]]: a[assignmentKey[kind]].filter((x) => x !== entityId) },
+              : reopenIfReleased(
+                  updateStep(p, elementId, (a) =>
+                    kind === 'role'
+                      ? { ...a, roles: a.roles.filter((r) => r.roleId !== entityId) }
+                      : { ...a, [assignmentKey[kind]]: a[assignmentKey[kind]].filter((x) => x !== entityId) },
+                  ),
+                  s,
                 ),
           ),
         })),
@@ -229,13 +263,23 @@ export const useStore = create<State>()(
           processes: s.processes.map((p) =>
             p.id !== processId
               ? p
-              : updateStep(p, elementId, (a) => ({ ...a, roles: a.roles.map((r) => (r.roleId === roleId ? { ...r, raci } : r)) })),
+              : reopenIfReleased(
+                  updateStep(p, elementId, (a) => ({ ...a, roles: a.roles.map((r) => (r.roleId === roleId ? { ...r, raci } : r)) })),
+                  s,
+                ),
           ),
         })),
 
       setStepNote: (processId, elementId, note) =>
         set((s) => ({
-          processes: s.processes.map((p) => (p.id !== processId ? p : updateStep(p, elementId, (a) => ({ ...a, note })))),
+          processes: s.processes.map((p) =>
+            p.id !== processId
+              ? p
+              : reopenIfReleased(
+                  updateStep(p, elementId, (a) => ({ ...a, note })),
+                  s,
+                ),
+          ),
         })),
 
       setCurrentUser: (currentUserId) => set({ currentUserId }),
@@ -251,7 +295,7 @@ export const useStore = create<State>()(
     }),
     {
       name: 'grc-prototype-v1',
-      version: 6,
+      version: 7,
       // v1 had no users and free-text role holders
       migrate: (persisted) => ({ ...normalizeData(persisted as Partial<State>), loggedIn: false }),
     },
@@ -273,15 +317,24 @@ function normalizeData(data: Partial<State>): Partial<State> {
       ...u,
     });
     // v6: only the system roles "employee" and "admin" remain
-    return merged.systemRoles.every((r) => r === 'employee' || r === 'admin') && merged.systemRoles.length
+    return merged.systemRoles.every((r) => r === 'employee' || r === 'admin' || r === 'ia') && merged.systemRoles.length
       ? merged
       : { ...merged, systemRoles: migrateSystemRoles(merged.systemRoles) };
   });
-  const roles = addMissing(data.role ?? [], seed.role).map((r: Partial<Role>) => normalizeRole(r));
+  // v7: demo data gets an I&A team member
+  if (demoBased && !users.some((u) => u.systemRoles.includes('ia'))) {
+    const qm = users.find((u) => u.id === 'U-013' && !u.systemRoles.includes('admin'));
+    if (qm) qm.systemRoles = [...qm.systemRoles, 'ia'];
+  }
+  // v7 added the approval workflow history (demo elements get their demo history)
+  const withHistory = <T extends { id: string; workflow?: unknown }>(x: T, demo: { id: string; workflow?: unknown }[]): T =>
+    x.workflow === undefined ? { ...x, workflow: demo.find((d) => d.id === x.id)?.workflow ?? [] } : x;
+  const roles = addMissing(data.role ?? [], seed.role).map((r: Partial<Role>) => normalizeRole(withHistory(r as Role, seed.role)));
   // v4 added positions: older data gets the demo positions and the demo persons' assignments
   const positions = addMissing(data.position ?? seed.position, seed.position).map((p: Partial<Position>) => {
     const demo = seed.position.find((x) => x.id === p.id);
     // v5 added target powers of attorney
+    p = withHistory(p as Position, seed.position);
     return normalizePosition(
       demo && p.signingAuthority === undefined ? { ...p, signingAuthority: demo.signingAuthority, approvalLimit: demo.approvalLimit } : p,
     );
@@ -294,7 +347,8 @@ function normalizeData(data: Partial<State>): Partial<State> {
     // v6 added the process landscape (area, order) and more demo processes
     processes: addMissing(data.processes ?? seed.processes, seed.processes).map((p) => {
       const demo = seed.processes.find((x) => x.id === p.id);
-      return demo && p.area === undefined ? { ...p, area: demo.area, landscapeOrder: demo.landscapeOrder } : p;
+      const q = withHistory(p, seed.processes);
+      return demo && q.area === undefined ? { ...q, area: demo.area, landscapeOrder: demo.landscapeOrder } : q;
     }),
     mandate: (data.mandate
       ? addMissing(data.mandate, seed.mandate)

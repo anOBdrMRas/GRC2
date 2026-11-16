@@ -156,15 +156,17 @@ export function UserInsights({ user }: { user: User }) {
 }
 
 /** Overview of the tool's system roles and what each may do. */
-const matrixRows: [string, boolean | string, boolean | string, boolean | string][] = [
-  ['Anmelden, persönliche Startseite, Prozesslandschaft', true, true, true],
-  ['Alle Inhalte lesen (außer Benutzerverwaltung)', true, true, true],
-  ['KI-Assistent: Fragen zu Prozessen und Zuständigkeiten', true, true, true],
-  ['Eigene Elemente bearbeiten', false, 'nur als Owner', true],
-  ['Ownership ändern (Owner-Felder)', false, false, true],
-  ['Neue Elemente anlegen, auch mit KI-Entwurf', false, false, true],
-  ['Elemente löschen', false, false, true],
-  ['Benutzer und Systemrollen pflegen, Daten importieren', false, false, true],
+const matrixRows: [string, boolean | string, boolean | string, boolean | string, boolean | string][] = [
+  ['Anmelden, persönliche Startseite, Prozesslandschaft', true, true, true, true],
+  ['Alle Inhalte lesen (außer Benutzerverwaltung)', true, true, true, true],
+  ['KI-Assistent: Fragen zu Prozessen und Zuständigkeiten', true, true, true, true],
+  ['Eigene Elemente bearbeiten', false, 'nur als Owner', 'nur als Owner', true],
+  ['Fachliche Freigabe (Prozesse, Rollen, Stellen)', false, 'nur als Owner', 'nur als Owner', true],
+  ['I&A-Qualitätsfreigabe, I&A-Cockpit', false, false, true, true],
+  ['Ownership ändern (Owner-Felder), Status direkt setzen', false, false, false, true],
+  ['Neue Elemente anlegen, auch mit KI-Entwurf', false, false, false, true],
+  ['Elemente löschen', false, false, false, true],
+  ['Benutzer und Systemrollen pflegen, Daten importieren und exportieren', false, false, false, true],
 ];
 
 const mark = (v: boolean | string) =>
@@ -189,22 +191,30 @@ export function SystemRoleMatrix() {
               <th>{t('Recht')}</th>
               <th>{t('Mitarbeiter')}</th>
               <th>🔑 {t('Owner')}</th>
+              <th>{t('I&A-Team')}</th>
               <th>{t('Administrator')}</th>
             </tr>
           </thead>
           <tbody>
-            {matrixRows.map(([label, a, b, c]) => (
+            {matrixRows.map(([label, a, b, c, e]) => (
               <tr key={label}>
                 <td>{t(label)}</td>
                 <td>{mark(a)}</td>
                 <td>{mark(b)}</td>
                 <td>{mark(c)}</td>
+                <td>{mark(e)}</td>
               </tr>
             ))}
             <tr>
               <td className="muted small">{t('Personen')}</td>
               <td className="small">{users.filter((u) => u.systemRoles.includes('employee')).length}</td>
               <td className="small">{owners}</td>
+              <td className="small">
+                {users
+                  .filter((u) => u.systemRoles.includes('ia'))
+                  .map((u) => u.title)
+                  .join(', ') || '–'}
+              </td>
               <td className="small">
                 {users
                   .filter((u) => u.systemRoles.includes('admin'))
