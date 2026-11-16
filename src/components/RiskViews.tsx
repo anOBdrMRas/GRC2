@@ -1,7 +1,8 @@
 // Risk Register helpers: computed evaluation and the 4-level assessment scale.
 import { useState } from 'react';
 import { useStore } from '../store';
-import { HIGH_RISK_ABOVE, MEDIUM_FROM, RISK_SCALE, isHighRisk, residualScore, riskLevel, riskScore } from '../logic';
+import { HIGH_RISK_ABOVE, MEDIUM_FROM, RISK_SCALE, isHighRisk, riskLevel, scoreOf } from '../logic';
+import type { RiskAction } from '../types';
 import { consequenceTypes, impactLevels, impactNames, likelihoodLevels } from '../riskScale';
 import { LevelBadge } from './common';
 import { t } from '../i18n';
@@ -9,17 +10,15 @@ import { t } from '../i18n';
 const range = Array.from({ length: RISK_SCALE }, (_, i) => i + 1);
 
 /** "3 Bewerten": score = likelihood × impact, level and "higher risk" (> 8). */
-export function RiskEval({ riskId, net }: { riskId: string; net: boolean }) {
+export function RiskEval({ riskId }: { riskId: string }) {
   const r = useStore((s) => s.risk.find((x) => x.id === riskId));
   if (!r) return null;
-  const l = net ? r.residualLikelihood : r.likelihood;
-  const i = net ? r.residualImpact : r.impact;
-  const score = net ? residualScore(r) : riskScore(r.likelihood, r.impact);
+  const score = scoreOf(r);
   const high = isHighRisk(score);
   return (
     <div className="risk-eval">
       <span className="mono">
-        {l} × {i} = <b>{score}</b>
+        {r.likelihood} × {r.impact} = <b>{score}</b>
       </span>
       <LevelBadge level={riskLevel(score)} />
       <span className={`risk-high ${high ? 'yes' : 'no'}`}>
@@ -129,6 +128,56 @@ export function RiskScaleDialog({ consequenceType, onClose }: { consequenceType?
           )}
         </p>
       </div>
+    </div>
+  );
+}
+
+/** "4 Behandeln": treatment actions, each with a responsible person ("+ Maßnahme"). */
+export function RiskActions({ value, onChange }: { value: RiskAction[]; onChange: (v: RiskAction[]) => void }) {
+  const users = useStore((s) => s.user);
+  const set = (i: number, patch: Partial<RiskAction>) => onChange(value.map((a, j) => (j === i ? { ...a, ...patch } : a)));
+  return (
+    <div className="risk-actions">
+      {value.length > 0 && (
+        <table className="mini">
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>{t('Maßnahme')}</th>
+              <th>{t('Verantwortlich')}</th>
+              <th />
+            </tr>
+          </thead>
+          <tbody>
+            {value.map((a, i) => (
+              <tr key={i}>
+                <td className="mono">{i + 1}</td>
+                <td>
+                  <textarea rows={2} value={a.text} placeholder={t('Maßnahme beschreiben…')} onChange={(e) => set(i, { text: e.target.value })} />
+                </td>
+                <td>
+                  <select value={a.ownerUserId} onChange={(e) => set(i, { ownerUserId: e.target.value })}>
+                    <option value="">{t('— nicht zugewiesen —')}</option>
+                    {users.map((u) => (
+                      <option key={u.id} value={u.id}>
+                        {u.title}
+                      </option>
+                    ))}
+                  </select>
+                </td>
+                <td>
+                  <button type="button" className="tag-x" title={t('Maßnahme entfernen')} onClick={() => onChange(value.filter((_, j) => j !== i))}>
+                    ×
+                  </button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
+      <button type="button" onClick={() => onChange([...value, { text: '', ownerUserId: '' }])}>
+        + {t('Maßnahme')}
+      </button>
     </div>
   );
 }

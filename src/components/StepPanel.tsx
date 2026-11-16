@@ -4,7 +4,7 @@ import type { SelectedElement } from '../bpmn/BpmnEditor';
 import { useStore } from '../store';
 import { useUi } from '../ui';
 import { modules } from '../schema';
-import { allFindings, assignedIds, emptyAssignment, isOpenFinding, kpiStatus, residualScore, riskLevel, riskScore } from '../logic';
+import { allFindings, assignedIds, emptyAssignment, isOpenFinding, kpiStatus, riskLevel, riskScore, scoreOf } from '../logic';
 import { LevelBadge, Picker, TrafficLight } from './common';
 import { useRights } from '../useRights';
 import { t } from '../i18n';
@@ -162,7 +162,7 @@ function ActivityPanel({ process, element, onOpenSubProcess }: { process: Proces
 
       {section('risk', (e) => {
         const r = e as Risk;
-        return <LevelBadge level={riskLevel(residualScore(r))} score={residualScore(r)} />;
+        return <LevelBadge level={riskLevel(scoreOf(r))} score={scoreOf(r)} />;
       })}
       {uncovered.length > 0 && (
         <div className="warn-box small">

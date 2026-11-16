@@ -22,7 +22,7 @@ export type OwnKind = EntityKind | 'processes';
 export const ownerFields: Partial<Record<OwnKind, string[]>> = {
   role: ['roleOwnerUserId'],
   position: ['reportsToDisciplinaryId'],
-  risk: ['ownerRoleId'],
+  risk: ['ownerUserId'],
   opportunity: ['ownerRoleId'],
   control: ['ownerRoleId'],
   kpi: ['ownerRoleId'],
@@ -36,7 +36,7 @@ export const ownershipRule: Partial<Record<OwnKind, string>> = {
   processes: 'Inhaber der Rolle „Prozessverantwortlicher“',
   role: 'Rollenverantwortlicher',
   position: 'Inhaber der disziplinarisch übergeordneten Stelle (Vorgesetzter)',
-  risk: 'Inhaber der Rolle „Risikoeigner“',
+  risk: 'Risikoeigner (Person)',
   opportunity: 'Inhaber der verantwortlichen Rolle',
   control: 'Inhaber der Rolle „Kontrollverantwortlicher“',
   kpi: 'Inhaber der Rolle „Verantwortlich für Messung“',
@@ -59,8 +59,9 @@ export function ownersOf(kind: OwnKind, entity: unknown, d: Pick<OwnershipData, 
       const sup = e.reportsToDisciplinaryId;
       return !sup || sup === 'n/a' ? [] : d.user.filter((u) => u.positionId === sup).map((u) => u.id);
     }
-    case 'processes':
     case 'risk':
+      return e.ownerUserId ? [e.ownerUserId] : [];
+    case 'processes':
     case 'opportunity':
     case 'control':
     case 'kpi':

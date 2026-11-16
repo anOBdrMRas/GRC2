@@ -24,6 +24,9 @@ export const riskDepartments = [
   'Management Board - CEO',
 ];
 
+/** legal entities of the group */
+export const riskEntities = ['CDE', 'CUS', 'CTW', 'CMY', 'CCZ'];
+
 export const riskCategories = ['Qualität', 'Informationssicherheit', 'Umwelt', 'Compliance', 'Finanziell', 'Strategisch', 'Operativ'];
 
 export const consequenceTypes = [

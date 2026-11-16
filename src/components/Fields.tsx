@@ -1,9 +1,9 @@
 import { useState } from 'react';
 import type { FieldDef } from '../schema';
 import { modules } from '../schema';
-import type { AnyEntity, AuditFinding, Measurement, PositionRole } from '../types';
+import type { AnyEntity, AuditFinding, Measurement, PositionRole, RiskAction } from '../types';
 import { PositionHolders, PositionRoles, RoleRelations } from './OrgViews';
-import { RiskEval, RiskScaleButton } from './RiskViews';
+import { RiskActions, RiskEval, RiskScaleButton } from './RiskViews';
 import { FindingsEditor, ProcessRefs } from './AuditViews';
 import { MandateList } from './MandateViews';
 import { systemRoleConflicts, systemRoles } from '../permissions';
@@ -37,7 +37,7 @@ export function Field({
   locked?: boolean | string;
 }) {
   // computed displays and buttons must not sit inside a <label> (a click on the label would trigger them)
-  const Wrap = def.type === 'riskEval' || def.type === 'riskGuide' ? 'div' : 'label';
+  const Wrap = def.type === 'riskEval' || def.type === 'riskGuide' || def.type === 'riskActions' ? 'div' : 'label';
   return (
     <Wrap className={`field ${def.wide || def.type === 'textarea' ? 'wide' : ''}`}>
       <span className="field-label">
@@ -192,7 +192,9 @@ function FieldInput({ def, value, onChange, entityId }: { def: FieldDef; value: 
     case 'roleList':
       return <RoleList value={(value as string[]) ?? []} selfId={entityId} onChange={onChange} />;
     case 'riskEval':
-      return <RiskEval riskId={entityId ?? ''} net={def.key === '#net'} />;
+      return <RiskEval riskId={entityId ?? ''} />;
+    case 'riskActions':
+      return <RiskActions value={(value as RiskAction[]) ?? []} onChange={onChange} />;
     case 'riskGuide':
       return <RiskScaleButton riskId={entityId ?? ''} />;
     case 'systemRoles':

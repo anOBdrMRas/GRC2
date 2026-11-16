@@ -2571,3 +2571,28 @@ table.program tbody tr:hover {
 .scale-legend {
   align-items: flex-start;
 }
+.risk-actions table.mini {
+  width: 100%;
+  margin-bottom: 6px;
+}
+.risk-actions td {
+  vertical-align: top;
+}
+.risk-actions td:nth-child(2) {
+  width: 60%;
+}
+.risk-actions textarea,
+.risk-actions select {
+  width: 100%;
+}
+.bar-fill.dept-high,
+.bar-fill.dept-other {
+  display: inline-block;
+  vertical-align: top;
+}
+.bar-fill.dept-high {
+  background: #ff8787;
+}
+.bar-fill.dept-other {
+  background: #a5d8ff;
+}

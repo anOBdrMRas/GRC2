@@ -144,7 +144,8 @@ export function fromCell(c: Col, raw: unknown, lk: Lookup, warn: (msg: string) =
     case 'long':
       return typeof raw === 'number' ? String(raw) : s;
     case 'number': {
-      if (!s) return 0;
+      // empty scale cells keep the current (or default) value
+      if (!s) return c.max ? undefined : 0;
       const n =
         typeof raw === 'number'
           ? raw

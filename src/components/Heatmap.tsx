@@ -5,22 +5,10 @@ import { t } from '../i18n';
 const levels = Array.from({ length: RISK_SCALE }, (_, i) => i + 1);
 
 /** 4×4 risk matrix (likelihood × impact). */
-export function Heatmap({
-  risks,
-  mode,
-  selected,
-  onSelect,
-}: {
-  risks: Risk[];
-  mode: 'gross' | 'net';
-  selected?: string | null;
-  onSelect?: (cell: string | null) => void;
-}) {
+export function Heatmap({ risks, selected, onSelect }: { risks: Risk[]; selected?: string | null; onSelect?: (cell: string | null) => void }) {
   const counts = new Map<string, number>();
   for (const r of risks) {
-    const l = mode === 'gross' ? r.likelihood : r.residualLikelihood;
-    const i = mode === 'gross' ? r.impact : r.residualImpact;
-    counts.set(`${l}-${i}`, (counts.get(`${l}-${i}`) ?? 0) + 1);
+    counts.set(`${r.likelihood}-${r.impact}`, (counts.get(`${r.likelihood}-${r.impact}`) ?? 0) + 1);
   }
   return (
     <div className="heatmap">

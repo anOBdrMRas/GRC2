@@ -12,13 +12,11 @@ import {
   mandateStateLabel,
   orgIssues,
   personSodConflicts,
-  residualScore,
-  riskLevel,
   roleHolders,
   today,
 } from '../logic';
 import { isoLabel } from '../iso';
-import { LevelBadge, StatusPill, Tag, download } from './common';
+import { StatusPill, Tag, download } from './common';
 import { FindingLine } from './AuditViews';
 import { t } from '../i18n';
 
@@ -28,7 +26,6 @@ function useRoleDerived(role: Role) {
   const usages = findUsages(s.processes, 'role', role.id);
   return {
     usages,
-    risks: s.risk.filter((r) => r.ownerRoleId === role.id),
     opportunities: s.opportunity.filter((o) => o.ownerRoleId === role.id),
     controlsOwned: s.control.filter((c) => c.ownerRoleId === role.id),
     controlsExecuted: s.control.filter((c) => c.executorRoleId === role.id),
@@ -167,10 +164,6 @@ export function RoleInsights({ role, part }: { role: Role; part: 'warnings' | 'd
               ))}
             </span>
           </div>
-          {list('Risikoeigner für', d.risks, 'risk', (id) => {
-            const r = d.risks.find((x) => x.id === id)!;
-            return <LevelBadge level={riskLevel(residualScore(r))} />;
-          })}
           {list('Chancen', d.opportunities, 'opportunity')}
           {list('Controls verantwortet', d.controlsOwned, 'control')}
           {list('Controls durchgeführt', d.controlsExecuted, 'control')}
@@ -308,7 +301,6 @@ export function RoleProfile({ role, onClose }: { role: Role; onClose: () => void
           <table className="profile-table">
             <tbody>
               {row('Prozessverantwortung', items(d.processesOwned))}
-              {row('Risikoeigner', items(d.risks))}
               {row('Chancen', items(d.opportunities))}
               {row('Controls (verantwortlich)', items(d.controlsOwned))}
               {row('Controls (Durchführung)', items(d.controlsExecuted))}

@@ -4,8 +4,7 @@ import {
   activityTypes,
   orgIssues,
   isHighRisk,
-  residualScore,
-  riskScore,
+  scoreOf,
   parseElements,
   personSodConflicts,
   positionHolders,
@@ -139,7 +138,7 @@ export function imsChecks(d: OwnershipData): Check[] {
       key: 'risk-owner',
       label: 'Risiken ohne Risikoeigner',
       module: 'risk',
-      items: d.risk.filter((r) => !r.ownerRoleId).map((r) => ({ kind: 'risk', id: r.id, label: label(r) })),
+      items: d.risk.filter((r) => !r.ownerUserId).map((r) => ({ kind: 'risk', id: r.id, label: label(r) })),
     },
     {
       key: 'risk-control',
@@ -151,17 +150,15 @@ export function imsChecks(d: OwnershipData): Check[] {
     },
     {
       key: 'risk-high',
-      label: 'Hohe Restrisiken (> 8)',
+      label: 'Höhere Risiken (> 8)',
       module: 'risk',
-      items: d.risk
-        .filter((r) => isHighRisk(residualScore(r)))
-        .map((r) => ({ kind: 'risk', id: r.id, label: label(r), detail: String(residualScore(r)) })),
+      items: d.risk.filter((r) => isHighRisk(scoreOf(r))).map((r) => ({ kind: 'risk', id: r.id, label: label(r), detail: String(scoreOf(r)) })),
     },
     {
       key: 'risk-content',
-      label: 'Risiken ohne Ursache oder Auswirkung',
+      label: 'Risiken ohne Beschreibung oder Ursache und Auswirkung',
       module: 'risk',
-      items: d.risk.filter((r) => !filled(r.cause) || !filled(r.consequence)).map((r) => ({ kind: 'risk', id: r.id, label: label(r) })),
+      items: d.risk.filter((r) => !filled(r.description) || !filled(r.cause)).map((r) => ({ kind: 'risk', id: r.id, label: label(r) })),
     },
     {
       key: 'risk-reason',
@@ -177,17 +174,12 @@ export function imsChecks(d: OwnershipData): Check[] {
       module: 'risk',
       items: d.risk
         .filter(
-          (r) => isHighRisk(riskScore(r.likelihood, r.impact)) && r.treatment !== 'Akzeptieren' && (!filled(r.treatmentPlan) || !r.actionOwnerUserId),
+          (r) =>
+            isHighRisk(scoreOf(r)) &&
+            r.treatment !== 'Akzeptieren' &&
+            (!r.actions.some((a) => filled(a.text)) || r.actions.some((a) => filled(a.text) && !a.ownerUserId)),
         )
-        .map((r) => ({ kind: 'risk', id: r.id, label: label(r), detail: String(riskScore(r.likelihood, r.impact)) })),
-    },
-    {
-      key: 'risk-accept',
-      label: 'Akzeptierte Risiken ohne Akzeptanznachweis',
-      module: 'risk',
-      items: d.risk
-        .filter((r) => (r.status === 'Akzeptiert' || r.treatment === 'Akzeptieren') && (!filled(r.acceptedBy) || !r.acceptedAt))
-        .map((r) => ({ kind: 'risk', id: r.id, label: label(r) })),
+        .map((r) => ({ kind: 'risk', id: r.id, label: label(r), detail: String(scoreOf(r)) })),
     },
     // opportunities
     {

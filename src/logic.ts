@@ -84,36 +84,30 @@ export function blankEntity<K extends EntityKind>(kind: K, code: string, title =
   const byKind: { [P in EntityKind]: EntityMap[P] } = {
     risk: {
       ...common,
-      category: 'Operativ',
-      cause: '',
-      consequence: '',
-      affectedAssets: '',
-      protectionGoals: [],
-      complianceObligation: '',
-      interestedParties: '',
-      ownerRoleId: '',
-      likelihood: 2,
-      impact: 2,
-      treatment: 'Reduzieren',
-      treatmentPlan: '',
-      residualLikelihood: 2,
-      residualImpact: 2,
       department: '',
+      category: 'Operativ',
       activity: '',
       processIds: [],
-      assessmentReason: '',
-      consequenceType: '',
-      likelihoodReason: '',
-      impactReason: '',
-      actionOwnerUserId: '',
-      reviewNote: '',
-      entity: '',
-      sourceRef: '',
-      acceptedBy: '',
-      acceptedAt: '',
+      complianceObligation: '',
+      cause: '',
+      ownerUserId: '',
       status: 'Identifiziert',
+      consequenceType: '',
+      likelihood: 2,
+      likelihoodReason: '',
+      impact: 2,
+      impactReason: '',
+      treatment: 'Reduzieren',
+      actions: [],
+      assessmentReason: '',
       lastAssessment: today(),
       nextReview: '',
+      reviewNote: '',
+      affectedAssets: '',
+      protectionGoals: [],
+      interestedParties: '',
+      entity: '',
+      sourceRef: '',
       isoRefs: [],
     },
     opportunity: {
@@ -379,8 +373,18 @@ export function entityName(e: AnyEntity | undefined) {
   return e ? `${e.code} ${e.title}` : '—';
 }
 
-export function residualScore(r: Risk) {
-  return riskScore(r.residualLikelihood, r.residualImpact);
+/** risk score (likelihood × impact, 1..16) */
+export const scoreOf = (r: Pick<Risk, 'likelihood' | 'impact'>) => riskScore(r.likelihood, r.impact);
+
+/** Risks have no title field: the first sentence of the description (max. 80 characters) labels them in lists. */
+export function riskTitle(description: string): string {
+  const first =
+    description
+      .trim()
+      .split(/\n|(?<=\p{Ll}{3}[.!?])\s/u)[0]
+      ?.trim()
+      .replace(/[.:;]$/, '') ?? '';
+  return first.length > 80 ? `${first.slice(0, 79).trimEnd()}…` : first;
 }
 
 /** Fills fields added in later versions so older stored data keeps working. */

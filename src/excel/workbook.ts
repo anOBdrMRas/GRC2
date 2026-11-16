@@ -25,13 +25,14 @@ import {
   mandateStateLabel,
   now,
   parseElements,
-  residualScore,
-  riskScore,
+  riskTitle,
+  scoreOf,
   uid,
 } from '../logic';
 import { emptyDiagram } from '../bpmn/templates';
 import { t, useLang } from '../i18n';
 import {
+  RISK_ACTION_COLS,
   columnsOf,
   exportSheetName,
   findingCols,
@@ -166,10 +167,14 @@ function entitySpec(kind: EntityKind, d: Data, lk: Lookup): SheetSpec {
     const rec = e as unknown as Record<string, unknown>;
     return cols.map((c) => {
       if (c.key === '#state') return t(mandateStateLabel[mandateState(e as Mandate)]);
-      if (c.key.startsWith('#gross') || c.key.startsWith('#net')) {
-        const r = e as Risk;
-        const score = c.key.startsWith('#gross') ? riskScore(r.likelihood, r.impact) : residualScore(r);
-        return c.key.endsWith('Score') ? score : isHighRisk(score) ? t('Ja') : t('Nein');
+      if (c.key === '#score' || c.key === '#high') {
+        const score = scoreOf(e as Risk);
+        return c.key === '#score' ? score : isHighRisk(score) ? t('Ja') : t('Nein');
+      }
+      const a = c.key.match(/^actions\[(\d+)\]\.(text|ownerUserId)$/);
+      if (a) {
+        const act = (e as Risk).actions[Number(a[1])];
+        return act ? toCell(c, act[a[2] as 'text' | 'ownerUserId'], lk) : null;
       }
       const m = c.key.match(/^roles\[(\d)\]\.(roleId|comment)$/);
       if (m) {
@@ -439,6 +444,16 @@ export async function importExcel(file: ArrayBuffer, d: Data, only?: EntityKind 
       const existing = code && list.find((e) => e.code.toLowerCase() === code.toLowerCase());
       if (existing) ids.push(existing.id);
       else {
+        // risk IDs are always assigned by the system
+        if (code && s.kind === 'risk') {
+          messages.push({
+            sheet: s.ws.name,
+            row: rowNo,
+            text: t('Risk-ID {id} gibt es nicht – das Risiko wird neu angelegt und bekommt eine neue ID.', { id: code }),
+            level: 'warn',
+          });
+          code = '';
+        }
         if (!code) code = nextCodeOf(list, prefix);
         const id = s.kind === 'user' && /^U-\d+$/.test(code) && !list.some((e) => e.id === code) ? code : uid();
         list.push({ id, code, title: '' } as never);
@@ -489,6 +504,8 @@ export async function importExcel(file: ArrayBuffer, d: Data, only?: EntityKind 
       const fields: Record<string, unknown> = {};
       const roles: { roleId: string; comment: string }[] = [];
       let rolesTouched = false;
+      const actions: { text: string; ownerUserId: string }[] = [];
+      let actionsTouched = false;
       for (const c of s.cols) {
         if (!s.colIndex.has(c.key) || c.kind === 'computed') continue;
         const raw = get(c);
@@ -501,6 +518,13 @@ export async function importExcel(file: ArrayBuffer, d: Data, only?: EntityKind 
         }
         const v = fromCell(c, raw, lk, warn);
         if (v === undefined) continue;
+        const a = c.key.match(/^actions\[(\d+)\]\.(text|ownerUserId)$/);
+        if (a) {
+          actionsTouched = true;
+          const idx = Number(a[1]);
+          actions[idx] = { text: actions[idx]?.text ?? '', ownerUserId: actions[idx]?.ownerUserId ?? '', [a[2]]: v as string };
+          continue;
+        }
         const m = c.key.match(/^roles\[(\d)\]\.(roleId|comment)$/);
         if (m) {
           rolesTouched = true;
@@ -520,7 +544,15 @@ export async function importExcel(file: ArrayBuffer, d: Data, only?: EntityKind 
         fields[c.key] = v;
       }
       if (rolesTouched) fields.roles = roles.filter((r) => r && r.roleId);
-      if (fields.code === '' || fields.code === undefined) fields.code = lk.codeOf(kind, id) || (old?.code as string);
+      if (actionsTouched)
+        // actions beyond the Excel columns stay as they are
+        fields.actions = [
+          ...actions.filter((x) => x && (x.text.trim() || x.ownerUserId)),
+          ...(((old?.actions as unknown[]) ?? []).slice(RISK_ACTION_COLS) as { text: string; ownerUserId: string }[]),
+        ];
+      if (kind === 'risk' && typeof fields.description === 'string' && fields.description.trim()) fields.title = riskTitle(fields.description);
+      // risk IDs come from the system (pass 1), never from the file
+      if (kind === 'risk' || fields.code === '' || fields.code === undefined) fields.code = lk.codeOf(kind, id) || (old?.code as string);
       if (old) {
         const changed = Object.keys(fields).some((k) => !same(fields[k], old[k]));
         if (changed) {

@@ -15,9 +15,8 @@ import {
   kpiStatus,
   mandateState,
   positionHolders,
-  residualScore,
   riskLevel,
-  riskScore,
+  scoreOf,
   roleHolders,
 } from '../logic';
 import { Field } from './Fields';
@@ -53,27 +52,16 @@ function useColumns(kind: EntityKind): Column[] {
       return [
         { label: 'Bereich / Funktion', render: (e) => (e as Risk).department || '–', sort: (e) => (e as Risk).department },
         { label: 'Kategorie', render: (e) => t((e as Risk).category), sort: (e) => (e as Risk).category },
-        { label: 'Eigner', render: (e) => roleName((e as Risk).ownerRoleId) },
+        { label: 'Risikoeigner', render: (e) => org.user.find((u) => u.id === (e as Risk).ownerUserId)?.title ?? <span className="warn">–</span> },
         {
-          label: 'Brutto',
-          render: (e) => {
-            const s = riskScore((e as Risk).likelihood, (e as Risk).impact);
-            return <LevelBadge level={riskLevel(s)} score={s} />;
-          },
-          sort: (e) => -riskScore((e as Risk).likelihood, (e as Risk).impact),
-        },
-        {
-          label: 'Netto',
-          render: (e) => {
-            const s = residualScore(e as Risk);
-            return <LevelBadge level={riskLevel(s)} score={s} />;
-          },
-          sort: (e) => -residualScore(e as Risk),
+          label: 'Score',
+          render: (e) => <LevelBadge level={riskLevel(scoreOf(e as Risk))} score={scoreOf(e as Risk)} />,
+          sort: (e) => -scoreOf(e as Risk),
         },
         {
           label: 'Höheres Risiko',
-          render: (e) => (isHighRisk(riskScore((e as Risk).likelihood, (e as Risk).impact)) ? <b className="warn">{t('Ja')}</b> : t('Nein')),
-          sort: (e) => (isHighRisk(riskScore((e as Risk).likelihood, (e as Risk).impact)) ? 0 : 1),
+          render: (e) => (isHighRisk(scoreOf(e as Risk)) ? <b className="warn">{t('Ja')}</b> : t('Nein')),
+          sort: (e) => (isHighRisk(scoreOf(e as Risk)) ? 0 : 1),
         },
         { label: 'Controls', render: (e) => controls.filter((c) => c.mitigatesRiskIds.includes(e.id)).length || <span className="warn">0</span> },
         { label: 'Status', render: (e) => t((e as Risk).status) },
@@ -223,7 +211,6 @@ export function EntityModule({ kind }: { kind: EntityKind }) {
   const select = useUi((s) => s.select);
   const columns = useColumns(kind);
   const [q, setQ] = useState('');
-  const [heatMode, setHeatMode] = useState<'gross' | 'net'>('gross');
   const [heatCell, setHeatCell] = useState<string | null>(null);
   const [sortCol, setSortCol] = useState<number | null>(null);
   const [roleType, setRoleType] = useState<string>('');
@@ -245,8 +232,7 @@ export function EntityModule({ kind }: { kind: EntityKind }) {
     if (kind === 'risk' && heatCell) {
       list = list.filter((e) => {
         const r = e as Risk;
-        const key = heatMode === 'gross' ? `${r.likelihood}-${r.impact}` : `${r.residualLikelihood}-${r.residualImpact}`;
-        return key === heatCell;
+        return `${r.likelihood}-${r.impact}` === heatCell;
       });
     }
     if (kind === 'risk' && riskDept) list = list.filter((e) => (e as Risk).department === riskDept);
@@ -257,7 +243,7 @@ export function EntityModule({ kind }: { kind: EntityKind }) {
     const sorter = sortCol !== null ? columns[sortCol].sort : undefined;
     if (sorter) list = [...list].sort((a, b) => (sorter(a) < sorter(b) ? -1 : sorter(a) > sorter(b) ? 1 : 0));
     return list;
-  }, [items, q, kind, heatCell, heatMode, sortCol, columns, roleType, mandatoryOnly, auditType, mineOnly, isOwnerOf, riskDept]);
+  }, [items, q, kind, heatCell, sortCol, columns, roleType, mandatoryOnly, auditType, mineOnly, isOwnerOf, riskDept]);
 
   const selected = items.find((e) => e.id === selectedId);
   if (!canRead(kind)) return <Empty>{t('Ihre Systemrollen erlauben keinen Zugriff auf {name}.', { name: t(def.plural) })}</Empty>;
@@ -356,16 +342,8 @@ export function EntityModule({ kind }: { kind: EntityKind }) {
           <div className="card heat-card">
             <div className="row space">
               <strong>{t('Risikomatrix')}</strong>
-              <div className="seg">
-                <button className={heatMode === 'gross' ? 'active' : ''} onClick={() => setHeatMode('gross')}>
-                  {t('Brutto')}
-                </button>
-                <button className={heatMode === 'net' ? 'active' : ''} onClick={() => setHeatMode('net')}>
-                  {t('Netto')}
-                </button>
-              </div>
             </div>
-            <Heatmap risks={items as Risk[]} mode={heatMode} selected={heatCell} onSelect={setHeatCell} />
+            <Heatmap risks={items as Risk[]} selected={heatCell} onSelect={setHeatCell} />
           </div>
         )}
         {kind === 'risk' && (
@@ -386,7 +364,7 @@ export function EntityModule({ kind }: { kind: EntityKind }) {
             <thead>
               <tr>
                 <th>ID</th>
-                <th>{t('Bezeichnung')}</th>
+                <th>{t(kind === 'risk' ? 'Risiko' : 'Bezeichnung')}</th>
                 {columns.map((c, i) => (
                   <th key={c.label} className={c.sort ? 'sortable' : ''} onClick={() => c.sort && setSortCol(sortCol === i ? null : i)}>
                     {t(c.label)}
@@ -478,7 +456,7 @@ function EntityEditor({ kind, entity }: { kind: EntityKind; entity: AnyEntity })
         <PositionInsights position={entity as Position} part="warnings" />
       ) : kind === 'mandate' ? (
         <MandateInsights mandate={entity as Mandate} />
-      ) : (
+      ) : kind === 'risk' ? null : (
         <Insights kind={kind} entity={entity} />
       )}
       <fieldset className="plain" disabled={!editable}>
@@ -506,6 +484,8 @@ function EntityEditor({ kind, entity }: { kind: EntityKind; entity: AnyEntity })
           </fieldset>
         ))}
       </fieldset>
+      {/* risks: usage in process steps, mitigating controls and audit findings below the form */}
+      {kind === 'risk' && <Insights kind={kind} entity={entity} />}
       {kind === 'role' && <RoleInsights role={entity as Role} part="derived" />}
       {kind === 'position' && <PositionInsights position={entity as Position} part="derived" />}
       <div className="muted small">

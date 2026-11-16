@@ -1,7 +1,16 @@
 // Declarative field definitions that drive the generic module editors.
 import { mandateTypes, type EntityKind } from './types';
 import { orgUnits } from './logic';
-import { assessmentReasons, consequenceTypes, impactNames, likelihoodLevels, riskCategories, riskDepartments, treatmentOptions } from './riskScale';
+import {
+  assessmentReasons,
+  consequenceTypes,
+  impactNames,
+  likelihoodLevels,
+  riskCategories,
+  riskDepartments,
+  riskEntities,
+  treatmentOptions,
+} from './riskScale';
 
 export const auditTypes = ['Internes Audit', 'Zertifizierungsaudit', 'Systemaudit', 'Kundenaudit', 'Lieferantenaudit'];
 export const auditStatuses = ['Geplant', 'In Vorbereitung', 'Durchgeführt', 'Bericht erstellt', 'Maßnahmen offen', 'Abgeschlossen', 'Abgesagt'];
@@ -19,6 +28,7 @@ export type FieldType =
   | 'scale' // 1..max (default 5)
   | 'riskEval' // read-only: score, level and "higher risk" (key '#gross' or '#net')
   | 'riskGuide' // button: opens the assessment scale
+  | 'riskActions' // treatment actions with responsible person (repeatable)
   | 'ref' // single reference to another entity
   | 'refs' // multiple references
   | 'iso' // ISO clause references
@@ -88,8 +98,7 @@ export const modules: Record<EntityKind, ModuleDef> = {
       {
         title: '1 Identifizieren',
         fields: [
-          { key: 'code', label: 'ID', type: 'text' },
-          { key: 'title', label: 'Bezeichnung', type: 'text' },
+          { key: 'code', label: 'Risk-ID', type: 'readonly', hint: 'wird automatisch vergeben' },
           { key: 'department', label: 'Bereich / Funktion', type: 'select', options: ['', ...riskDepartments] },
           { key: 'category', label: 'Risikokategorie', type: 'select', options: riskCategories },
           { key: 'activity', label: 'Aktivität, Prozess, Produkt oder Service', type: 'text', wide: true },
@@ -101,12 +110,10 @@ export const modules: Record<EntityKind, ModuleDef> = {
             hint: 'Gesetz, Vertrag, Kundenanforderung, Kodex · ISO 37301 4.5',
             wide: true,
           },
-          { key: 'description', label: 'Risikobeschreibung', type: 'textarea', wide: true },
-          { key: 'cause', label: 'Ursache', type: 'textarea' },
-          { key: 'consequence', label: 'Auswirkung', type: 'textarea' },
-          { key: 'ownerRoleId', label: 'Risikoeigner', type: 'ref', refKind: 'role', hint: 'ISO 27001 6.1.2 c) 2)' },
+          { key: 'description', label: 'Risikobeschreibung', type: 'textarea', wide: true, hint: 'der erste Satz erscheint in Listen' },
+          { key: 'cause', label: 'Ursache und Auswirkung', type: 'textarea', wide: true },
+          { key: 'ownerUserId', label: 'Risikoeigner', type: 'ref', refKind: 'user', hint: 'ISO 27001 6.1.2 c) 2)' },
           { key: 'status', label: 'Status', type: 'select', options: ['Identifiziert', 'Bewertet', 'In Behandlung', 'Akzeptiert', 'Geschlossen'] },
-          { key: 'assessmentReason', label: 'Anlass der Bewertung', type: 'select', options: ['', ...assessmentReasons], hint: 'ISO 37301 A.4.6' },
         ],
       },
       {
@@ -129,24 +136,19 @@ export const modules: Record<EntityKind, ModuleDef> = {
       },
       {
         title: '3 Bewerten',
-        fields: [{ key: '#gross', label: 'Risiko-Score (brutto)', type: 'riskEval', wide: true }],
+        fields: [{ key: '#score', label: 'Risiko-Score', type: 'riskEval', wide: true }],
       },
       {
         title: '4 Behandeln',
         fields: [
           { key: 'treatment', label: 'Behandlungsoption', type: 'select', options: treatmentOptions, hint: 'ISO 27001 6.1.3' },
-          { key: 'actionOwnerUserId', label: 'Maßnahmenverantwortliche/r', type: 'ref', refKind: 'user' },
-          { key: 'treatmentPlan', label: 'Behandlungsmaßnahmen', type: 'textarea', wide: true },
-          { key: 'residualLikelihood', label: 'Rest-Wahrscheinlichkeit', type: 'scale', max: 4, levels: likelihoodLevels.map(([n]) => n) },
-          { key: 'residualImpact', label: 'Rest-Ausmaß', type: 'scale', max: 4, levels: impactNames },
-          { key: '#net', label: 'Restrisiko (netto)', type: 'riskEval', wide: true },
-          { key: 'acceptedBy', label: 'Restrisiko akzeptiert von', type: 'text', hint: 'ISO 27001 6.1.3 f)' },
-          { key: 'acceptedAt', label: 'Akzeptiert am', type: 'date' },
+          { key: 'actions', label: 'Behandlungsmaßnahmen', type: 'riskActions', wide: true, hint: 'je Maßnahme ein/e Verantwortliche/r' },
         ],
       },
       {
         title: '5 Überwachen',
         fields: [
+          { key: 'assessmentReason', label: 'Anlass der Bewertung', type: 'select', options: ['', ...assessmentReasons], hint: 'ISO 37301 A.4.6' },
           { key: 'lastAssessment', label: 'Bewertungsdatum', type: 'date' },
           { key: 'nextReview', label: 'Nächste Überprüfung', type: 'date', hint: 'Regelintervall 12 Monate' },
           { key: 'reviewNote', label: 'Kommentar / Review-Notiz', type: 'textarea', wide: true },
@@ -163,7 +165,7 @@ export const modules: Record<EntityKind, ModuleDef> = {
       {
         title: 'Herkunft',
         fields: [
-          { key: 'entity', label: 'Gesellschaft', type: 'text' },
+          { key: 'entity', label: 'Entity', type: 'select', options: ['', ...riskEntities] },
           { key: 'sourceRef', label: 'Quellenangabe', type: 'text', hint: 'z. B. Workshop-Protokoll, Auditbericht, Hinweis' },
         ],
       },

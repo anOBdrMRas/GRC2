@@ -15,7 +15,7 @@ import {
   positionHolders,
   positionSodConflicts,
   isHighRisk,
-  residualScore,
+  scoreOf,
   riskLevel,
   roleHolders,
   today,
@@ -35,7 +35,7 @@ function useCockpit() {
   const now = today();
 
   const risksWithoutControl = store.risk.filter((r) => !store.control.some((c) => c.mitigatesRiskIds.includes(r.id)));
-  const highResidual = store.risk.filter((r) => isHighRisk(residualScore(r)));
+  const highRisks = store.risk.filter((r) => isHighRisk(scoreOf(r)));
   const weakControls = store.control.filter((c) => c.operatingEffectiveness !== 'Wirksam');
   const overdue = [
     ...store.risk.filter((r) => r.nextReview && r.nextReview < now).map((r) => ({ kind: 'risk' as EntityKind, e: r })),
@@ -98,7 +98,7 @@ function useCockpit() {
     openStep,
     now,
     risksWithoutControl,
-    highResidual,
+    highRisks,
     weakControls,
     overdue,
     steps,
@@ -142,16 +142,33 @@ export function CockpitStats() {
 /** Risk matrices, ICS effectiveness, role coverage, KPI traffic lights, audit findings. */
 export function CockpitCharts() {
   const { store, go, coverage, effectiveness, openFindings, overdueFindings } = useCockpit();
+  const byDepartment = [...new Set(store.risk.map((r) => r.department || t('ohne Bereich')))]
+    .map((dept) => {
+      const rs = store.risk.filter((r) => (r.department || t('ohne Bereich')) === dept);
+      return { dept, n: rs.length, high: rs.filter((r) => isHighRisk(scoreOf(r))).length };
+    })
+    .sort((a, b) => b.high - a.high || b.n - a.n);
+  const maxDept = Math.max(1, ...byDepartment.map((d) => d.n));
   return (
     <>
       <div className="dash-grid">
         <div className="card">
-          <h3>{t('Risikomatrix brutto')}</h3>
-          <Heatmap risks={store.risk} mode="gross" onSelect={() => go('risk')} />
+          <h3>{t('Risikomatrix')}</h3>
+          <Heatmap risks={store.risk} onSelect={() => go('risk')} />
         </div>
         <div className="card">
-          <h3>{t('Risikomatrix netto')}</h3>
-          <Heatmap risks={store.risk} mode="net" onSelect={() => go('risk')} />
+          <h3>{t('Risiken je Bereich')}</h3>
+          {byDepartment.length === 0 && <div className="muted small">{t('Keine Risiken erfasst.')}</div>}
+          {byDepartment.map(({ dept, n, high }) => (
+            <div key={dept} className="bar-row" title={t('{n} davon höhere Risiken (> 8)', { n: high })}>
+              <span className="bar-label">{dept}</span>
+              <span className="bar">
+                <span className="bar-fill dept-high" style={{ width: `${(high / maxDept) * 100}%` }} />
+                <span className="bar-fill dept-other" style={{ width: `${((n - high) / maxDept) * 100}%` }} />
+              </span>
+              <span className="bar-num">{n}</span>
+            </div>
+          ))}
         </div>
         <div className="card">
           <h3>{t('IKS – operative Wirksamkeit')}</h3>
@@ -225,7 +242,7 @@ export function CockpitActions() {
     go,
     openStep,
     risksWithoutControl,
-    highResidual,
+    highRisks,
     weakControls,
     overdue,
     withoutRole,
@@ -246,10 +263,10 @@ export function CockpitActions() {
             </div>
           ))}
         </Finding>
-        <Finding title="Hohe Restrisiken (> 8)" count={highResidual.length}>
-          {highResidual.map((r) => (
+        <Finding title="Höhere Risiken (> 8)" count={highRisks.length}>
+          {highRisks.map((r) => (
             <div key={r.id} className="link small row gap-s" onClick={() => go('risk', r.id)}>
-              <LevelBadge level={riskLevel(residualScore(r))} score={residualScore(r)} /> {r.code} {r.title}
+              <LevelBadge level={riskLevel(scoreOf(r))} score={scoreOf(r)} /> {r.code} {r.title}
             </div>
           ))}
         </Finding>

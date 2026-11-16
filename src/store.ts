@@ -11,9 +11,12 @@ import {
   normalizeRole,
   normalizeUser,
   now,
+  riskTitle,
   roleHolders,
   uid,
 } from './logic';
+import { riskEntities } from './riskScale';
+import { t } from './i18n';
 import { modules } from './schema';
 import { seedData } from './seed';
 import { migrateSystemRoles } from './permissions';
@@ -112,6 +115,8 @@ export const useStore = create<State>()(
               [kind]: (s[kind] as EntityMap[typeof kind][]).map((e) => {
                 if (e.id !== id) return e;
                 const next = { ...e, ...patch, updatedAt: now() };
+                // risks have no title field: lists show the first sentence of the description
+                if (kind === 'risk' && 'description' in patch) next.title = riskTitle(String(next.description ?? '')) || next.title;
                 return kind === 'role' || kind === 'position' ? reopenIfReleased(next as WfItem, s, patch) : next;
               }),
             }) as Partial<State>,
@@ -152,7 +157,11 @@ export const useStore = create<State>()(
               mandate,
               user: s.user.filter((u) => u.id !== id),
               role: s.role.map((r) => ({ ...r, roleOwnerUserId: clear(r.roleOwnerUserId) })),
-              risk: s.risk.map((r) => (r.actionOwnerUserId === id ? { ...r, actionOwnerUserId: '' } : r)),
+              risk: s.risk.map((r) =>
+                r.ownerUserId === id || r.actions.some((a) => a.ownerUserId === id)
+                  ? { ...r, ownerUserId: clear(r.ownerUserId), actions: r.actions.map((a) => ({ ...a, ownerUserId: clear(a.ownerUserId) })) }
+                  : r,
+              ),
             };
           }
           // Remove the entity and all references to it.
@@ -297,7 +306,7 @@ export const useStore = create<State>()(
     }),
     {
       name: 'grc-prototype-v1',
-      version: 8,
+      version: 9,
       // v1 had no users and free-text role holders
       migrate: (persisted) => ({ ...normalizeData(persisted as Partial<State>), loggedIn: false }),
       onRehydrateStorage: () => (_state, error) => {
@@ -360,47 +369,83 @@ function normalizeData(data: Partial<State>): Partial<State> {
       : migrateMandates(data.role ?? [], { role: roles, position: positions, user: users }, seed.mandate)
     ).map((m: Partial<Mandate>) => normalizeMandate(m)),
     // v8: risk register fields and 4×4 matrix
-    risk: (data.risk ?? seed.risk).map((r) => normalizeRisk(r, seed.risk)),
+    risk: (data.risk ?? seed.risk).map((r) => normalizeRisk(r, seed.risk, { role: roles, position: positions, user: users })),
     // v3 added audits: older data gets the demo audits
     audit: (data.audit ?? seed.audit).map((a: Partial<Audit>) => normalizeAudit(a)),
     currentUserId: data.currentUserId && users.some((u) => u.id === data.currentUserId) ? data.currentUserId : (users[0]?.id ?? ''),
   };
 }
 
+/** fields of risks before v9 */
+type LegacyRisk = Partial<Risk> & {
+  consequence?: string;
+  ownerRoleId?: string;
+  treatmentPlan?: string;
+  actionOwnerUserId?: string;
+  residualLikelihood?: number;
+  residualImpact?: number;
+  acceptedBy?: string;
+  acceptedAt?: string;
+};
+
 /**
- * v8: risks follow the Risk Register template. Data from before (no `department` field yet) is moved
- * from the 5-level to the 4-level scale (5 → 4) once; demo risks get their register details.
+ * Brings a stored risk to the Risk Register shape.
+ * - v8 (no `department` yet): 5-level scale → 4 levels (5 → 4), demo risks get their register details.
+ * - v9: no title field (first sentence of the description), cause and consequence in one field, a person as risk owner
+ *   (first holder of the former owner role), treatment actions with responsible persons, no residual risk, entity code.
  */
-export function normalizeRisk(r: Partial<Risk>, demo: Risk[] = []): Risk {
-  // (inside the function: the store hydrates while this module is still initialising)
-  const registerFields = [
-    'department',
-    'activity',
-    'processIds',
-    'assessmentReason',
-    'consequenceType',
-    'likelihoodReason',
-    'impactReason',
-    'actionOwnerUserId',
-    'reviewNote',
-    'entity',
-    'sourceRef',
-  ] as const;
-  const legacy = r.department === undefined;
-  const to4 = (v: unknown) => Math.min(4, Math.max(1, Math.round(Number(v) || 1)));
+export function normalizeRisk(raw: LegacyRisk, demo: Risk[] = [], org?: { role: Role[]; position: Position[]; user: User[] }): Risk {
+  const r: LegacyRisk = { ...raw };
   const base = blankEntity('risk', r.code ?? '', r.title ?? '');
-  const d = legacy ? demo.find((x) => x.id === r.id) : undefined;
-  const fromDemo = d ? Object.fromEntries(registerFields.map((k) => [k, d[k]])) : {};
-  const out = { ...base, ...fromDemo, ...r } as Risk;
-  for (const k of registerFields) if (out[k] === undefined) (out as unknown as Record<string, unknown>)[k] = base[k];
-  if (!Array.isArray(out.processIds)) out.processIds = [];
-  if (legacy) {
-    out.likelihood = to4(out.likelihood);
-    out.impact = to4(out.impact);
-    out.residualLikelihood = to4(out.residualLikelihood);
-    out.residualImpact = to4(out.residualImpact);
-    if (out.category === 'Datenschutz') out.category = 'Compliance';
+  const d = demo.find((x) => x.id === r.id);
+  const to4 = (v: unknown) => Math.min(4, Math.max(1, Math.round(Number(v) || 1)));
+  if (r.department === undefined) {
+    // v7 → v8
+    r.likelihood = to4(r.likelihood);
+    r.impact = to4(r.impact);
+    if (r.category === 'Datenschutz') r.category = 'Compliance';
+    if (d)
+      for (const k of ['department', 'activity', 'processIds', 'consequenceType', 'likelihoodReason', 'impactReason', 'sourceRef'] as const)
+        (r as Record<string, unknown>)[k] = d[k];
   }
+  const legacy = 'consequence' in r || 'ownerRoleId' in r || 'treatmentPlan' in r || 'residualLikelihood' in r;
+  if (legacy) {
+    // v8 → v9
+    if (r.consequence?.trim())
+      r.cause = r.cause?.trim() ? `${r.cause.trim()}\n${t('Auswirkung')}: ${r.consequence.trim()}` : `${t('Auswirkung')}: ${r.consequence.trim()}`;
+    if (!r.ownerUserId && r.ownerRoleId && org) {
+      const role = org.role.find((x) => x.id === r.ownerRoleId);
+      r.ownerUserId = (role && roleHolders(role, org)[0]?.user.id) || '';
+    }
+    if (!r.ownerUserId && d) r.ownerUserId = d.ownerUserId;
+    if (!r.actions) {
+      r.actions = r.treatmentPlan?.trim()
+        ? [{ text: r.treatmentPlan.trim(), ownerUserId: r.actionOwnerUserId ?? '' }]
+        : d && !r.treatmentPlan
+          ? d.actions
+          : [];
+    }
+    if (!r.description?.trim()) r.description = d && r.title === d.title ? d.description : (r.title ?? '');
+    if (r.entity && !riskEntities.includes(r.entity)) {
+      if (r.entity !== 'Muster GmbH') r.reviewNote = [r.reviewNote, `${t('Gesellschaft bisher')}: ${r.entity}`].filter(Boolean).join('\n');
+      r.entity = d?.entity ?? '';
+    }
+    for (const k of [
+      'consequence',
+      'ownerRoleId',
+      'treatmentPlan',
+      'actionOwnerUserId',
+      'residualLikelihood',
+      'residualImpact',
+      'acceptedBy',
+      'acceptedAt',
+    ])
+      delete (r as Record<string, unknown>)[k];
+  }
+  const out = { ...base, ...r } as Risk;
+  if (!Array.isArray(out.processIds)) out.processIds = [];
+  if (!Array.isArray(out.actions)) out.actions = [];
+  out.title = riskTitle(out.description) || out.title;
   return out;
 }
 

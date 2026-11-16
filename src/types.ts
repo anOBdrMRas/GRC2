@@ -15,38 +15,41 @@ export interface BaseEntity {
 }
 
 /** ISO 9001 6.1 · ISO/IEC 27001 6.1.2 / 8.2 · ISO 37301 4.6 */
+/** treatment action of a risk (later: link to a Jira ticket) */
+export interface RiskAction {
+  text: string;
+  ownerUserId: string;
+}
+
+/**
+ * Risk Register (ISO 37301 4.6). `title` is not entered: it is the first sentence of the description (list label).
+ * `cause` holds cause and consequence together.
+ */
 export interface Risk extends BaseEntity {
-  category: string;
-  cause: string;
-  consequence: string;
-  affectedAssets: string;
-  protectionGoals: string[]; // C / I / A
-  complianceObligation: string;
-  interestedParties: string;
-  ownerRoleId: string;
-  likelihood: number; // 1..4 gross
-  impact: number; // 1..4 gross
-  treatment: string;
-  treatmentPlan: string;
-  /** Risk Register (ISO 37301 4.6): department / function, activity, linked processes */
   department: string;
+  category: string;
   activity: string;
   processIds: string[];
-  assessmentReason: string;
-  consequenceType: string;
-  likelihoodReason: string;
-  impactReason: string;
-  actionOwnerUserId: string;
-  reviewNote: string;
-  entity: string;
-  sourceRef: string;
-  residualLikelihood: number;
-  residualImpact: number;
-  acceptedBy: string;
-  acceptedAt: string;
+  complianceObligation: string;
+  cause: string;
+  ownerUserId: string;
   status: string;
+  consequenceType: string;
+  likelihood: number; // 1..4
+  likelihoodReason: string;
+  impact: number; // 1..4
+  impactReason: string;
+  treatment: string;
+  actions: RiskAction[];
+  assessmentReason: string;
   lastAssessment: string;
   nextReview: string;
+  reviewNote: string;
+  affectedAssets: string;
+  protectionGoals: string[]; // C / I / A
+  interestedParties: string;
+  entity: string;
+  sourceRef: string;
   isoRefs: string[];
 }
 

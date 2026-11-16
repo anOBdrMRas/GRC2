@@ -4,6 +4,9 @@ import { modules, type FieldDef } from '../schema';
 import { t } from '../i18n';
 import { en } from '../i18n.en';
 
+/** treatment actions per risk in the Excel sheet (more are kept on import) */
+export const RISK_ACTION_COLS = 6;
+
 export type ColKind = 'id' | 'text' | 'long' | 'number' | 'date' | 'bool' | 'select' | 'ref' | 'refs' | 'iso' | 'annex' | 'sysroles' | 'computed';
 
 export interface Col {
@@ -31,11 +34,33 @@ const widthOf = (k: ColKind) =>
 
 function fieldCols(f: FieldDef, section: string): Col[] {
   const c = (k: ColKind, extra: Partial<Col> = {}): Col[] => [
-    { key: f.key, label: f.label, section, kind: k, hint: f.hint, width: widthOf(k), required: f.key === 'code' || f.key === 'title', ...extra },
+    {
+      key: f.key,
+      label: f.label,
+      section,
+      kind: k,
+      hint: f.hint,
+      width: widthOf(k),
+      required: (f.key === 'code' && f.type !== 'readonly') || f.key === 'title',
+      ...extra,
+    },
   ];
   switch (f.type) {
     case 'readonly':
-      return f.key === 'code' ? c('id') : [];
+      return f.key === 'code' ? c('id', { hint: f.hint }) : [];
+    case 'riskActions':
+      return Array.from({ length: RISK_ACTION_COLS }, (_, k) => k + 1).flatMap((i) => [
+        { key: `actions[${i - 1}].text`, label: 'Maßnahme {i}', vars: { i }, section, kind: 'long' as ColKind, width: 34 },
+        {
+          key: `actions[${i - 1}].ownerUserId`,
+          label: 'Verantwortlich für Maßnahme {i}',
+          vars: { i },
+          section,
+          kind: 'ref' as ColKind,
+          refKind: 'user' as EntityKind,
+          width: 22,
+        },
+      ]);
     case 'text':
       return f.key === 'code' ? c('id') : c('text');
     case 'textarea':
@@ -103,14 +128,9 @@ export function columnsOf(kind: EntityKind): Col[] {
   cols.sort((a, b) => (a.kind === 'id' ? -1 : 0) - (b.kind === 'id' ? -1 : 0));
   if (kind === 'risk')
     cols.push(
-      ...(['#grossScore', '#grossHigh', '#netScore', '#netHigh'] as const).map((key) => ({
+      ...(['#score', '#high'] as const).map((key) => ({
         key,
-        label: {
-          '#grossScore': 'Risiko-Score (brutto)',
-          '#grossHigh': 'Höheres Risiko? (brutto)',
-          '#netScore': 'Restrisiko-Score (netto)',
-          '#netHigh': 'Höheres Risiko? (netto)',
-        }[key],
+        label: { '#score': 'Risiko-Score', '#high': 'Höheres Risiko?' }[key],
         section: 'Ergebnis (berechnet)',
         kind: 'computed' as ColKind,
         width: 14,
