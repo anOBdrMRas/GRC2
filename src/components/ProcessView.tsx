@@ -10,6 +10,7 @@ import { ConfirmButton, Empty, StatusPill, download } from './common';
 import { openFindingsByElement } from './AuditViews';
 import { useRights } from '../useRights';
 import { AiProcessDraft } from './AiDraft';
+import { ExcelTools } from './ExcelTools';
 import { t } from '../i18n';
 
 const categories: ProcessModel['category'][] = ['Führungsprozess', 'Kernprozess', 'Unterstützungsprozess'];
@@ -49,6 +50,7 @@ export function ProcessView() {
             </button>
             <button onClick={() => setDraftOpen(true)}>✨ {t('Mit KI entwerfen')}</button>
             <button onClick={() => fileInput.current?.click()}>{t('BPMN importieren')}</button>
+            <ExcelTools scope="processes" compact />
             <input
               ref={fileInput}
               type="file"

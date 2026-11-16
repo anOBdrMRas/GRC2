@@ -48,7 +48,7 @@ interface State extends Collections {
   resetDemo: () => void;
 }
 
-function nextCode(items: { code: string }[], prefix: string) {
+export function nextCode(items: { code: string }[], prefix: string) {
   const max = items.reduce((m, i) => {
     const n = parseInt(i.code.replace(/\D+/g, ''), 10);
     return Number.isFinite(n) ? Math.max(m, n) : m;

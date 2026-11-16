@@ -2105,3 +2105,26 @@ table.program tbody tr:hover {
 .process-list > .row.gap button {
   white-space: nowrap;
 }
+
+/* ---------- Excel import preview ---------- */
+.modal.import-preview {
+  width: min(860px, calc(100vw - 32px));
+  max-height: calc(100vh - 60px);
+  overflow: auto;
+  display: grid;
+  gap: 10px;
+}
+.import-messages {
+  max-height: 260px;
+  overflow: auto;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 6px 8px;
+  display: grid;
+  gap: 2px;
+  background: #fffaf0;
+}
+.module-head .row.gap {
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}

@@ -78,6 +78,11 @@ BPMN-2.0-Prozessmodellierung und integrierten GRC-Modulen.
   - *KPI*: Ziel, Formel, Einheit, Ziel-/Warn-/Kritisch-Schwellen, Frequenz, Datenquelle,
     Messreihe mit Ampel und Verlauf
   - Jedes Element zeigt, in welchen Prozessschritten es verwendet wird (mit Sprung ins Modell)
+- **Excel-Import und -Export** (nur Administratoren): je Modul über „⬇ Excel“ / „⬆ Excel“ und für alle Module
+  in der Seitenleiste. Spalten werden aus dem Modulschema erzeugt (Abschnitte, Auswahllisten, Hinweise); Verweise
+  stehen als IDs, Personen als Namen; Messwerte, Audit-Feststellungen und Prozessschritte in eigenen Blättern.
+  Der Import erkennt Spalten auf Deutsch und Englisch (auch die Vorlagen in `docs/`), gleicht per ID ab und zeigt
+  vor dem Übernehmen eine Vorschau mit neu/geändert/unverändert und allen Hinweisen
 - **GRC-Cockpit**: Risikomatrizen, IKS-Wirksamkeit, Rollenabdeckung, KPI-Ampel und Handlungsbedarf
 
 Die Oberfläche lässt sich oben links zwischen Deutsch und Englisch umschalten (eingegebene Inhalte werden nicht übersetzt).

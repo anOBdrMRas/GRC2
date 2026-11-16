@@ -7,6 +7,8 @@ export interface ExportFile {
   filename: string;
   content: string;
   type: string;
+  /** binary file (e.g. Excel); content is then only a description */
+  blob?: Blob;
 }
 
 interface UiState {

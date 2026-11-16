@@ -10,6 +10,7 @@ import { Login } from './components/Login';
 import { Home } from './components/Home';
 import { ProcessLandscape } from './components/ProcessLandscape';
 import { AssistantChat } from './components/AssistantChat';
+import { ExcelTools } from './components/ExcelTools';
 import { ConfirmButton, Empty, ExportDialog, Notice, download } from './components/common';
 import { useRights } from './useRights';
 import { t, useLang } from './i18n';
@@ -109,10 +110,11 @@ export default function App() {
             ⏻ {t('Abmelden')}
           </button>
           <div className="muted small">ISO 9001 · ISO 27001 · ISO 37301</div>
-          <button onClick={exportAll}>{t('Daten exportieren')}</button>
           {isAdmin && (
             <>
-              <button onClick={() => fileInput.current?.click()}>{t('Daten importieren')}</button>
+              <ExcelTools scope="all" />
+              <button onClick={exportAll}>{t('Daten exportieren')} (JSON)</button>
+              <button onClick={() => fileInput.current?.click()}>{t('Daten importieren')} (JSON)</button>
               <ConfirmButton label={t('Demodaten laden')} confirmLabel={t('Alle Daten ersetzen?')} className="" onConfirm={resetDemo} />
             </>
           )}

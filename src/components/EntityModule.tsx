@@ -23,6 +23,7 @@ import { Field } from './Fields';
 import { ConfirmButton, Empty, LevelBadge, StatusPill, Tag, TrafficLight } from './common';
 import { useRights } from '../useRights';
 import { AiFieldSuggest, canSuggest } from './AiDraft';
+import { ExcelTools } from './ExcelTools';
 import { useSample } from '../ai';
 import { dateLocale, t } from '../i18n';
 import { systemRoleById } from '../permissions';
@@ -278,6 +279,7 @@ export function EntityModule({ kind }: { kind: EntityKind }) {
             <input type="checkbox" checked={mineOnly} onChange={(e) => setMineOnly(e.target.checked)} /> 🔑 {t('nur meine')}
           </label>
         )}
+        {!(kind === 'user' && userTab === 'matrix') && <ExcelTools scope={kind} compact />}
         {canEdit(kind) && !(kind === 'user' && userTab === 'matrix') && !(kind === 'audit' && auditTab !== 'audits') && (
           <button
             className="primary"

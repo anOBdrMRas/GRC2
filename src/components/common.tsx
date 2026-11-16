@@ -126,8 +126,13 @@ export function download(filename: string, content: string, type = 'application/
   useUi.getState().setExportFile({ filename, content, type });
 }
 
-function saveFile({ filename, content, type }: ExportFile) {
-  const url = URL.createObjectURL(new Blob([content], { type }));
+/** Offers a binary file (e.g. Excel) in the export dialog. */
+export function downloadBlob(filename: string, blob: Blob) {
+  useUi.getState().setExportFile({ filename, content: '', type: blob.type, blob });
+}
+
+function saveFile({ filename, content, type, blob }: ExportFile) {
+  const url = URL.createObjectURL(blob ?? new Blob([content], { type }));
   const a = document.createElement('a');
   a.href = url;
   a.download = filename;
@@ -153,18 +158,26 @@ export function ExportDialog() {
     <div className="modal-backdrop" onClick={() => close(null)}>
       <div className="modal" role="dialog" aria-label="Export" onClick={(e) => e.stopPropagation()}>
         <div className="row space">
-          <h3>{t('Export')}: {file.filename}</h3>
+          <h3>
+            {t('Export')}: {file.filename}
+          </h3>
           <button className="tag-x" onClick={() => close(null)} title={t('Schließen')}>
             ×
           </button>
         </div>
-        <p className="muted small">{t('Falls der Download in dieser Umgebung blockiert ist, den Inhalt kopieren und als Datei speichern.')}</p>
-        <textarea id="export-content" ref={area} readOnly rows={14} value={file.content} />
+        {file.blob ? (
+          <p className="muted small">{t('Die Excel-Datei ist erstellt ({size} KB).', { size: Math.max(1, Math.round(file.blob.size / 1024)) })}</p>
+        ) : (
+          <>
+            <p className="muted small">{t('Falls der Download in dieser Umgebung blockiert ist, den Inhalt kopieren und als Datei speichern.')}</p>
+            <textarea id="export-content" ref={area} readOnly rows={14} value={file.content} />
+          </>
+        )}
         <div className="row gap">
           <button className="primary" onClick={() => saveFile(file)}>
             {t('Herunterladen')}
           </button>
-          <button onClick={copy}>{copied ? t('Kopiert ✓') : t('In Zwischenablage kopieren')}</button>
+          {!file.blob && <button onClick={copy}>{copied ? t('Kopiert ✓') : t('In Zwischenablage kopieren')}</button>}
         </div>
       </div>
     </div>
@@ -186,7 +199,17 @@ export function Notice() {
 }
 
 /** Two-step button: the first click arms it, the second executes. Replaces window.confirm. */
-export function ConfirmButton({ label, confirmLabel, onConfirm, className = 'danger' }: { label: string; confirmLabel: string; onConfirm: () => void; className?: string }) {
+export function ConfirmButton({
+  label,
+  confirmLabel,
+  onConfirm,
+  className = 'danger',
+}: {
+  label: string;
+  confirmLabel: string;
+  onConfirm: () => void;
+  className?: string;
+}) {
   const [armed, setArmed] = useState(false);
   const timer = useRef<number>(undefined);
   return (
