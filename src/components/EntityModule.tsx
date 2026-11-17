@@ -3,6 +3,7 @@ import type { AnyEntity, Audit, Control, EntityKind, Kpi, Mandate, Opportunity, 
 import { MandateInsights, MandateStatePill, MandateWorkflowBar } from './MandateViews';
 import { PositionInsights, PositionProfile } from './OrgViews';
 import { auditTypes, modules } from '../schema';
+import { moduleDef } from '../contentConfig';
 import { useStore } from '../store';
 import { useUi } from '../ui';
 import {
@@ -421,11 +422,14 @@ export function EntityModule({ kind }: { kind: EntityKind }) {
 }
 
 function EntityEditor({ kind, entity }: { kind: EntityKind; entity: AnyEntity }) {
-  const def = modules[kind];
+  // module definition incl. custom fields and dropdown values of the content administration
+  const config = useStore((s) => s.config);
+  const def = useMemo(() => moduleDef(kind, config), [kind, config]);
   const update = useStore((s) => s.updateEntity);
   const remove = useStore((s) => s.deleteEntity);
   const select = useUi((s) => s.select);
-  const { canDelete, canEditEntity, canEditField, isOwnerOf, isRecorder, isAdmin } = useRights();
+  const { canDelete, canEditEntity, canEditField, isOwnerOf, isRecorder, canManage } = useRights();
+  const isAdmin = canManage(kind);
   // a changed draft of a released element: the released state can be shown next to it
   const [showReleased, setShowReleased] = useState(false);
   const snapshot = (entity as { released?: Record<string, unknown> }).released;

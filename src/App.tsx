@@ -8,6 +8,7 @@ import { OrgChart } from './components/OrgViews';
 import { Login } from './components/Login';
 import { Home } from './components/Home';
 import { IaCockpit } from './components/IaCockpit';
+import { ContentAdmin } from './components/ContentAdmin';
 import { AssistantChat } from './components/AssistantChat';
 import { ExcelTools } from './components/ExcelTools';
 import { ConfirmButton, Empty, ExportDialog, Notice, download } from './components/common';
@@ -33,7 +34,7 @@ const nav: { view: View; label: string; icon: string; color?: string }[] = [
 
 /** Rights module that governs a navigation entry. */
 const moduleOf = (v: View): ModuleKey => (v === 'orgchart' ? 'position' : (v as ModuleKey));
-const open = (v: View) => v === 'home' || v === 'ia';
+const open = (v: View) => v === 'home' || v === 'ia' || v === 'content';
 
 export default function App() {
   const view = useUi((s) => s.view);
@@ -53,10 +54,10 @@ export default function App() {
   if (!loggedIn || !user) return <Login key={lang} />;
 
   const exportAll = () => {
-    const { risk, opportunity, control, role, position, mandate, kpi, audit, user, processes } = useStore.getState();
+    const { risk, opportunity, control, role, position, mandate, kpi, audit, user, processes, config } = useStore.getState();
     download(
       `grc-export-${new Date().toISOString().slice(0, 10)}.json`,
-      JSON.stringify({ risk, opportunity, control, role, position, mandate, kpi, audit, user, processes }, null, 2),
+      JSON.stringify({ risk, opportunity, control, role, position, mandate, kpi, audit, user, processes, config }, null, 2),
       'application/json',
     );
   };
@@ -112,6 +113,8 @@ export default function App() {
               <button
                 key={n.view}
                 className={`nav-item ${view === n.view ? 'active' : ''}`}
+                title={n.view === 'home' ? t('Startseite') : undefined}
+                aria-label={n.view === 'home' ? t('Startseite') : undefined}
                 onClick={() => {
                   if (!mayLeave()) return;
                   // the process module always starts with the landscape
@@ -119,20 +122,27 @@ export default function App() {
                   go(n.view);
                 }}
               >
-                <span className="nav-icon" style={n.color ? { color: n.color } : undefined}>
-                  {n.icon}
-                </span>
-                {t(n.label)}
+                {/* only the start page has a symbol (house), all other entries are text */}
+                {n.view === 'home' ? <span className="nav-home">⌂</span> : t(n.label)}
               </button>
             ))}
           </div>
           {isAdmin && (
             <div className="menubar-data">
               <button className={`nav-item ${dataOpen ? 'active' : ''}`} aria-expanded={dataOpen} onClick={() => setDataOpen(!dataOpen)}>
-                ⋯ {t('Daten')}
+                ⚙ {t('Administration')}
               </button>
               {dataOpen && (
                 <div className="data-menu" onClick={(e) => e.stopPropagation()}>
+                  <button
+                    onClick={() => {
+                      setDataOpen(false);
+                      go('content');
+                    }}
+                  >
+                    ⚙ {t('Inhaltsverwaltung')}
+                  </button>
+                  <hr />
                   <ExcelTools scope="all" />
                   <button onClick={exportAll}>{t('Daten exportieren')} (JSON)</button>
                   <button onClick={() => fileInput.current?.click()}>{t('Daten importieren')} (JSON)</button>
@@ -163,6 +173,7 @@ export default function App() {
         <main className="main">
           {view === 'home' && <Home />}
           {view === 'ia' && canReview && <IaCockpit />}
+          {view === 'content' && isAdmin && <ContentAdmin />}
           {view === 'processes' && canRead('processes') && <ProcessView />}
           {view === 'orgchart' && canRead('position') && <OrgChart />}
           {!open(view) && !canRead(moduleOf(view)) && <Empty>{t('Ihre Systemrollen erlauben keinen Zugriff auf diesen Bereich.')}</Empty>}

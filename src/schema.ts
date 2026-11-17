@@ -83,6 +83,10 @@ export interface FieldDef {
   max?: number;
   /** scale: name of each level (tooltip), index 0 = level 1 */
   levels?: string[];
+  /** field added in the content administration: label shown as entered */
+  custom?: boolean;
+  /** option values entered in the content administration (not translated) */
+  plain?: string[];
 }
 
 export interface SectionDef {

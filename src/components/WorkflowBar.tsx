@@ -29,7 +29,8 @@ export function WorkflowBar({
 }) {
   const users = useStore((s) => s.user);
   const act = useStore((s) => s.workflowAction);
-  const { isAdmin, canReview, isOwnerOf, user } = useRights();
+  const { isAdmin, canReview, canManage, isOwnerOf, user } = useRights();
+  const mgr = canManage(kind);
   const [comment, setComment] = useState('');
   const [showHistory, setShowHistory] = useState(false);
   const stage = stageOf(item.status);
@@ -77,7 +78,7 @@ export function WorkflowBar({
         )}
 
         <div className="wf-actions">
-          {stage === 'draft' && (owner || isAdmin) && (
+          {stage === 'draft' && (owner || mgr) && (
             <>
               <input value={comment} onChange={(e) => setComment(e.target.value)} placeholder={t('Kommentar (optional)')} />
               <button className="primary small-btn" onClick={() => run('submit')} title={t('Danach prüft das I&A-Team die Qualität.')}>
@@ -85,7 +86,7 @@ export function WorkflowBar({
               </button>
             </>
           )}
-          {stage === 'draft' && !owner && !isAdmin && (kind === 'risk' || kind === 'opportunity') && (
+          {stage === 'draft' && !owner && !mgr && (kind === 'risk' || kind === 'opportunity') && (
             <span className="small muted">{t('Fachliche Freigabe durch den Owner')}</span>
           )}
           {stage === 'review' && canReview && (
@@ -110,7 +111,7 @@ export function WorkflowBar({
             </>
           )}
           {stage === 'review' && !canReview && owner && <span className="small muted">🔒 {t('Liegt beim I&A-Team')}</span>}
-          {isAdmin && (
+          {mgr && (
             <select
               className="wf-admin"
               title={t('Status setzen (Administration)')}
@@ -146,7 +147,7 @@ export function WorkflowBar({
           {submitted.comment && ` – „${submitted.comment}“`}
         </div>
       )}
-      {stage === 'released' && owner && !isAdmin && (
+      {stage === 'released' && owner && !mgr && (
         <div className="wf-note small muted">{t('Änderungen setzen das Element auf „Entwurf“ zurück und erfordern eine neue Freigabe.')}</div>
       )}
 

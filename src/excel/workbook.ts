@@ -41,7 +41,7 @@ import {
   headerVariants,
   measurementCols,
   normHeader,
-  processCols,
+  processColumns,
   sheetNames,
   stepCols,
   type Col,
@@ -249,7 +249,7 @@ function extraSpecs(kind: EntityKind | 'processes', d: Data, lk: Lookup): SheetS
 
 function processSpec(d: Data, lk: Lookup): SheetSpec {
   const rows = d.processes.map((p) =>
-    processCols.map((c) =>
+    processColumns().map((c) =>
       c.key === 'standards' ? p.standards.join(', ') || null : toCell(c, (p as unknown as Record<string, unknown>)[c.key], lk),
     ),
   );
@@ -257,7 +257,7 @@ function processSpec(d: Data, lk: Lookup): SheetSpec {
     kind: 'processes',
     title: t('Prozesse'),
     hint: t('Steckbriefe der Prozesse. Das BPMN-Diagramm selbst wird im Prozessmodul als BPMN-Datei ex- und importiert.'),
-    cols: processCols,
+    cols: processColumns(),
     rows,
   };
 }
@@ -398,7 +398,7 @@ export async function importExcel(file: ArrayBuffer, d: Data, only?: EntityKind 
     let ws = findSheet(wb, kind);
     if (!ws && only) ws = wb.worksheets.find((w) => w.state !== 'hidden');
     if (!ws) continue;
-    const s = readSheet(kind, ws, kind === 'processes' ? processCols : columnsOf(kind), messages);
+    const s = readSheet(kind, ws, kind === 'processes' ? processColumns() : columnsOf(kind), messages);
     if (s) sheets.push(s);
   }
   const extra: [SheetKind, Col[]][] = [];

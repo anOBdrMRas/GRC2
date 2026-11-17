@@ -44,6 +44,8 @@ export function toCell(c: Col, value: unknown, lk: Lookup): CellValue {
       return value ? t('Ja') : t('Nein');
     case 'select':
       return t(String(value));
+    case 'multi':
+      return list(((value as string[]) ?? []).map((v) => t(v))) || null;
     case 'ref': {
       const v = String(value);
       if (v === 'n/a') return 'n/a';
@@ -179,6 +181,15 @@ export function fromCell(c: Col, raw: unknown, lk: Lookup, warn: (msg: string) =
       if (yes.includes(v)) return true;
       if (!no.includes(v)) warn(t('„{col}“: „{value}“ ist weder Ja noch Nein.', { col: label, value: s }));
       return false;
+    }
+    case 'multi': {
+      const out: string[] = [];
+      for (const x of split(s)) {
+        const m = matchOption(c.options ?? [], x);
+        if (m !== undefined) out.push(m);
+        else warn(t('„{col}“: ungültiger Wert „{value}“.', { col: label, value: x }));
+      }
+      return out;
     }
     case 'select': {
       if (!s) return '';

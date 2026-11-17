@@ -15,6 +15,10 @@ import { today } from '../logic';
 import { dateLocale, t } from '../i18n';
 import { systemRoleById } from '../permissions';
 
+/** Labels and values from the content administration are shown as entered. */
+const lbl = (def: FieldDef) => (def.custom ? def.label : t(def.label));
+const opt = (def: FieldDef, o: string) => (def.custom || def.plain?.includes(o) ? o : t(o));
+
 const annexAOptions = annexA.map(([id, title]) => ({ id, label: `${id} ${title}` }));
 // ISO 27001 titles are kept in English; ISO 9001 / 37301 titles are German and get translated.
 const isoTitle = (id: string) => {
@@ -42,9 +46,14 @@ export function Field({
   return (
     <Wrap className={`field ${def.wide || def.type === 'textarea' ? 'wide' : ''}`}>
       <span className="field-label">
-        {t(def.label)}
+        {lbl(def)}
         {def.hint && <span className="hint"> · {t(def.hint)}</span>}
-        {locked && <span className="hint lock"> · 🔒 {t(typeof locked === 'string' ? locked : 'legt die Ownership fest – nur Administration')}</span>}
+        {locked && (
+          <span className="hint lock">
+            {' '}
+            · 🔒 {t(typeof locked === 'string' ? locked : 'legt die Ownership fest – nur Administration und I&A-Team')}
+          </span>
+        )}
       </span>
       {locked ? (
         <fieldset className="plain" disabled>
@@ -61,7 +70,7 @@ export function Field({
 export function FieldView({ def, value, entityId }: { def: FieldDef; value: unknown; entityId?: string }) {
   return (
     <div className={`field view ${def.wide || def.type === 'textarea' ? 'wide' : ''}`}>
-      <span className="field-label">{t(def.label)}</span>
+      <span className="field-label">{lbl(def)}</span>
       <div className="field-value">
         <FieldValue def={def} value={value} entityId={entityId} />
       </div>
@@ -94,7 +103,7 @@ function FieldValue({ def, value, entityId }: { def: FieldDef; value: unknown; e
     case 'select': {
       const v = value as string;
       if (!v) return empty;
-      return <>{v === 'higher' ? t('Höher ist besser') : v === 'lower' ? t('Niedriger ist besser') : t(v)}</>;
+      return <>{v === 'higher' ? t('Höher ist besser') : v === 'lower' ? t('Niedriger ist besser') : opt(def, v)}</>;
     }
     case 'scale': {
       const n = value as number;
@@ -110,7 +119,7 @@ function FieldValue({ def, value, entityId }: { def: FieldDef; value: unknown; e
       return arr(value).length ? (
         <div className="tags">
           {arr(value).map((o) => (
-            <Tag key={o}>{t(o)}</Tag>
+            <Tag key={o}>{opt(def, o)}</Tag>
           ))}
         </div>
       ) : (
@@ -262,7 +271,7 @@ function FieldInput({ def, value, onChange, entityId }: { def: FieldDef; value: 
         <select value={(value as string) ?? ''} onChange={(e) => onChange(e.target.value)}>
           {def.options!.map((o) => (
             <option key={o} value={o}>
-              {o === 'higher' ? t('Höher ist besser') : o === 'lower' ? t('Niedriger ist besser') : o === '' ? t('— bitte wählen —') : t(o)}
+              {o === 'higher' ? t('Höher ist besser') : o === 'lower' ? t('Niedriger ist besser') : o === '' ? t('— bitte wählen —') : opt(def, o)}
             </option>
           ))}
         </select>
@@ -291,7 +300,7 @@ function FieldInput({ def, value, onChange, entityId }: { def: FieldDef; value: 
           {def.options!.map((o) => (
             <label key={o} className="checkbox">
               <input type="checkbox" checked={v.includes(o)} onChange={(e) => onChange(e.target.checked ? [...v, o] : v.filter((x) => x !== o))} />
-              {t(o)}
+              {opt(def, o)}
             </label>
           ))}
         </div>

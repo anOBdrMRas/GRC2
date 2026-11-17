@@ -16,6 +16,7 @@ import { stepsOfUser } from '../ownership';
 import { stageLabel, stageOf } from '../workflow';
 import { ExcelTools } from './ExcelTools';
 import { Field, FieldView } from './Fields';
+import { withConfig } from '../contentConfig';
 import { t } from '../i18n';
 
 const categories: ProcessModel['category'][] = ['Führungsprozess', 'Kernprozess', 'Unterstützungsprozess'];
@@ -234,7 +235,8 @@ function ProcessWorkspace({ process: current }: { process: ProcessModel }) {
   const clearFocus = useUi((s) => s.clearFocus);
   const openStep = useUi((s) => s.openStep);
   const select = useUi((s) => s.select);
-  const { canEditEntity, isOwnerOf, isAdmin } = useRights();
+  const { canEditEntity, isOwnerOf, canManage } = useRights();
+  const isAdmin = canManage('processes');
   const editable = canEditEntity('processes', current) && !viewingReleased;
   const audits = useStore((s) => s.audit);
   const findingCounts = useMemo(() => openFindingsByElement(audits, process.id), [audits, process.id]);
@@ -331,7 +333,9 @@ function ProcessWorkspace({ process: current }: { process: ProcessModel }) {
   );
 }
 
-const profileFields: FieldDef[] = [
+export const PROFILE_SECTION = 'Prozesssteckbrief (ISO 9001 4.4)';
+
+export const profileFields: FieldDef[] = [
   { key: 'code', label: 'ID', type: 'readonly' },
   { key: 'title', label: 'Bezeichnung', type: 'text' },
   { key: 'category', label: 'Prozesskategorie', type: 'select', options: categories },
@@ -350,7 +354,8 @@ const profileFields: FieldDef[] = [
 /** Process profile: read view, "Bearbeiten" shows the inputs; changes are saved together. */
 function ProcessProfile({ process, editable }: { process: ProcessModel; editable: boolean }) {
   const update = useStore((s) => s.updateProcess);
-  const { isAdmin } = useRights();
+  const { canManage } = useRights();
+  const isAdmin = canManage('processes');
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState<Record<string, unknown>>({});
   const inEdit = editing && editable;
@@ -359,11 +364,17 @@ function ProcessProfile({ process, editable }: { process: ProcessModel; editable
   useEffect(() => setDirty(dirty), [dirty, setDirty]);
   useEffect(() => () => setDirty(false), [setDirty]);
   const values = { ...process, ...(inEdit ? draft : {}) } as unknown as Record<string, unknown>;
+  // custom fields and dropdown values of the content administration
+  const config = useStore((s) => s.config);
+  const fields = useMemo(
+    () => withConfig([{ title: PROFILE_SECTION, fields: profileFields }], 'processes', config).flatMap((s) => s.fields),
+    [config],
+  );
   const locked = (key: string) =>
     key === 'status'
       ? 'wird über den Freigabe-Workflow gesetzt'
       : key === 'ownerRoleId' && !isAdmin
-        ? 'Nur die Administration ändert die Ownership.'
+        ? 'Nur Administration und I&A-Team ändern die Ownership.'
         : false;
 
   return (
@@ -403,7 +414,7 @@ function ProcessProfile({ process, editable }: { process: ProcessModel; editable
           </div>
         )}
         <div className="grid">
-          {profileFields.map((f) =>
+          {fields.map((f) =>
             inEdit ? (
               <Field key={f.key} def={f} value={values[f.key]} locked={locked(f.key)} onChange={(v) => setDraft((d) => ({ ...d, [f.key]: v }))} />
             ) : (

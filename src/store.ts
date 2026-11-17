@@ -34,6 +34,7 @@ import { riskEntities } from './riskScale';
 import { t } from './i18n';
 import { modules, userDepartments } from './schema';
 import { useUi } from './ui';
+import { emptyConfig, type ContentConfig } from './contentConfig';
 import { seedData } from './seed';
 import { migrateSystemRoles } from './permissions';
 import { emptyDiagram } from './bpmn/templates';
@@ -43,6 +44,9 @@ type Collections = { [K in EntityKind]: EntityMap[K][] };
 
 interface State extends Collections {
   processes: ProcessModel[];
+  /** content administration: custom fields and dropdown values */
+  config: ContentConfig;
+  setConfig: (config: ContentConfig) => void;
   /** simulated login (prototype has no authentication) */
   currentUserId: string;
   setCurrentUser: (id: string) => void;
@@ -68,7 +72,7 @@ interface State extends Collections {
   /** mandates: granted by the grantor, accepted (or declined) by the recipient */
   mandateAction: (id: string, action: MandateWfAction, comment?: string) => void;
 
-  importAll: (data: Partial<Collections> & { processes: ProcessModel[] }) => void;
+  importAll: (data: Partial<Collections> & { processes: ProcessModel[]; config?: ContentConfig }) => void;
   resetDemo: () => void;
 }
 
@@ -92,7 +96,8 @@ function updateStep(p: ProcessModel, elementId: string, fn: (a: StepAssignment) 
 function reopenIfReleased<T extends WfItem>(item: T, s: { user: User[]; currentUserId: string }, patch: object, before: T): T {
   if (stageOf(item.status) !== 'released' || 'status' in patch || 'workflow' in patch) return item;
   const user = s.user.find((u) => u.id === s.currentUserId);
-  if (!user || user.systemRoles.includes('admin')) return item;
+  // administrators and the I&A team change released elements without reopening them
+  if (!user || user.systemRoles.includes('admin') || user.systemRoles.includes('ia')) return item;
   // the released state is the element before this change
   return { ...item, ...workflowPatch(before, 'reopen', user.id, '') } as T;
 }
@@ -335,6 +340,8 @@ export const useStore = create<State>()(
       login: (currentUserId) => set({ currentUserId, loggedIn: true }),
       logout: () => set({ loggedIn: false }),
       importAll: (data) => set(normalizeData(data)),
+      config: emptyConfig(),
+      setConfig: (config) => set({ config }),
       resetDemo: () =>
         set((s) => {
           const seed = seedData();
@@ -426,6 +433,8 @@ function normalizeData(data: Partial<State>): Partial<State> {
     }),
     // v3 added audits: older data gets the demo audits
     audit: (data.audit ?? seed.audit).map((a: Partial<Audit>) => normalizeAudit(a)),
+    // content administration (added later; kept as is)
+    config: data.config ?? emptyConfig(),
     currentUserId: data.currentUserId && users.some((u) => u.id === data.currentUserId) ? data.currentUserId : (users[0]?.id ?? ''),
   };
 }

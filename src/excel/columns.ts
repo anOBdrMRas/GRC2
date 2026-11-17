@@ -1,13 +1,29 @@
 // Excel columns derived from the module schema (src/schema.ts): one definition for export and import.
 import type { EntityKind } from '../types';
 import { modules, type FieldDef } from '../schema';
+import { withConfig, type ContentConfig } from '../contentConfig';
+import { useStore } from '../store';
 import { t } from '../i18n';
 import { en } from '../i18n.en';
 
 /** treatment actions per risk in the Excel sheet (more are kept on import) */
 export const RISK_ACTION_COLS = 6;
 
-export type ColKind = 'id' | 'text' | 'long' | 'number' | 'date' | 'bool' | 'select' | 'ref' | 'refs' | 'iso' | 'annex' | 'sysroles' | 'computed';
+export type ColKind =
+  | 'id'
+  | 'text'
+  | 'long'
+  | 'number'
+  | 'date'
+  | 'bool'
+  | 'select'
+  | 'multi'
+  | 'ref'
+  | 'refs'
+  | 'iso'
+  | 'annex'
+  | 'sysroles'
+  | 'computed';
 
 export interface Col {
   /** stable key, also written into the header comment ("Feld im GRC Studio: key") */
@@ -30,7 +46,22 @@ export interface Col {
 }
 
 const widthOf = (k: ColKind) =>
-  ({ id: 11, text: 24, long: 40, number: 13, date: 12, bool: 10, select: 18, ref: 16, refs: 20, iso: 20, annex: 20, sysroles: 20, computed: 16 })[k];
+  ({
+    id: 11,
+    text: 24,
+    long: 40,
+    number: 13,
+    date: 12,
+    bool: 10,
+    select: 18,
+    multi: 24,
+    ref: 16,
+    refs: 20,
+    iso: 20,
+    annex: 20,
+    sysroles: 20,
+    computed: 16,
+  })[k];
 
 function fieldCols(f: FieldDef, section: string): Col[] {
   const c = (k: ColKind, extra: Partial<Col> = {}): Col[] => [
@@ -75,6 +106,8 @@ function fieldCols(f: FieldDef, section: string): Col[] {
       return c('bool');
     case 'select':
       return c('select', { options: f.options?.filter(Boolean) });
+    case 'multiselect':
+      return c('multi', { options: f.options, hint: f.hint ?? 'mehrere Werte mit Komma trennen' });
     case 'ref':
       return c('ref', { refKind: f.refKind, allowNA: f.allowNA, width: f.refKind === 'user' ? 22 : 16 });
     case 'refs':
@@ -122,8 +155,9 @@ function fieldCols(f: FieldDef, section: string): Col[] {
 }
 
 /** Columns of a module sheet. */
-export function columnsOf(kind: EntityKind): Col[] {
-  const cols = modules[kind].sections.flatMap((s) => s.fields.flatMap((f) => fieldCols(f, s.title)));
+export function columnsOf(kind: EntityKind, config: ContentConfig | undefined = useStore.getState().config): Col[] {
+  // incl. custom fields and dropdown values of the content administration
+  const cols = withConfig(modules[kind].sections, kind, config).flatMap((s) => s.fields.flatMap((f) => fieldCols(f, s.title)));
   // the ID always comes first
   cols.sort((a, b) => (a.kind === 'id' ? -1 : 0) - (b.kind === 'id' ? -1 : 0));
   if (kind === 'risk')
@@ -220,6 +254,16 @@ export const processCols: Col[] = [
   { key: 'outputs', label: 'Ergebnisse (Outputs)', section: 'ISO 9001 4.4', kind: 'long', width: 26 },
   { key: 'resources', label: 'Ressourcen', section: 'ISO 9001 4.4', kind: 'long', width: 26 },
 ];
+
+/** Process columns incl. custom fields and dropdown values of the content administration. */
+export function processColumns(config: ContentConfig | undefined = useStore.getState().config): Col[] {
+  const base = processCols.map((c) => {
+    const extra = config?.extraOptions[`processes.${c.key}`];
+    return extra?.length && c.options ? { ...c, options: [...c.options, ...extra.filter((o) => !c.options!.includes(o))] } : c;
+  });
+  const custom = withConfig([], 'processes', config).flatMap((s) => s.fields.flatMap((f) => fieldCols(f, s.title)));
+  return [...base, ...custom];
+}
 
 export const stepCols: Col[] = [
   { key: 'processCode', label: 'Prozess', section: 'Schritt', kind: 'ref', refKind: 'processes', width: 10, required: true },

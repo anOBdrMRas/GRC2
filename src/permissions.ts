@@ -55,8 +55,8 @@ export const systemRoles: SystemRole[] = [
     id: 'ia',
     name: 'I&A-Team',
     description:
-      'Integrity & Assurance: gibt Prozesse, Rollen und Stellen nach der fachlichen Freigabe des Owners qualitativ frei und sieht das I&A-Cockpit.',
-    rights: all('read', { user: 'none' }),
+      'Integrity & Assurance: legt in allen Fachmodulen an, bearbeitet und löscht, gibt nach der fachlichen Freigabe des Owners qualitativ frei und sieht das I&A-Cockpit. Keine Benutzerverwaltung.',
+    rights: all('edit', { user: 'none' }),
   },
   {
     id: 'admin',

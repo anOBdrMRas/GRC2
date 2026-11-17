@@ -26,6 +26,8 @@ export function useRights() {
     (kind === 'risk' || kind === 'opportunity') &&
     (entity as { createdByUserId?: string }).createdByUserId === user.id &&
     stageOf((entity as { status?: string }).status) === 'draft';
+  /** may manage a module (create, edit, delete, owner fields): administrators everywhere, the I&A team in the GRC modules */
+  const manage = (kind: OwnKind) => active && rights[kind as ModuleKey] === 'edit';
   const everybodyRecords = (m: ModuleKey) => active && (m === 'risk' || m === 'opportunity');
   return {
     user,
@@ -37,19 +39,20 @@ export function useRights() {
     canRead: (m: ModuleKey) => rights[m] !== 'none',
     /** administrator level: create, delete, manage */
     canEdit: (m: ModuleKey) => rights[m] === 'edit',
-    /** risks and opportunities are recorded by everybody, all other elements by administrators */
+    /** risks and opportunities are recorded by everybody, all other elements by administrators and the I&A team */
     canCreate: (m: ModuleKey) => rights[m] === 'edit' || everybodyRecords(m),
     /** administrators; the recorder deletes an own draft that was never submitted */
+    canManage: manage,
     canDelete: (kind: OwnKind, entity: unknown) =>
-      isAdmin || (recorder(kind, entity) && !((entity as { workflow?: unknown[] }).workflow ?? []).length),
+      manage(kind) || (recorder(kind, entity) && !((entity as { workflow?: unknown[] }).workflow ?? []).length),
     isRecorder: recorder,
     /** edit an existing element: administrators and its owners */
-    canEditEntity: (kind: OwnKind, entity: unknown) => isAdmin || ((owner(kind, entity) || recorder(kind, entity)) && !inReview(kind, entity)),
+    canEditEntity: (kind: OwnKind, entity: unknown) => manage(kind) || ((owner(kind, entity) || recorder(kind, entity)) && !inReview(kind, entity)),
     isOwnerOf: owner,
     inReview,
     /** ownership-defining fields stay with administrators; the status of workflow elements is set by the workflow */
     canEditField: (kind: OwnKind, key: string, entity?: unknown) =>
-      isAdmin ||
+      manage(kind) ||
       !(
         ((ownerFields[kind] ?? []).includes(key) && !(entity !== undefined && recorder(kind, entity))) ||
         (isWfKind(kind) && key === 'status') ||

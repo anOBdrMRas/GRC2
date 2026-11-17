@@ -38,11 +38,12 @@ const snapshot = (): Data => {
 
 /** "⬇ Excel" and "⬆ Excel" for one module or all modules. Renders nothing for non-administrators. */
 export function ExcelTools({ scope, compact = false }: { scope: Scope; compact?: boolean }) {
-  const { isAdmin } = useRights();
+  const { isAdmin, canManage } = useRights();
   const input = useRef<HTMLInputElement>(null);
   const [busy, setBusy] = useState(false);
   const [preview, setPreview] = useState<{ file: string; result: ImportResult } | null>(null);
-  if (!isAdmin) return null;
+  // everything (incl. users): administrators; one module: whoever manages it (administration, I&A team)
+  if (!(scope === 'all' ? isAdmin : canManage(scope))) return null;
 
   const exportNow = async () => {
     setBusy(true);

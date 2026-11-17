@@ -224,7 +224,8 @@ const mandateSteps = [
 /** Actions of one pending delegation for the current user (grant / accept / decline). */
 export function MandateActions({ m, compact = false }: { m: Mandate; compact?: boolean }) {
   const act = useStore((s) => s.mandateAction);
-  const { user, isAdmin } = useRights();
+  const { user, canManage } = useRights();
+  const isAdmin = canManage('mandate');
   const [comment, setComment] = useState('');
   const stage = mandateStage(m);
   const isGrantor = !!user && m.grantedByUserId === user.id;
