@@ -87,7 +87,7 @@ export default function App() {
           </button>
         ))}
         <div className="sidebar-foot">
-          <div className="muted small">ISO 9001 · ISO 27001 · ISO 37301</div>
+          <div className="muted small">ISO 9001 · 14001 · 27001 · 37301</div>
           {isAdmin && (
             <>
               <ExcelTools scope="all" />
@@ -127,7 +127,7 @@ export default function App() {
                 </button>
               ))}
             </div>
-            <div className="topbar-user" title={user.email}>
+            <div className="topbar-user">
               <div className="user-avatar">
                 {user.title
                   .split(' ')

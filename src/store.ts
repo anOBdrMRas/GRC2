@@ -25,13 +25,14 @@ import {
   normalizeRole,
   normalizeUser,
   now,
+  fullName,
   riskTitle,
   roleHolders,
   uid,
 } from './logic';
 import { riskEntities } from './riskScale';
 import { t } from './i18n';
-import { modules } from './schema';
+import { modules, userDepartments } from './schema';
 import { seedData } from './seed';
 import { migrateSystemRoles } from './permissions';
 import { emptyDiagram } from './bpmn/templates';
@@ -136,6 +137,8 @@ export const useStore = create<State>()(
                 const next = { ...e, ...patch, updatedAt: now() };
                 // risks have no title field: lists show the first sentence of the description
                 if (kind === 'risk' && 'description' in patch) next.title = riskTitle(String(next.description ?? '')) || next.title;
+                // persons: the name shown everywhere is "first name last name"
+                if (kind === 'user' && ('firstName' in patch || 'lastName' in patch)) next.title = fullName(next as User) || next.title;
                 return isWfKind(kind) ? reopenIfReleased(next as WfItem, s, patch, e as WfItem) : next;
               }),
             }) as Partial<State>,
@@ -338,7 +341,7 @@ export const useStore = create<State>()(
     }),
     {
       name: 'grc-prototype-v1',
-      version: 10,
+      version: 11,
       // v1 had no users and free-text role holders
       migrate: (persisted) => ({ ...normalizeData(persisted as Partial<State>), loggedIn: false }),
       onRehydrateStorage: () => (_state, error) => {
@@ -362,6 +365,15 @@ function normalizeData(data: Partial<State>): Partial<State> {
       ...(!data.position && u.positionId === undefined ? pick(demo) : {}),
       ...u,
     });
+    // v11: Bereich and Abteilung as lists (demo persons get their demo values)
+    if ((u as Partial<User>).division === undefined) {
+      if (demo) Object.assign(merged, { division: demo.division, department: demo.department });
+      else if (merged.department && !userDepartments.includes(merged.department)) {
+        merged.description = [merged.description, `${t('Abteilung bisher')}: ${merged.department}`].filter(Boolean).join('\n');
+        merged.department = '';
+      }
+      merged.division ??= '';
+    }
     // v6: only the system roles "employee" and "admin" remain
     return merged.systemRoles.every((r) => r === 'employee' || r === 'admin' || r === 'ia') && merged.systemRoles.length
       ? merged

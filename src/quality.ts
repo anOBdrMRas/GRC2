@@ -138,14 +138,6 @@ export function imsChecks(d: OwnershipData): Check[] {
       module: 'position',
       items: d.position.filter((p) => !filled(p.purpose) || !filled(p.tasks)).map((p) => ({ kind: 'position', id: p.id, label: label(p) })),
     },
-    {
-      key: 'pos-ack',
-      label: 'Stellenbeschreibung nicht zur Kenntnis genommen',
-      module: 'position',
-      items: d.user
-        .filter((u) => u.status === 'Aktiv' && u.positionId && !u.jobDescriptionAckAt)
-        .map((u) => ({ kind: 'user', id: u.id, label: u.title, detail: d.position.find((p) => p.id === u.positionId)?.title })),
-    },
     // risks
     {
       key: 'risk-owner',

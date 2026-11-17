@@ -174,6 +174,9 @@ export function blankEntity<K extends EntityKind>(kind: K, code: string, title =
     },
     user: {
       ...common,
+      lastName: title,
+      firstName: '',
+      division: '',
       email: '',
       department: '',
       jobTitle: '',
@@ -460,9 +463,22 @@ export function normalizeRole(r: LegacyRole): Role {
   return merged;
 }
 
+/** Display name of a person: "first name last name". */
+export const fullName = (u: { firstName?: string; lastName?: string }) => [u.firstName?.trim(), u.lastName?.trim()].filter(Boolean).join(' ');
+
+/** Before v11 a person had one name field: the last word becomes the last name, the rest the first name. */
+export function splitName(name: string): { firstName: string; lastName: string } {
+  const parts = name.trim().split(/\s+/);
+  if (parts.length < 2 || /[:()]/.test(name)) return { firstName: '', lastName: name.trim() };
+  return { firstName: parts.slice(0, -1).join(' '), lastName: parts[parts.length - 1] };
+}
+
 export function normalizeUser(u: Partial<User>): User {
   const base = blankEntity('user', u.code ?? '', u.title ?? '');
-  return { ...base, ...u, id: u.id ?? base.id } as User;
+  const names = u.lastName === undefined ? splitName(u.title ?? '') : {};
+  const out = { ...base, ...u, ...names, id: u.id ?? base.id } as User;
+  out.title = fullName(out) || out.title;
+  return out;
 }
 
 export function normalizeMandate(m: Partial<Mandate>): Mandate {
@@ -710,7 +726,6 @@ export function orgIssues(org: MandateOrg, now = today()): OrgIssue[] {
   const userById = new Map(org.user.map((u) => [u.id, u]));
   const roleById = new Map(org.role.map((r) => [r.id, r]));
   const positionById = new Map(org.position.map((p) => [p.id, p]));
-  const in90 = addDays(now, 90);
 
   // roles that need a formal transfer: every holder needs an effective mandate
   for (const role of org.role) {
@@ -772,17 +787,8 @@ export function orgIssues(org: MandateOrg, now = today()): OrgIssue[] {
       out.push({ ...base, text: t('{mandate}: kein Empfänger festgelegt.', { mandate: label }) });
       continue;
     }
-    if (user.status !== 'Aktiv' || (user.contractEnd && user.contractEnd < now))
+    if (user.status !== 'Aktiv')
       out.push({ ...base, text: t('{mandate}: {user} ist ausgeschieden oder inaktiv – widerrufen.', { mandate: label, user: user.title }) });
-    else if (user.contractEnd && user.contractEnd <= in90 && (!m.validUntil || m.validUntil > user.contractEnd))
-      out.push({
-        ...base,
-        text: t('{mandate}: Vertrag von {user} endet am {date} – Übertragung befristen oder übergeben.', {
-          mandate: label,
-          user: user.title,
-          date: user.contractEnd,
-        }),
-      });
     if (state === 'active' && m.validUntil && m.validUntil <= addDays(now, 60))
       out.push({ ...base, text: t('{mandate}: läuft am {date} ab.', { mandate: label, date: m.validUntil }) });
     if (state === 'active' && m.nextSupervision && m.nextSupervision < now)
@@ -831,20 +837,6 @@ export function orgIssues(org: MandateOrg, now = today()): OrgIssue[] {
     }
   }
 
-  // persons: employment evidence
-  for (const u of org.user) {
-    if (u.status !== 'Aktiv') continue;
-    const pos = positionById.get(u.positionId);
-    const base = { kind: 'user' as EntityKind, id: u.id, userId: u.id };
-    if (pos && !u.jobDescriptionAckAt) out.push({ ...base, text: t('{user}: Kenntnisnahme der Stellenbeschreibung fehlt.', { user: u.title }) });
-    else if (pos && u.jobDescriptionAckAt < pos.lastReview)
-      out.push({ ...base, text: t('{user}: Stellenbeschreibung wurde nach der Kenntnisnahme geändert.', { user: u.title }) });
-    if (pos?.ndaRequired && !u.confidentialityAt) out.push({ ...base, text: t('{user}: Vertraulichkeitsverpflichtung fehlt.', { user: u.title }) });
-    if (u.employmentType !== 'Externer Dienstleister' && !u.codeOfConductAt)
-      out.push({ ...base, text: t('{user}: Verhaltenskodex nicht bestätigt.', { user: u.title }) });
-    if (u.contractEnd && u.contractEnd < now)
-      out.push({ ...base, text: t('{user}: Vertrag endete am {date}, Benutzer ist noch aktiv.', { user: u.title, date: u.contractEnd }) });
-  }
   return out;
 }
 

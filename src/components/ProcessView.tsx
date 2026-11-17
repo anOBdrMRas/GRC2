@@ -414,7 +414,7 @@ function ProcessProfile({ process }: { process: ProcessModel }) {
           <label className="field">
             <span className="field-label">{t('Relevante Managementsysteme')}</span>
             <div className="checks">
-              {['ISO 9001', 'ISO 27001', 'ISO 37301'].map((s) => (
+              {['ISO 9001', 'ISO 14001', 'ISO 27001', 'ISO 37301'].map((s) => (
                 <label key={s} className="checkbox">
                   <input
                     type="checkbox"

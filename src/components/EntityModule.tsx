@@ -424,11 +424,19 @@ function EntityEditor({ kind, entity }: { kind: EntityKind; entity: AnyEntity })
           <div className="muted small">{t(def.label)}</div>
           <h3>
             <span className="mono">{entity.code}</span> {entity.title}
+            {(kind === 'role' || kind === 'position') && (
+              <button
+                className="icon-btn profile-btn"
+                title={t(kind === 'role' ? 'Rollenbeschreibung (Zusammenfassung) anzeigen' : 'Stellenbeschreibung (Zusammenfassung) anzeigen')}
+                aria-label={t(kind === 'role' ? 'Rollenbeschreibung (Zusammenfassung) anzeigen' : 'Stellenbeschreibung (Zusammenfassung) anzeigen')}
+                onClick={() => setShowProfile(true)}
+              >
+                📄
+              </button>
+            )}
           </h3>
         </div>
         <div className="row gap">
-          {kind === 'role' && <button onClick={() => setShowProfile(true)}>{t('Rollenbeschreibung')}</button>}
-          {kind === 'position' && <button onClick={() => setShowProfile(true)}>{t('Stellenbeschreibung')}</button>}
           {editable && sample && canSuggest(kind) && <button onClick={() => setSuggest(true)}>✨ {t('Mit KI vorschlagen')}</button>}
           {!isAdmin &&
             (editable && !isOwnerOf(kind, entity) && isRecorder(kind, entity) ? (

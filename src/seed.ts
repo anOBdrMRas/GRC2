@@ -15,7 +15,7 @@ import type {
   Role,
   User,
 } from './types';
-import { blankEntity, blankFinding, emptyAssignment, now } from './logic';
+import { blankEntity, splitName, blankFinding, emptyAssignment, now } from './logic';
 import { accessManagementXml, purchaseToPayXml } from './bpmn/templates';
 import { generateProcessXml, type DraftStep } from './bpmn/generate';
 
@@ -340,6 +340,30 @@ export function seedData() {
       conflictOfInterestAt: '2026-01-20',
     }),
   ];
+  // first and last name, Bereich and Abteilung
+  const org: Record<string, [string, string]> = {
+    'U-001': ['Business Enablement (BE)', 'Global IT'],
+    'U-002': ['Operations', 'Einkauf'],
+    'U-003': ['Operations', 'Einkauf'],
+    'U-004': ['Operations', 'Einkauf'],
+    'U-005': ['Finance & Admin', 'Finanzen'],
+    'U-006': ['Finance & Admin', 'Finanzen'],
+    'U-007': ['Geschäftsführung', 'Legal & Compliance'],
+    'U-008': ['Business Enablement (BE)', 'Global IT'],
+    'U-009': ['Operations', 'Logistik'],
+    'U-010': ['Geschäftsführung', ''],
+    'U-011': ['Sales', 'Vertrieb'],
+    'U-012': ['Business Enablement (BE)', 'I&A'],
+    'U-013': ['Business Enablement (BE)', 'I&A'],
+    'U-014': ['', ''],
+    'U-015': ['Business Enablement (BE)', 'Export Control & Customs'],
+    'U-016': ['Business Enablement (BE)', 'Legal & Compliance'],
+    'U-017': ['Finance & Admin', 'Controlling'],
+    'U-018': ['Business Enablement (BE)', 'Export Control & Customs'],
+    'U-019': ['Geschäftsführung', ''],
+    'U-020': ['Business Enablement (BE)', ''],
+  };
+  for (const u of user) Object.assign(u, splitName(u.title), { division: org[u.id]?.[0] ?? '', department: org[u.id]?.[1] ?? '' });
 
   const reviewed = { version: '1.0', status: 'Freigegeben', lastReview: '2026-01-15', nextReview: '2027-01-15' };
 

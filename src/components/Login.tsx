@@ -65,7 +65,7 @@ export function Login() {
                 <span className="persona-body">
                   <b>{user!.title}</b>
                   <span className="persona-kind">{t(kind)}</span>
-                  <span className="small muted">{positions.find((p) => p.id === user!.positionId)?.title ?? user!.jobTitle}</span>
+                  <span className="small muted">{positions.find((p) => p.id === user!.positionId)?.title ?? user!.division}</span>
                   <span className="small">{t(text)}</span>
                 </span>
               </button>

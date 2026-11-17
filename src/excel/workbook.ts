@@ -25,6 +25,7 @@ import {
   mandateStateLabel,
   now,
   parseElements,
+  fullName,
   riskTitle,
   scoreOf,
   uid,
@@ -467,10 +468,13 @@ export async function importExcel(file: ArrayBuffer, d: Data, only?: EntityKind 
   const userSheet = sheets.find((s) => s.kind === 'user');
   if (userSheet) {
     const ids = target.get(userSheet)!;
-    const nameCol = userSheet.cols.find((c) => c.key === 'title')!;
+    // the name is "first name last name"
+    const col = (key: string) => userSheet.cols.find((c) => c.key === key);
+    const [firstCol, lastCol] = [col('firstName'), col('lastName')];
     userSheet.rows.forEach(([, get], i) => {
       const u = work.user.find((x) => x.id === ids[i]);
-      if (u && !u.title) (u as { title: string }).title = cellText(get(nameCol));
+      const name = fullName({ firstName: firstCol ? cellText(get(firstCol)) : '', lastName: lastCol ? cellText(get(lastCol)) : '' });
+      if (u && !u.title && name) (u as { title: string }).title = name;
     });
   }
   const lk = lookup(work);
@@ -551,6 +555,13 @@ export async function importExcel(file: ArrayBuffer, d: Data, only?: EntityKind 
           ...(((old?.actions as unknown[]) ?? []).slice(RISK_ACTION_COLS) as { text: string; ownerUserId: string }[]),
         ];
       if (kind === 'risk' && typeof fields.description === 'string' && fields.description.trim()) fields.title = riskTitle(fields.description);
+      if (kind === 'user' && ('firstName' in fields || 'lastName' in fields)) {
+        const name = fullName({
+          firstName: String(fields.firstName ?? old?.firstName ?? ''),
+          lastName: String(fields.lastName ?? old?.lastName ?? ''),
+        });
+        if (name) fields.title = name;
+      }
       // risk IDs come from the system (pass 1), never from the file
       if (kind === 'risk' || fields.code === '' || fields.code === undefined) fields.code = lk.codeOf(kind, id) || (old?.code as string);
       if (old) {

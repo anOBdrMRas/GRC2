@@ -76,9 +76,7 @@ export function FindingLine({ audit, finding }: { audit: Audit; finding: AuditFi
       <span className="mono">{finding.code}</span>
       <FindingTypePill type={finding.type} />
       <span className="grow clamp-2">{finding.description || audit.title}</span>
-      <span className={`small ${overdue ? 'warn' : 'muted'}`}>
-        {overdue ? `⚠ ${finding.dueDate}` : t(finding.status)}
-      </span>
+      <span className={`small ${overdue ? 'warn' : 'muted'}`}>{overdue ? `⚠ ${finding.dueDate}` : t(finding.status)}</span>
     </div>
   );
 }
@@ -197,7 +195,15 @@ export function FindingsEditor({ value, auditId, onChange }: { value: AuditFindi
   );
 }
 
-function FindingForm({ finding: f, onChange, onDelete }: { finding: AuditFinding; onChange: (p: Partial<AuditFinding>) => void; onDelete: () => void }) {
+function FindingForm({
+  finding: f,
+  onChange,
+  onDelete,
+}: {
+  finding: AuditFinding;
+  onChange: (p: Partial<AuditFinding>) => void;
+  onDelete: () => void;
+}) {
   const { processes, role, user, risk, control } = useStore();
   const process = processes.find((p) => p.id === f.processId);
   const steps = process ? parseElements(process.xml).filter((e) => activityTypes.includes(e.type)) : [];
@@ -235,7 +241,11 @@ function FindingForm({ finding: f, onChange, onDelete }: { finding: AuditFinding
           );
         })}
       </div>
-      <Picker options={items.map((e) => ({ id: e.id, label: `${e.code} ${e.title}` }))} exclude={f[key]} onPick={(id) => onChange({ [key]: [...f[key], id] })} />
+      <Picker
+        options={items.map((e) => ({ id: e.id, label: `${e.code} ${e.title}` }))}
+        exclude={f[key]}
+        onPick={(id) => onChange({ [key]: [...f[key], id] })}
+      />
     </div>
   );
 
@@ -244,15 +254,26 @@ function FindingForm({ finding: f, onChange, onDelete }: { finding: AuditFinding
       <div className="grid">
         <label className="field">
           {label('Typ')}
-          {select('type', findingTypes.map((x) => ({ value: x, label: t(x) })), false)}
+          {select(
+            'type',
+            findingTypes.map((x) => ({ value: x, label: t(x) })),
+            false,
+          )}
         </label>
         <label className="field">
           {label('Status')}
-          {select('status', findingStatuses.map((x) => ({ value: x, label: t(x) })), false)}
+          {select(
+            'status',
+            findingStatuses.map((x) => ({ value: x, label: t(x) })),
+            false,
+          )}
         </label>
         <label className="field">
           {label('Normkapitel')}
-          {select('clause', isoCatalog.map((r) => ({ value: r.id, label: clauseTitle(r.id) })))}
+          {select(
+            'clause',
+            isoCatalog.map((r) => ({ value: r.id, label: clauseTitle(r.id) })),
+          )}
         </label>
         <label className="field">
           {label('Frist')}
@@ -293,11 +314,17 @@ function FindingForm({ finding: f, onChange, onDelete }: { finding: AuditFinding
         </div>
         <label className="field">
           {label('Verantwortliche Rolle')}
-          {select('responsibleRoleId', role.map((r) => ({ value: r.id, label: `${r.code} ${r.title}` })))}
+          {select(
+            'responsibleRoleId',
+            role.map((r) => ({ value: r.id, label: `${r.code} ${r.title}` })),
+          )}
         </label>
         <label className="field">
           {label('Verantwortliche Person')}
-          {select('responsibleUserId', user.map((u) => ({ value: u.id, label: u.title })))}
+          {select(
+            'responsibleUserId',
+            user.map((u) => ({ value: u.id, label: u.title })),
+          )}
         </label>
         {area('rootCause', 'Ursachenanalyse', 'ISO 9001 10.2.1 b')}
         {area('correctiveAction', 'Korrekturmaßnahme', 'ISO 9001 10.2.1 c')}
@@ -307,7 +334,10 @@ function FindingForm({ finding: f, onChange, onDelete }: { finding: AuditFinding
         </label>
         <label className="field">
           {label('Wirksamkeit geprüft durch')}
-          {select('verifiedByUserId', user.map((u) => ({ value: u.id, label: u.title })))}
+          {select(
+            'verifiedByUserId',
+            user.map((u) => ({ value: u.id, label: u.title })),
+          )}
         </label>
         {area('verificationResult', 'Ergebnis der Wirksamkeitsprüfung', 'ISO 9001 10.2.1 d')}
       </div>
@@ -333,7 +363,8 @@ export function AuditInsights({ audit }: { audit: Audit }) {
     if (days < 0) issues.push(t('Zertifikat ist seit {date} abgelaufen.', { date: audit.certificateValidUntil }));
     else if (days < 180) issues.push(t('Zertifikat läuft in {n} Tagen ab ({date}).', { n: days, date: audit.certificateValidUntil }));
   }
-  if (audit.status === 'Abgeschlossen' && open.length > 0) issues.push(t('Audit ist abgeschlossen, aber {n} Feststellungen sind noch offen.', { n: open.length }));
+  if (audit.status === 'Abgeschlossen' && open.length > 0)
+    issues.push(t('Audit ist abgeschlossen, aber {n} Feststellungen sind noch offen.', { n: open.length }));
   if (auditDate(audit) && auditDate(audit) < now && ['Geplant', 'In Vorbereitung'].includes(audit.status))
     issues.push(t('Termin {date} ist verstrichen, Status ist noch „{status}“.', { date: auditDate(audit), status: t(audit.status) }));
   if (!audit.leadAuditorUserId && !audit.externalLeadAuditor) issues.push(t('Kein leitender Auditor benannt.'));
@@ -478,6 +509,7 @@ const coverageStandards: { label: string; prefix: string }[] = [
   { label: 'ISO 9001', prefix: '9001:' },
   { label: 'ISO 27001', prefix: '27001:' },
   { label: 'ISO 37301', prefix: '37301:' },
+  { label: 'ISO 14001', prefix: '14001:' },
 ];
 
 export function AuditProgram() {
@@ -566,9 +598,10 @@ export function AuditProgram() {
           ))}
         </div>
         {coverageStandards.map(({ label, prefix }) => {
-          // main clauses only; Annex A controls would dominate the list
-          const clauses = isoCatalog.filter((r) => r.id.startsWith(prefix) && !r.clause.startsWith('A.'));
-          const covered = clauses.filter((r) => coveredClauses.has(r.id));
+          // clauses like 8.4 (no chapter headings, no Annex A); audited if the clause or one of its subclauses was audited
+          const clauses = isoCatalog.filter((r) => r.id.startsWith(prefix) && /^\d+\.\d+$/.test(r.clause));
+          const isCovered = (id: string) => coveredClauses.has(id) || [...coveredClauses].some((c) => c.startsWith(`${id}.`));
+          const covered = clauses.filter((r) => isCovered(r.id));
           return (
             <div key={label} className="card">
               <h3>
@@ -579,7 +612,7 @@ export function AuditProgram() {
               </div>
               <div className="tags coverage-tags">
                 {clauses.map((r) => (
-                  <span key={r.id} className={`clause-chip ${coveredClauses.has(r.id) ? 'on' : ''}`} title={clauseTitle(r.id)}>
+                  <span key={r.id} className={`clause-chip ${isCovered(r.id) ? 'on' : ''}`} title={clauseTitle(r.id)}>
                     {r.clause}
                   </span>
                 ))}

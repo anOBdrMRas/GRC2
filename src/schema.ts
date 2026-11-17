@@ -12,6 +12,29 @@ import {
   treatmentOptions,
 } from './riskScale';
 
+/** Organisation of persons: Bereich (division) and Abteilung (department). */
+export const userDivisions = [
+  'Geschäftsführung',
+  'Business Enablement (BE)',
+  'Marketing and Communication',
+  'Sales',
+  'Operations',
+  'Finance & Admin',
+];
+export const userDepartments = [
+  'Global IT',
+  'I&A',
+  'Einkauf',
+  'Finanzen',
+  'Controlling',
+  'Logistik',
+  'Qualitätsmanagement',
+  'Legal & Compliance',
+  'Export Control & Customs',
+  'Vertrieb',
+  'Interne Revision',
+];
+
 export const auditTypes = ['Internes Audit', 'Zertifizierungsaudit', 'Systemaudit', 'Kundenaudit', 'Lieferantenaudit'];
 export const auditStatuses = ['Geplant', 'In Vorbereitung', 'Durchgeführt', 'Bericht erstellt', 'Maßnahmen offen', 'Abgeschlossen', 'Abgesagt'];
 export const findingTypes = ['Hauptabweichung', 'Nebenabweichung', 'Beobachtung', 'Verbesserungspotenzial', 'Positive Feststellung'];
@@ -608,45 +631,13 @@ export const modules: Record<EntityKind, ModuleDef> = {
       {
         title: 'Benutzer',
         fields: [
-          { key: 'code', label: 'Benutzer-ID', type: 'text' },
-          { key: 'title', label: 'Name', type: 'text' },
-          { key: 'email', label: 'E-Mail / Login', type: 'text' },
-          { key: 'status', label: 'Status', type: 'select', options: ['Aktiv', 'Inaktiv', 'Gesperrt'] },
-          { key: 'department', label: 'Abteilung', type: 'text' },
-          { key: 'jobTitle', label: 'Stellenbezeichnung', type: 'text' },
+          { key: 'code', label: 'Benutzer-ID', type: 'readonly', hint: 'wird automatisch vergeben' },
+          { key: 'lastName', label: 'Nachname', type: 'text' },
+          { key: 'firstName', label: 'Vorname', type: 'text' },
+          { key: 'division', label: 'Bereich', type: 'select', options: ['', ...userDivisions] },
+          { key: 'department', label: 'Abteilung', type: 'select', options: ['', ...userDepartments] },
           { key: 'positionId', label: 'Stelle', type: 'ref', refKind: 'position' },
-          { key: 'positionSince', label: 'Stelle seit', type: 'date' },
-          { key: 'validUntil', label: 'Zugang gültig bis', type: 'date', hint: 'leer = unbefristet' },
           { key: 'description', label: 'Bemerkung', type: 'textarea', wide: true },
-        ],
-      },
-      {
-        title: 'Arbeitsverhältnis',
-        fields: [
-          { key: 'employer', label: 'Arbeitgeber / Vertragspartner', type: 'text' },
-          {
-            key: 'employmentType',
-            label: 'Beschäftigungsart',
-            type: 'select',
-            options: ['Unbefristet angestellt', 'Befristet angestellt', 'Organmitglied', 'Leiharbeit', 'Freie Mitarbeit', 'Externer Dienstleister'],
-          },
-          { key: 'entryDate', label: 'Eintritt / Vertragsbeginn', type: 'date' },
-          { key: 'contractEnd', label: 'Befristet bis / Austritt', type: 'date', hint: 'leer = unbefristet' },
-          {
-            key: 'contractRef',
-            label: 'Vertragsreferenz (HR-System)',
-            type: 'text',
-            hint: 'nur Verweis – Vertragsinhalte bleiben im HR-System (§ 26 BDSG)',
-          },
-          {
-            key: 'jobDescriptionAckAt',
-            label: 'Stellenbeschreibung zur Kenntnis genommen am',
-            type: 'date',
-            hint: 'macht die Stellenbeschreibung verbindlich (§ 106 GewO)',
-          },
-          { key: 'confidentialityAt', label: 'Vertraulichkeitsverpflichtung am', type: 'date', hint: 'ISO 27001 A.6.6' },
-          { key: 'codeOfConductAt', label: 'Verhaltenskodex bestätigt am', type: 'date', hint: 'ISO 37301 5.2 / 7.3' },
-          { key: 'conflictOfInterestAt', label: 'Interessenkonflikterklärung am', type: 'date' },
         ],
       },
       {
@@ -700,7 +691,7 @@ export const modules: Record<EntityKind, ModuleDef> = {
             key: 'standards',
             label: 'Normen / Regelwerke',
             type: 'multiselect',
-            options: ['ISO 9001', 'ISO 27001', 'ISO 37301', 'Kundenanforderung', 'Lieferantenanforderung', 'Sonstiges'],
+            options: ['ISO 9001', 'ISO 14001', 'ISO 27001', 'ISO 37301', 'Kundenanforderung', 'Lieferantenanforderung', 'Sonstiges'],
           },
           { key: 'objective', label: 'Auditziel & Geltungsbereich', type: 'textarea', wide: true, hint: 'ISO 19011 5.2 / 6.2' },
           { key: 'criteria', label: 'Auditkriterien (Normkapitel)', type: 'iso', wide: true },

@@ -2651,3 +2651,16 @@ table.program tbody tr:hover {
 .stat.clickable.active {
   outline: 2px solid var(--accent);
 }
+.profile-btn {
+  border: none;
+  background: none;
+  padding: 0 4px;
+  margin-left: 4px;
+  font-size: 15px;
+  cursor: pointer;
+  opacity: 0.7;
+  vertical-align: middle;
+}
+.profile-btn:hover {
+  opacity: 1;
+}

@@ -117,7 +117,7 @@ function parseIso(s: string): string | undefined {
     .replace(/^iso\/iec/, 'iso')
     .replace(/\s+/g, ' ');
   if (isoByLabel.has(key)) return isoByLabel.get(key);
-  const m = key.match(/^(?:iso\s*)?(9001|27001|37301)[\s:]+(.+)$/);
+  const m = key.match(/^(?:iso\s*)?(9001|27001|37301|14001)[\s:]+(.+)$/);
   if (m && isoById.has(`${m[1]}:${m[2].toUpperCase().startsWith('A') ? m[2].toUpperCase() : m[2]}`))
     return `${m[1]}:${m[2].toUpperCase().startsWith('A') ? m[2].toUpperCase() : m[2]}`;
   return undefined;

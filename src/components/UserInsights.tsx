@@ -18,20 +18,14 @@ export function UserInsights({ user }: { user: User }) {
   const rights = effectiveRights(user);
   const sysConflicts = userSystemRoleConflicts(user);
   const sod = personSodConflicts(org).filter((c) => c.user.id === user.id);
-  const expired = user.validUntil && user.validUntil < new Date().toISOString().slice(0, 10);
   const issues = orgIssues(org).filter((i) => i.userId === user.id);
   const effective = org.mandate.filter((m) => m.recipientUserId === user.id && mandateState(m) === 'active');
 
   return (
     <div className="insights">
-      {(sysConflicts.length > 0 || sod.length > 0 || expired || issues.length > 0) && (
+      {(sysConflicts.length > 0 || sod.length > 0 || issues.length > 0) && (
         <div className="insight warn-box">
           <div className="insight-title">⚠ {t('Handlungsbedarf')}</div>
-          {expired && (
-            <div className="small">
-              Zugang ist seit {user.validUntil} abgelaufen, Status ist aber „{user.status}“.
-            </div>
-          )}
           {sysConflicts.map(([a, b, why]) => (
             <div key={a + b} className="small">
               {t('Unvereinbare Systemrollen im Tool')}: {t(systemRoles.find((r) => r.id === a)?.name ?? a)} +{' '}

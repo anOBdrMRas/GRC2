@@ -197,9 +197,14 @@ export interface Position extends BaseEntity {
 }
 
 /** Tool user (user management module). */
+/** Person. `title` is the display name, formed from first and last name. */
 export interface User extends BaseEntity {
-  email: string;
+  lastName: string;
+  firstName: string;
+  /** Bereich (e.g. Business Enablement) and Abteilung (e.g. Global IT) */
+  division: string;
   department: string;
+  email: string;
   jobTitle: string;
   status: 'Aktiv' | 'Inaktiv' | 'Gesperrt';
   systemRoles: string[];
