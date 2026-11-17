@@ -36,6 +36,8 @@ export function useRights() {
     isIa,
     /** may give or refuse the I&A quality approval */
     canReview: isIa || isAdmin,
+    /** quality approval (approve / send back): only the I&A team; administrators set the status instead */
+    canApprove: isIa,
     canRead: (m: ModuleKey) => rights[m] !== 'none',
     /** administrator level: create, delete, manage */
     canEdit: (m: ModuleKey) => rights[m] === 'edit',

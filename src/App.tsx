@@ -69,7 +69,7 @@ export default function App() {
         <header className="topbar">
           <div className="brand light">
             GRC<span>Studio</span>
-            <span className="brand-sub">{t('Prototyp')} · ISO 9001 · 14001 · 27001 · 37301</span>
+            <span className="brand-sub">{t('Prototyp')}</span>
           </div>
           <div className="topbar-right">
             <div className="lang-switch light" role="group" aria-label={t('Sprache')}>

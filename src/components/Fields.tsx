@@ -15,6 +15,8 @@ import { today } from '../logic';
 import { dateLocale, t } from '../i18n';
 import { systemRoleById } from '../permissions';
 
+const labelTypes: FieldDef['type'][] = ['text', 'textarea', 'number', 'date', 'select', 'ref', 'bool'];
+
 /** Labels and values from the content administration are shown as entered. */
 const lbl = (def: FieldDef) => (def.custom ? def.label : t(def.label));
 const opt = (def: FieldDef, o: string) => (def.custom || def.plain?.includes(o) ? o : t(o));
@@ -42,7 +44,9 @@ export function Field({
   locked?: boolean | string;
 }) {
   // computed displays and buttons must not sit inside a <label> (a click on the label would trigger them)
-  const Wrap = def.type === 'riskEval' || def.type === 'riskGuide' || def.type === 'riskActions' ? 'div' : 'label';
+  // only simple inputs sit in a <label>: a click inside a label also triggers its first control
+  // (e.g. the "×" of the first tag when a suggestion of a picker is clicked)
+  const Wrap = labelTypes.includes(def.type) ? 'label' : 'div';
   return (
     <Wrap className={`field ${def.wide || def.type === 'textarea' ? 'wide' : ''}`}>
       <span className="field-label">
@@ -80,7 +84,7 @@ export function FieldView({ def, value, entityId }: { def: FieldDef; value: unkn
 
 const empty = <span className="muted">–</span>;
 
-function FieldValue({ def, value, entityId }: { def: FieldDef; value: unknown; entityId?: string }) {
+export function FieldValue({ def, value, entityId }: { def: FieldDef; value: unknown; entityId?: string }) {
   const store = useStore();
   const go = useUi((s) => s.go);
   const arr = (v: unknown) => (Array.isArray(v) ? (v as string[]) : []);

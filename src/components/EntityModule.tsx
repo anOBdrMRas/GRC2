@@ -4,6 +4,8 @@ import { MandateInsights, MandateStatePill, MandateWorkflowBar } from './Mandate
 import { PositionInsights, PositionProfile } from './OrgViews';
 import { auditTypes, modules } from '../schema';
 import { moduleDef } from '../contentConfig';
+import { stateAt } from '../history';
+import { HistoryBanner, HistoryPanel } from './History';
 import { useStore } from '../store';
 import { useUi } from '../ui';
 import {
@@ -434,7 +436,9 @@ function EntityEditor({ kind, entity }: { kind: EntityKind; entity: AnyEntity })
   const [showReleased, setShowReleased] = useState(false);
   const snapshot = (entity as { released?: Record<string, unknown> }).released;
   const viewingReleased = showReleased && !!snapshot;
-  const editable = canEditEntity(kind, entity) && !viewingReleased;
+  // an older state from the change history (read-only)
+  const [viewRev, setViewRev] = useState<number | null>(null);
+  const editable = canEditEntity(kind, entity) && !viewingReleased && viewRev === null;
   const [showProfile, setShowProfile] = useState(false);
   const [suggest, setSuggest] = useState(false);
   const sample = useSample();
@@ -458,7 +462,11 @@ function EntityEditor({ kind, entity }: { kind: EntityKind; entity: AnyEntity })
     setDraft({});
     setEditing(false);
   };
-  const values = (viewingReleased ? { ...entity, ...snapshot } : { ...entity, ...(inEdit ? draft : {}) }) as unknown as Record<string, unknown>;
+  const values = (viewRev !== null
+    ? stateAt(entity, viewRev)
+    : viewingReleased
+      ? { ...entity, ...snapshot }
+      : { ...entity, ...(inEdit ? draft : {}) }) as unknown as Record<string, unknown>;
   if (kind === 'risk') values['#score'] = { likelihood: values.likelihood, impact: values.impact };
 
   return (
@@ -528,6 +536,7 @@ function EntityEditor({ kind, entity }: { kind: EntityKind; entity: AnyEntity })
         </div>
       )}
       {kind === 'mandate' && <MandateWorkflowBar mandate={entity as Mandate} />}
+      {viewRev !== null && <HistoryBanner item={entity} index={viewRev} onBack={() => setViewRev(null)} />}
       {suggest && <AiFieldSuggest kind={kind} entity={entity} onClose={() => setSuggest(false)} />}
       {kind === 'role' && showProfile && <RoleProfile role={entity as Role} onClose={() => setShowProfile(false)} />}
       {kind === 'position' && showProfile && <PositionProfile position={entity as Position} onClose={() => setShowProfile(false)} />}
@@ -580,6 +589,16 @@ function EntityEditor({ kind, entity }: { kind: EntityKind; entity: AnyEntity })
       {kind === 'risk' && <Insights kind={kind} entity={entity} />}
       {kind === 'role' && <RoleInsights role={entity as Role} part="derived" />}
       {kind === 'position' && <PositionInsights position={entity as Position} part="derived" />}
+      <HistoryPanel
+        item={entity}
+        fields={def.sections.flatMap((s) => s.fields)}
+        viewing={viewRev}
+        onView={(i) => {
+          if (inEdit) cancel();
+          setViewRev(i);
+          if (i !== null) document.querySelector('.module-detail')?.scrollTo({ top: 0, behavior: 'smooth' });
+        }}
+      />
       <div className="muted small">
         {t('Angelegt')} {new Date(entity.createdAt).toLocaleString(dateLocale())} · {t('zuletzt geändert')}{' '}
         {new Date(entity.updatedAt).toLocaleString(dateLocale())}

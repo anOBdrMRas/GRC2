@@ -29,7 +29,7 @@ export function WorkflowBar({
 }) {
   const users = useStore((s) => s.user);
   const act = useStore((s) => s.workflowAction);
-  const { isAdmin, canReview, canManage, isOwnerOf, user } = useRights();
+  const { canApprove, canManage, isOwnerOf, user } = useRights();
   const mgr = canManage(kind);
   const [comment, setComment] = useState('');
   const [showHistory, setShowHistory] = useState(false);
@@ -40,7 +40,7 @@ export function WorkflowBar({
   const submitted = lastStep(item, 'submitted');
   const name = (id: string) => users.find((u) => u.id === id)?.title ?? '–';
   // four-eyes principle: whoever gave the business approval does not also give the quality approval
-  const ownSubmission = !isAdmin && submitted?.byUserId === user?.id && stage === 'review';
+  const ownSubmission = submitted?.byUserId === user?.id && stage === 'review';
   const position = stage === 'draft' ? 0 : stage === 'review' ? 2 : 3;
   const released = item.released;
 
@@ -89,7 +89,7 @@ export function WorkflowBar({
           {stage === 'draft' && !owner && !mgr && (kind === 'risk' || kind === 'opportunity') && (
             <span className="small muted">{t('Fachliche Freigabe durch den Owner')}</span>
           )}
-          {stage === 'review' && canReview && (
+          {stage === 'review' && canApprove && (
             <>
               <input value={comment} onChange={(e) => setComment(e.target.value)} placeholder={t('Kommentar (für Zurückweisen erforderlich)')} />
               <button
@@ -110,7 +110,7 @@ export function WorkflowBar({
               </button>
             </>
           )}
-          {stage === 'review' && !canReview && owner && <span className="small muted">🔒 {t('Liegt beim I&A-Team')}</span>}
+          {stage === 'review' && !canApprove && (owner || mgr) && <span className="small muted">🔒 {t('Qualitätsfreigabe durch das I&A-Team')}</span>}
           {mgr && (
             <select
               className="wf-admin"

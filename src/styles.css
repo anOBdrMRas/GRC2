@@ -2880,3 +2880,51 @@ fieldset.reading .grid {
   padding: 2px 6px;
   font-size: 12px;
 }
+
+/* ---------- change history ---------- */
+.history-panel {
+  margin: 10px 0;
+  border-top: 1px solid var(--border);
+  padding-top: 8px;
+}
+.history-toggle {
+  font-weight: 600;
+}
+.history-list {
+  display: grid;
+  gap: 4px;
+  margin-top: 6px;
+}
+.history-entry {
+  border: 1px solid #eef1f5;
+  border-radius: 6px;
+  padding: 4px 8px;
+  background: #fff;
+}
+.history-entry.viewing {
+  border-color: #ffd43b;
+  background: #fff9db;
+}
+.history-head {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+.history-head .grow {
+  flex: 1;
+  min-width: 120px;
+}
+.history-diff td {
+  vertical-align: top;
+}
+.history-value {
+  max-height: 120px;
+  overflow: auto;
+}
+.history-old {
+  background: #fff5f5;
+}
+.history-new {
+  background: #ebfbee;
+}

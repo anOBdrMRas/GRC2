@@ -26,6 +26,7 @@ import {
   normalizeUser,
   now,
   fullName,
+  parseElements,
   riskTitle,
   roleHolders,
   uid,
@@ -34,6 +35,7 @@ import { riskEntities } from './riskScale';
 import { t } from './i18n';
 import { modules, userDepartments } from './schema';
 import { useUi } from './ui';
+import { track, withRevision } from './history';
 import { emptyConfig, type ContentConfig } from './contentConfig';
 import { seedData } from './seed';
 import { migrateSystemRoles } from './permissions';
@@ -102,6 +104,27 @@ function reopenIfReleased<T extends WfItem>(item: T, s: { user: User[]; currentU
   return { ...item, ...workflowPatch(before, 'reopen', user.id, '') } as T;
 }
 
+const stepNotes: Record<WfAction, string> = {
+  submit: 'Fachlich freigegeben',
+  approve: 'Qualität freigegeben (I&A)',
+  reject: 'Zurückgewiesen (I&A)',
+  reopen: 'Nach Freigabe geändert',
+  setStatus: 'Status gesetzt (Administration)',
+};
+const mandateNotes: Record<MandateWfAction, string> = {
+  grant: 'Erteilt (Erteilende/r)',
+  accept: 'Angenommen (Empfänger/in)',
+  decline: 'Abgelehnt / zurückgegeben',
+};
+
+/** Variables of a history note about a process step: step name and the assigned element. */
+function stepVars(p: ProcessModel, elementId: string, kind?: AssignableKind, entityId?: string, s?: Collections): Record<string, string> {
+  const step = parseElements(p.xml).find((e) => e.id === elementId)?.name || elementId;
+  if (!kind || !entityId || !s) return { step };
+  const e = (s[kind] as { id: string; code: string; title: string }[]).find((x) => x.id === entityId);
+  return { step, kind: modules[kind].label, code: e ? `${e.code} ${e.title}` : entityId };
+}
+
 export const useStore = create<State>()(
   persist(
     (set, get) => ({
@@ -112,7 +135,8 @@ export const useStore = create<State>()(
         const e = blankEntity(kind, nextCode(items, modules[kind].codePrefix), title);
         // risks and opportunities can be recorded by everybody: remember who did
         if (kind === 'risk' || kind === 'opportunity') (e as Risk).createdByUserId = get().currentUserId;
-        set({ [kind]: [...items, e] } as Partial<State>);
+        const created = withRevision(e, { at: now(), byUserId: get().currentUserId, kind: 'create', changes: [] });
+        set({ [kind]: [...items, created] } as Partial<State>);
         useUi.setState({ justCreatedId: e.id });
         return e;
       },
@@ -123,15 +147,21 @@ export const useStore = create<State>()(
           const next = (patch as Partial<Role>).incompatibleRoleIds ?? [];
           set((s) => ({
             role: s.role.map((r) => {
-              if (r.id === id) return reopenIfReleased({ ...r, ...(patch as Partial<Role>), updatedAt: now() }, s, patch, r);
+              if (r.id === id)
+                return track(r, reopenIfReleased({ ...r, ...(patch as Partial<Role>), updatedAt: now() }, s, patch, r), s.currentUserId, 'edit');
               const has = r.incompatibleRoleIds.includes(id);
               const should = next.includes(r.id);
               if (has === should) return r;
-              return {
-                ...r,
-                incompatibleRoleIds: should ? [...r.incompatibleRoleIds, id] : r.incompatibleRoleIds.filter((x) => x !== id),
-                updatedAt: now(),
-              };
+              return track(
+                r,
+                {
+                  ...r,
+                  incompatibleRoleIds: should ? [...r.incompatibleRoleIds, id] : r.incompatibleRoleIds.filter((x) => x !== id),
+                  updatedAt: now(),
+                },
+                s.currentUserId,
+                'edit',
+              );
             }),
           }));
           return;
@@ -146,7 +176,8 @@ export const useStore = create<State>()(
                 if (kind === 'risk' && 'description' in patch) next.title = riskTitle(String(next.description ?? '')) || next.title;
                 // persons: the name shown everywhere is "first name last name"
                 if (kind === 'user' && ('firstName' in patch || 'lastName' in patch)) next.title = fullName(next as User) || next.title;
-                return isWfKind(kind) ? reopenIfReleased(next as WfItem, s, patch, e as WfItem) : next;
+                const out = isWfKind(kind) ? reopenIfReleased(next as WfItem, s, patch, e as WfItem) : next;
+                return track(e, out as typeof e, s.currentUserId, 'edit');
               }),
             }) as Partial<State>,
         );
@@ -239,25 +270,52 @@ export const useStore = create<State>()(
           createdAt: now(),
           updatedAt: now(),
         };
-        set((s) => ({ processes: [...s.processes, p] }));
-        return p;
+        const created = withRevision(p, { at: now(), byUserId: get().currentUserId, kind: 'create', changes: [] });
+        set((s) => ({ processes: [...s.processes, created] }));
+        return created;
       },
 
       updateProcess: (id, patch) =>
-        set((s) => ({ processes: s.processes.map((p) => (p.id === id ? reopenIfReleased({ ...p, ...patch, updatedAt: now() }, s, patch, p) : p)) })),
+        set((s) => ({
+          processes: s.processes.map((p) => {
+            if (p.id !== id) return p;
+            const next = reopenIfReleased({ ...p, ...patch, updatedAt: now() }, s, patch, p);
+            // diagram changes are noted without the diagram itself (it would fill the browser storage)
+            const diagram = 'xml' in patch && patch.xml !== p.xml;
+            return track(p, next, s.currentUserId, diagram ? 'diagram' : 'edit', diagram ? 'Diagramm geändert' : undefined);
+          }),
+        })),
 
       workflowAction: (kind, id, action, comment = '', status) =>
         set((s) => {
           const list = (kind === 'processes' ? s.processes : s[kind]) as WfItem[];
           const next = list.map((e) =>
-            e.id === id ? ({ ...e, ...workflowPatch(e, action, s.currentUserId, comment, status), updatedAt: now() } as WfItem) : e,
+            e.id === id
+              ? track(
+                  e,
+                  { ...e, ...workflowPatch(e, action, s.currentUserId, comment, status), updatedAt: now() } as WfItem,
+                  s.currentUserId,
+                  'workflow',
+                  stepNotes[action],
+                )
+              : e,
           );
           return { [kind]: next } as Partial<State>;
         }),
 
       mandateAction: (id, action, comment = '') =>
         set((s) => ({
-          mandate: s.mandate.map((m) => (m.id === id ? { ...m, ...mandatePatch(m, action, s.currentUserId, comment), updatedAt: now() } : m)),
+          mandate: s.mandate.map((m) =>
+            m.id === id
+              ? track(
+                  m,
+                  { ...m, ...mandatePatch(m, action, s.currentUserId, comment), updatedAt: now() },
+                  s.currentUserId,
+                  'workflow',
+                  mandateNotes[action],
+                )
+              : m,
+          ),
         })),
 
       deleteProcess: (id) =>
@@ -274,17 +332,24 @@ export const useStore = create<State>()(
           processes: s.processes.map((p) =>
             p.id !== processId
               ? p
-              : reopenIfReleased(
-                  updateStep(p, elementId, (a) => {
-                    if (kind === 'role') {
-                      return a.roles.some((r) => r.roleId === entityId) ? a : { ...a, roles: [...a.roles, { roleId: entityId, raci: 'R' }] };
-                    }
-                    const key = assignmentKey[kind];
-                    return a[key].includes(entityId) ? a : { ...a, [key]: [...a[key], entityId] };
-                  }),
-                  s,
-                  {},
+              : track(
                   p,
+                  reopenIfReleased(
+                    updateStep(p, elementId, (a) => {
+                      if (kind === 'role') {
+                        return a.roles.some((r) => r.roleId === entityId) ? a : { ...a, roles: [...a.roles, { roleId: entityId, raci: 'R' }] };
+                      }
+                      const key = assignmentKey[kind];
+                      return a[key].includes(entityId) ? a : { ...a, [key]: [...a[key], entityId] };
+                    }),
+                    s,
+                    {},
+                    p,
+                  ),
+                  s.currentUserId,
+                  'assignment',
+                  '{kind} {code} dem Schritt „{step}“ zugeordnet',
+                  stepVars(p, elementId, kind, entityId, s),
                 ),
           ),
         })),
@@ -294,15 +359,22 @@ export const useStore = create<State>()(
           processes: s.processes.map((p) =>
             p.id !== processId
               ? p
-              : reopenIfReleased(
-                  updateStep(p, elementId, (a) =>
-                    kind === 'role'
-                      ? { ...a, roles: a.roles.filter((r) => r.roleId !== entityId) }
-                      : { ...a, [assignmentKey[kind]]: a[assignmentKey[kind]].filter((x) => x !== entityId) },
-                  ),
-                  s,
-                  {},
+              : track(
                   p,
+                  reopenIfReleased(
+                    updateStep(p, elementId, (a) =>
+                      kind === 'role'
+                        ? { ...a, roles: a.roles.filter((r) => r.roleId !== entityId) }
+                        : { ...a, [assignmentKey[kind]]: a[assignmentKey[kind]].filter((x) => x !== entityId) },
+                    ),
+                    s,
+                    {},
+                    p,
+                  ),
+                  s.currentUserId,
+                  'assignment',
+                  '{kind} {code} vom Schritt „{step}“ entfernt',
+                  stepVars(p, elementId, kind, entityId, s),
                 ),
           ),
         })),
@@ -312,11 +384,18 @@ export const useStore = create<State>()(
           processes: s.processes.map((p) =>
             p.id !== processId
               ? p
-              : reopenIfReleased(
-                  updateStep(p, elementId, (a) => ({ ...a, roles: a.roles.map((r) => (r.roleId === roleId ? { ...r, raci } : r)) })),
-                  s,
-                  {},
+              : track(
                   p,
+                  reopenIfReleased(
+                    updateStep(p, elementId, (a) => ({ ...a, roles: a.roles.map((r) => (r.roleId === roleId ? { ...r, raci } : r)) })),
+                    s,
+                    {},
+                    p,
+                  ),
+                  s.currentUserId,
+                  'assignment',
+                  'RACI von {kind} {code} im Schritt „{step}“: {raci}',
+                  { ...stepVars(p, elementId, 'role', roleId, s), raci },
                 ),
           ),
         })),
@@ -326,11 +405,18 @@ export const useStore = create<State>()(
           processes: s.processes.map((p) =>
             p.id !== processId
               ? p
-              : reopenIfReleased(
-                  updateStep(p, elementId, (a) => ({ ...a, note })),
-                  s,
-                  {},
+              : track(
                   p,
+                  reopenIfReleased(
+                    updateStep(p, elementId, (a) => ({ ...a, note })),
+                    s,
+                    {},
+                    p,
+                  ),
+                  s.currentUserId,
+                  'assignment',
+                  'Notiz im Schritt „{step}“ geändert',
+                  stepVars(p, elementId),
                 ),
           ),
         })),

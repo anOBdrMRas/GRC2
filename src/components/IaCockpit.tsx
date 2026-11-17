@@ -97,7 +97,7 @@ export function StatusBar({ c }: { c: { draft: number; review: number; released:
 export function IaCockpit() {
   const d = useStore();
   const act = useStore((s) => s.workflowAction);
-  const { user, isAdmin } = useRights();
+  const { user, canApprove } = useRights();
   const openItem = useOpenItem();
   const [comments, setComments] = useState<Record<string, string>>({});
   const name = (id: string) => d.user.find((u) => u.id === id)?.title ?? '–';
@@ -228,7 +228,8 @@ export function IaCockpit() {
               {waiting.map(({ kind, item }) => {
                 const sub = lastStep(item, 'submitted');
                 const k = key(kind, item.id);
-                const own = !isAdmin && sub?.byUserId === user?.id;
+                // four-eyes principle: whoever gave the business approval does not also give the quality approval
+                const own = sub?.byUserId === user?.id;
                 return (
                   <tr key={k}>
                     <td>
@@ -253,31 +254,42 @@ export function IaCockpit() {
                     </td>
                     <td className="small">{t('{n} Tage', { n: daysSince(sub?.at) })}</td>
                     <td className="ia-decide">
-                      <input
-                        value={comments[k] ?? ''}
-                        onChange={(e) => setComments({ ...comments, [k]: e.target.value })}
-                        placeholder={t('Kommentar (für Zurückweisen erforderlich)')}
-                      />
-                      <div className="row gap-s">
-                        <button className="small-btn" onClick={() => openItem({ kind, id: item.id })}>
-                          {t('Öffnen')}
-                        </button>
-                        <button
-                          className="small-btn primary"
-                          disabled={own}
-                          title={own ? t('Vier-Augen-Prinzip: Sie haben fachlich freigegeben.') : undefined}
-                          onClick={() => act(kind, item.id, 'approve', comments[k]?.trim() ?? '')}
-                        >
-                          ✓ {t('Freigeben')}
-                        </button>
-                        <button
-                          className="small-btn danger"
-                          disabled={!comments[k]?.trim()}
-                          onClick={() => act(kind, item.id, 'reject', comments[k].trim())}
-                        >
-                          ↩ {t('Zurückweisen')}
-                        </button>
-                      </div>
+                      {!canApprove ? (
+                        <div className="row gap-s">
+                          <button className="small-btn" onClick={() => openItem({ kind, id: item.id })}>
+                            {t('Öffnen')}
+                          </button>
+                          <span className="small muted">{t('Qualitätsfreigabe durch das I&A-Team')}</span>
+                        </div>
+                      ) : (
+                        <>
+                          <input
+                            value={comments[k] ?? ''}
+                            onChange={(e) => setComments({ ...comments, [k]: e.target.value })}
+                            placeholder={t('Kommentar (für Zurückweisen erforderlich)')}
+                          />
+                          <div className="row gap-s">
+                            <button className="small-btn" onClick={() => openItem({ kind, id: item.id })}>
+                              {t('Öffnen')}
+                            </button>
+                            <button
+                              className="small-btn primary"
+                              disabled={own}
+                              title={own ? t('Vier-Augen-Prinzip: Sie haben fachlich freigegeben.') : undefined}
+                              onClick={() => act(kind, item.id, 'approve', comments[k]?.trim() ?? '')}
+                            >
+                              ✓ {t('Freigeben')}
+                            </button>
+                            <button
+                              className="small-btn danger"
+                              disabled={!comments[k]?.trim()}
+                              onClick={() => act(kind, item.id, 'reject', comments[k].trim())}
+                            >
+                              ↩ {t('Zurückweisen')}
+                            </button>
+                          </div>
+                        </>
+                      )}
                     </td>
                   </tr>
                 );

@@ -17,6 +17,8 @@ import { stageLabel, stageOf } from '../workflow';
 import { ExcelTools } from './ExcelTools';
 import { Field, FieldView } from './Fields';
 import { withConfig } from '../contentConfig';
+import { stateAt } from '../history';
+import { HistoryBanner, HistoryPanel } from './History';
 import { t } from '../i18n';
 
 const categories: ProcessModel['category'][] = ['Führungsprozess', 'Kernprozess', 'Unterstützungsprozess'];
@@ -322,11 +324,8 @@ function ProcessWorkspace({ process: current }: { process: ProcessModel }) {
           <StepPanel process={process} element={selected} readOnly={!editable} onOpenSubProcess={(id) => editor.current?.openSubProcess(id)} />
         </div>
       )}
-      {tab === 'profile' && (
-        <fieldset className="plain" disabled={!editable}>
-          <ProcessProfile process={process} editable={editable} />
-        </fieldset>
-      )}
+      {/* the profile handles read / edit itself (history stays usable for readers) */}
+      {tab === 'profile' && <ProcessProfile process={process} editable={editable} />}
       {tab === 'profile' && <ProcessAudits process={process} />}
       {tab === 'matrix' && <StepMatrix process={process} onOpen={(el) => openStep(process.id, el)} />}
     </section>
@@ -358,12 +357,14 @@ function ProcessProfile({ process, editable }: { process: ProcessModel; editable
   const isAdmin = canManage('processes');
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState<Record<string, unknown>>({});
-  const inEdit = editing && editable;
+  // an older state from the change history (read-only)
+  const [viewRev, setViewRev] = useState<number | null>(null);
+  const inEdit = editing && editable && viewRev === null;
   const dirty = Object.keys(draft).length > 0;
   const setDirty = useUi((s) => s.setDirty);
   useEffect(() => setDirty(dirty), [dirty, setDirty]);
   useEffect(() => () => setDirty(false), [setDirty]);
-  const values = { ...process, ...(inEdit ? draft : {}) } as unknown as Record<string, unknown>;
+  const values = (viewRev !== null ? stateAt(process, viewRev) : { ...process, ...(inEdit ? draft : {}) }) as unknown as Record<string, unknown>;
   // custom fields and dropdown values of the content administration
   const config = useStore((s) => s.config);
   const fields = useMemo(
@@ -381,7 +382,8 @@ function ProcessProfile({ process, editable }: { process: ProcessModel; editable
     <div className="profile">
       <fieldset className={inEdit ? 'editing' : 'reading'}>
         <legend>{t('Prozesssteckbrief (ISO 9001 4.4)')}</legend>
-        {editable && (
+        {viewRev !== null && <HistoryBanner item={process} index={viewRev} onBack={() => setViewRev(null)} />}
+        {editable && viewRev === null && (
           <div className="row gap profile-actions">
             {!inEdit ? (
               <button className="primary" onClick={() => setEditing(true)}>
@@ -422,6 +424,16 @@ function ProcessProfile({ process, editable }: { process: ProcessModel; editable
             ),
           )}
         </div>
+        <HistoryPanel
+          item={process}
+          fields={fields}
+          viewing={viewRev}
+          onView={(i) => {
+            setDraft({});
+            setEditing(false);
+            setViewRev(i);
+          }}
+        />
       </fieldset>
     </div>
   );

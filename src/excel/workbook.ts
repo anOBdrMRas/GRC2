@@ -47,6 +47,8 @@ import {
   type Col,
 } from './columns';
 import { cellText, fromCell, toCell, type Lookup, type RefKind } from './codec';
+import { track, withRevision } from '../history';
+import { useStore } from '../store';
 
 /** Store data the Excel functions work on. */
 export type Data = { [K in EntityKind]: EntityMap[K][] } & { processes: ProcessModel[] };
@@ -479,7 +481,8 @@ export async function importExcel(file: ArrayBuffer, d: Data, only?: EntityKind 
   }
   const lk = lookup(work);
 
-  // pass 2: values
+  // pass 2: values (changes are recorded in the history of each element)
+  const importUser = useStore.getState().currentUserId;
   const patch: Partial<Data> = {};
   let changes = 0;
   for (const s of sheets) {
@@ -569,7 +572,7 @@ export async function importExcel(file: ArrayBuffer, d: Data, only?: EntityKind 
         if (changed) {
           sum.updated++;
           const idx = result.findIndex((e) => e.id === id);
-          result[idx] = { ...result[idx], ...fields, updatedAt: now() };
+          result[idx] = track(result[idx], { ...result[idx], ...fields, updatedAt: now() }, importUser, 'import');
         } else sum.unchanged++;
       } else {
         sum.created++;
@@ -593,7 +596,12 @@ export async function importExcel(file: ArrayBuffer, d: Data, only?: EntityKind 
                 updatedAt: now(),
               } as unknown as Record<string, unknown>)
             : (blankEntity(kind, String(fields.code), '') as unknown as Record<string, unknown>);
-        result.push({ ...base, ...fields, id });
+        result.push(
+          withRevision(
+            { ...base, ...fields, id },
+            { at: now(), byUserId: importUser, kind: 'import', changes: [], note: 'Per Excel-Import angelegt' },
+          ),
+        );
       }
     });
     (patch as Record<string, unknown>)[kind] = result;
