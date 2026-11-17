@@ -12,7 +12,8 @@ import { useStore } from '../store';
 import { useUi } from '../ui';
 import { Picker, Tag } from './common';
 import { today } from '../logic';
-import { t } from '../i18n';
+import { dateLocale, t } from '../i18n';
+import { systemRoleById } from '../permissions';
 
 const annexAOptions = annexA.map(([id, title]) => ({ id, label: `${id} ${title}` }));
 // ISO 27001 titles are kept in English; ISO 9001 / 37301 titles are German and get translated.
@@ -56,6 +57,187 @@ export function Field({
   );
 }
 
+/** Read view of a field: the value as text (no input). */
+export function FieldView({ def, value, entityId }: { def: FieldDef; value: unknown; entityId?: string }) {
+  return (
+    <div className={`field view ${def.wide || def.type === 'textarea' ? 'wide' : ''}`}>
+      <span className="field-label">{t(def.label)}</span>
+      <div className="field-value">
+        <FieldValue def={def} value={value} entityId={entityId} />
+      </div>
+    </div>
+  );
+}
+
+const empty = <span className="muted">–</span>;
+
+function FieldValue({ def, value, entityId }: { def: FieldDef; value: unknown; entityId?: string }) {
+  const store = useStore();
+  const go = useUi((s) => s.go);
+  const arr = (v: unknown) => (Array.isArray(v) ? (v as string[]) : []);
+  const entityLabel = (kind: string, id: string) => {
+    const e = (store[kind as keyof typeof store] as unknown as AnyEntity[] | undefined)?.find((x) => x.id === id);
+    return e ? (kind === 'user' ? e.title : `${e.code} ${e.title}`) : id;
+  };
+  switch (def.type) {
+    case 'text':
+    case 'textarea':
+      return (value as string)?.trim() ? <div className="view-text">{value as string}</div> : empty;
+    case 'readonly':
+      return <span className="mono">{(value as string) || '–'}</span>;
+    case 'number':
+      return value === undefined || value === null || value === '' ? empty : <>{Number(value).toLocaleString(dateLocale())}</>;
+    case 'date':
+      return value ? <>{new Date(String(value)).toLocaleDateString(dateLocale())}</> : empty;
+    case 'bool':
+      return <>{value ? t('Ja') : t('Nein')}</>;
+    case 'select': {
+      const v = value as string;
+      if (!v) return empty;
+      return <>{v === 'higher' ? t('Höher ist besser') : v === 'lower' ? t('Niedriger ist besser') : t(v)}</>;
+    }
+    case 'scale': {
+      const n = value as number;
+      if (!n) return empty;
+      return (
+        <span>
+          <b>{n}</b>
+          {def.levels?.[n - 1] && <span className="muted"> – {t(def.levels[n - 1])}</span>}
+        </span>
+      );
+    }
+    case 'multiselect':
+      return arr(value).length ? (
+        <div className="tags">
+          {arr(value).map((o) => (
+            <Tag key={o}>{t(o)}</Tag>
+          ))}
+        </div>
+      ) : (
+        empty
+      );
+    case 'ref': {
+      const v = value as string;
+      if (!v) return empty;
+      if (v === 'n/a') return <>{t('n/a (nicht anwendbar)')}</>;
+      return (
+        <span className="link" onClick={() => go(def.refKind!, v)}>
+          {entityLabel(def.refKind!, v)}
+        </span>
+      );
+    }
+    case 'refs':
+    case 'roleList': {
+      const kind = def.type === 'roleList' ? 'role' : def.refKind!;
+      return arr(value).length ? (
+        <div className="tags">
+          {arr(value).map((id) => (
+            <Tag key={id} color={modules[kind].color} onClick={() => go(kind, id)}>
+              {entityLabel(kind, id)}
+            </Tag>
+          ))}
+        </div>
+      ) : (
+        empty
+      );
+    }
+    case 'processRefs':
+      return arr(value).length ? (
+        <div className="tags">
+          {arr(value).map((id) => {
+            const p = store.processes.find((x) => x.id === id);
+            return (
+              <Tag key={id} onClick={() => go('processes', id)}>
+                {p ? `${p.code} ${p.title}` : id}
+              </Tag>
+            );
+          })}
+        </div>
+      ) : (
+        empty
+      );
+    case 'iso':
+    case 'annexA':
+      return arr(value).length ? (
+        <div className="tags">
+          {arr(value).map((id) => (
+            <Tag key={id}>
+              <span title={def.type === 'iso' ? isoTitle(id) : annexA.find(([a]) => a === id)?.[1]}>{def.type === 'iso' ? isoLabel(id) : id}</span>
+            </Tag>
+          ))}
+        </div>
+      ) : (
+        empty
+      );
+    case 'systemRoles':
+      return arr(value).length ? (
+        <div className="tags">
+          {arr(value).map((id) => (
+            <Tag key={id}>{t(systemRoleById.get(id)?.name ?? id)}</Tag>
+          ))}
+        </div>
+      ) : (
+        empty
+      );
+    case 'riskActions': {
+      const acts = (value as RiskAction[]) ?? [];
+      return acts.length ? (
+        <ol className="view-list">
+          {acts.map((a, i) => (
+            <li key={i}>
+              <span className="view-text">{a.text || '–'}</span>
+              <span className="muted"> · {a.ownerUserId ? entityLabel('user', a.ownerUserId) : t('— nicht zugewiesen —')}</span>
+            </li>
+          ))}
+        </ol>
+      ) : (
+        empty
+      );
+    }
+    case 'positionRoles': {
+      const prs = (value as PositionRole[]) ?? [];
+      return prs.length ? (
+        <ul className="view-list">
+          {prs.map((pr, i) => (
+            <li key={i}>
+              <span className="link" onClick={() => go('role', pr.roleId)}>
+                {entityLabel('role', pr.roleId)}
+              </span>
+              {pr.comment && <span className="muted"> – {pr.comment}</span>}
+            </li>
+          ))}
+        </ul>
+      ) : (
+        empty
+      );
+    }
+    case 'measurements': {
+      const ms = [...((value as Measurement[]) ?? [])].sort((a, b) => a.date.localeCompare(b.date));
+      return ms.length ? (
+        <table className="mini">
+          <tbody>
+            {ms.map((m, i) => (
+              <tr key={i}>
+                <td>{new Date(m.date).toLocaleDateString(dateLocale())}</td>
+                <td>{m.value}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      ) : (
+        empty
+      );
+    }
+    default:
+      // read-only views (holders, mandates, risk score, scale guide) and the findings table
+      return (
+        <fieldset className="plain" disabled={def.type === 'findings'}>
+          <FieldInput def={def} value={value} onChange={() => {}} entityId={entityId} />
+        </fieldset>
+      );
+  }
+}
+
 function FieldInput({ def, value, onChange, entityId }: { def: FieldDef; value: unknown; onChange: (v: unknown) => void; entityId?: string }) {
   const store = useStore();
   const go = useUi((s) => s.go);
@@ -64,7 +246,7 @@ function FieldInput({ def, value, onChange, entityId }: { def: FieldDef; value: 
     case 'text':
       return <input value={(value as string) ?? ''} onChange={(e) => onChange(e.target.value)} />;
     case 'textarea':
-      return <textarea rows={3} value={(value as string) ?? ''} onChange={(e) => onChange(e.target.value)} />;
+      return <AutoTextarea value={(value as string) ?? ''} onChange={onChange} />;
     case 'number':
       return <input type="number" value={(value as number) ?? 0} onChange={(e) => onChange(Number(e.target.value))} />;
     case 'date':
@@ -200,6 +382,18 @@ function FieldInput({ def, value, onChange, entityId }: { def: FieldDef; value: 
     case 'systemRoles':
       return <SystemRolePicker value={(value as string[]) ?? []} onChange={onChange} />;
   }
+}
+
+/** Textarea that grows with its content. */
+function AutoTextarea({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+  const rows = Math.min(
+    24,
+    Math.max(
+      3,
+      value.split('\n').reduce((n, line) => n + Math.max(1, Math.ceil(line.length / 90)), 0),
+    ),
+  );
+  return <textarea rows={rows} value={value} onChange={(e) => onChange(e.target.value)} />;
 }
 
 function Measurements({ value, onChange }: { value: Measurement[]; onChange: (v: Measurement[]) => void }) {

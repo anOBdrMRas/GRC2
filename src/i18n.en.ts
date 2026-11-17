@@ -1520,4 +1520,8 @@ export const en: Record<string, string> = {
   'Externe Kommunikation': 'External communication',
   'Notfallvorsorge und Gefahrenabwehr': 'Emergency preparedness and response',
   'Bewertung der Einhaltung von Verpflichtungen': 'Evaluation of compliance',
+  Hauptmenü: 'Main menu',
+  Speichern: 'Save',
+  'Ungespeicherte Änderungen': 'Unsaved changes',
+  'Ungespeicherte Änderungen verwerfen?': 'Discard unsaved changes?',
 };

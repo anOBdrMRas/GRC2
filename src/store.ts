@@ -33,6 +33,7 @@ import {
 import { riskEntities } from './riskScale';
 import { t } from './i18n';
 import { modules, userDepartments } from './schema';
+import { useUi } from './ui';
 import { seedData } from './seed';
 import { migrateSystemRoles } from './permissions';
 import { emptyDiagram } from './bpmn/templates';
@@ -107,6 +108,7 @@ export const useStore = create<State>()(
         // risks and opportunities can be recorded by everybody: remember who did
         if (kind === 'risk' || kind === 'opportunity') (e as Risk).createdByUserId = get().currentUserId;
         set({ [kind]: [...items, e] } as Partial<State>);
+        useUi.setState({ justCreatedId: e.id });
         return e;
       },
 

@@ -1,6 +1,6 @@
-import { useRef } from 'react';
+import { useRef, useState } from 'react';
 import { useStore } from './store';
-import { useUi, type View } from './ui';
+import { mayLeave, useUi, type View } from './ui';
 import { modules, kindOrder } from './schema';
 import { ProcessView } from './components/ProcessView';
 import { EntityModule } from './components/EntityModule';
@@ -47,6 +47,7 @@ export default function App() {
   const { canRead, isAdmin, canReview, user } = useRights();
   const select = useUi((s) => s.select);
   const lang = useLang((s) => s.lang);
+  const [dataOpen, setDataOpen] = useState(false);
   const setLang = useLang((s) => s.setLang);
   const visibleNav = nav.filter((n) => (n.view === 'ia' ? canReview : open(n.view) || canRead(moduleOf(n.view))));
   if (!loggedIn || !user) return <Login key={lang} />;
@@ -62,63 +63,13 @@ export default function App() {
 
   return (
     // Re-mount on language change so every component picks up the new texts.
-    <div className="app" key={lang}>
-      <nav className="sidebar">
-        <div className="brand-row">
-          <div className="brand">
-            GRC<span>Studio</span>
-            <div className="brand-sub">{t('Prototyp')}</div>
-          </div>
-        </div>
-        {visibleNav.map((n) => (
-          <button
-            key={n.view}
-            className={`nav-item ${view === n.view ? 'active' : ''}`}
-            onClick={() => {
-              // the process module always starts with the landscape
-              if (n.view === 'processes') select('processes', undefined);
-              go(n.view);
-            }}
-          >
-            <span className="nav-icon" style={n.color ? { color: n.color } : undefined}>
-              {n.icon}
-            </span>
-            {t(n.label)}
-          </button>
-        ))}
-        <div className="sidebar-foot">
-          <div className="muted small">ISO 9001 · 14001 · 27001 · 37301</div>
-          {isAdmin && (
-            <>
-              <ExcelTools scope="all" />
-              <button onClick={exportAll}>{t('Daten exportieren')} (JSON)</button>
-              <button onClick={() => fileInput.current?.click()}>{t('Daten importieren')} (JSON)</button>
-              <ConfirmButton label={t('Demodaten laden')} confirmLabel={t('Alle Daten ersetzen?')} className="" onConfirm={resetDemo} />
-            </>
-          )}
-          <input
-            ref={fileInput}
-            type="file"
-            accept=".json"
-            hidden
-            onChange={async (e) => {
-              const f = e.target.files?.[0];
-              e.target.value = '';
-              if (!f) return;
-              try {
-                importAll(JSON.parse(await f.text()));
-              } catch {
-                useUi
-                  .getState()
-                  .setNotice(t('Die Datei konnte nicht gelesen werden. Bitte eine mit „Daten exportieren“ erzeugte JSON-Datei wählen.'));
-              }
-            }}
-          />
-        </div>
-      </nav>
+    <div className="app top-nav" key={lang}>
       <div className="main-col">
         <header className="topbar">
-          <div className="topbar-title">{t(nav.find((n) => n.view === view)?.label ?? 'GRC Studio')}</div>
+          <div className="brand light">
+            GRC<span>Studio</span>
+            <span className="brand-sub">{t('Prototyp')} · ISO 9001 · 14001 · 27001 · 37301</span>
+          </div>
           <div className="topbar-right">
             <div className="lang-switch light" role="group" aria-label={t('Sprache')}>
               {(['de', 'en'] as const).map((l) => (
@@ -146,6 +97,7 @@ export default function App() {
             <button
               className="logout-btn"
               onClick={() => {
+                if (!mayLeave()) return;
                 logout();
                 go('home');
               }}
@@ -154,6 +106,60 @@ export default function App() {
             </button>
           </div>
         </header>
+        <nav className="menubar" aria-label={t('Hauptmenü')}>
+          <div className="menubar-items">
+            {visibleNav.map((n) => (
+              <button
+                key={n.view}
+                className={`nav-item ${view === n.view ? 'active' : ''}`}
+                onClick={() => {
+                  if (!mayLeave()) return;
+                  // the process module always starts with the landscape
+                  if (n.view === 'processes') select('processes', undefined);
+                  go(n.view);
+                }}
+              >
+                <span className="nav-icon" style={n.color ? { color: n.color } : undefined}>
+                  {n.icon}
+                </span>
+                {t(n.label)}
+              </button>
+            ))}
+          </div>
+          {isAdmin && (
+            <div className="menubar-data">
+              <button className={`nav-item ${dataOpen ? 'active' : ''}`} aria-expanded={dataOpen} onClick={() => setDataOpen(!dataOpen)}>
+                ⋯ {t('Daten')}
+              </button>
+              {dataOpen && (
+                <div className="data-menu" onClick={(e) => e.stopPropagation()}>
+                  <ExcelTools scope="all" />
+                  <button onClick={exportAll}>{t('Daten exportieren')} (JSON)</button>
+                  <button onClick={() => fileInput.current?.click()}>{t('Daten importieren')} (JSON)</button>
+                  <ConfirmButton label={t('Demodaten laden')} confirmLabel={t('Alle Daten ersetzen?')} className="" onConfirm={resetDemo} />
+                </div>
+              )}
+            </div>
+          )}
+          <input
+            ref={fileInput}
+            type="file"
+            accept=".json"
+            hidden
+            onChange={async (e) => {
+              const f = e.target.files?.[0];
+              e.target.value = '';
+              if (!f) return;
+              try {
+                importAll(JSON.parse(await f.text()));
+              } catch {
+                useUi
+                  .getState()
+                  .setNotice(t('Die Datei konnte nicht gelesen werden. Bitte eine mit „Daten exportieren“ erzeugte JSON-Datei wählen.'));
+              }
+            }}
+          />
+        </nav>
         <main className="main">
           {view === 'home' && <Home />}
           {view === 'ia' && canReview && <IaCockpit />}

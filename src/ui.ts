@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import type { EntityKind } from './types';
+import { t } from './i18n';
 
 export type View = 'home' | 'ia' | 'processes' | 'orgchart' | EntityKind;
 
@@ -33,19 +34,34 @@ interface UiState {
   /** AI process draft dialog in the process module */
   draftOpen: boolean;
   setDraftOpen: (open: boolean) => void;
+  /** a form has unsaved changes: leaving it asks first */
+  dirty: boolean;
+  setDirty: (dirty: boolean) => void;
+  /** element just created: its form opens in edit mode */
+  justCreatedId: string | null;
+}
+
+/** Asks before unsaved changes are discarded; true = may leave. */
+export function mayLeave(): boolean {
+  if (!useUi.getState().dirty) return true;
+  // eslint-disable-next-line no-alert
+  const ok = window.confirm(t('Ungespeicherte Änderungen verwerfen?'));
+  if (ok) useUi.setState({ dirty: false });
+  return ok;
 }
 
 export const useUi = create<UiState>()((set) => ({
   view: 'home',
   selected: {},
   focusElementId: null,
-  go: (view, id) => set((s) => ({ view, selected: id ? { ...s.selected, [view]: id } : s.selected })),
+  go: (view, id) => mayLeave() && set((s) => ({ view, selected: id ? { ...s.selected, [view]: id } : s.selected })),
   openStep: (processId, elementId) =>
-    set((s) => ({ view: 'processes', selected: { ...s.selected, processes: processId }, focusElementId: elementId })),
-  select: (view, id) => set((s) => ({ selected: { ...s.selected, [view]: id } })),
+    mayLeave() && set((s) => ({ view: 'processes', selected: { ...s.selected, processes: processId }, focusElementId: elementId })),
+  select: (view, id) => mayLeave() && set((s) => ({ selected: { ...s.selected, [view]: id } })),
   clearFocus: () => set({ focusElementId: null }),
   focusFindingId: null,
-  openFinding: (auditId, findingId) => set((s) => ({ view: 'audit', selected: { ...s.selected, audit: auditId }, focusFindingId: findingId })),
+  openFinding: (auditId, findingId) =>
+    mayLeave() && set((s) => ({ view: 'audit', selected: { ...s.selected, audit: auditId }, focusFindingId: findingId })),
   clearFindingFocus: () => set({ focusFindingId: null }),
   exportFile: null,
   setExportFile: (exportFile) => set({ exportFile }),
@@ -53,4 +69,7 @@ export const useUi = create<UiState>()((set) => ({
   setNotice: (notice) => set({ notice }),
   draftOpen: false,
   setDraftOpen: (draftOpen) => set({ draftOpen }),
+  dirty: false,
+  setDirty: (dirty) => set({ dirty }),
+  justCreatedId: null,
 }));

@@ -421,7 +421,7 @@ table.mini th {
 /* ---------- modules ---------- */
 .module {
   display: grid;
-  grid-template-columns: minmax(0, 1.2fr) minmax(440px, 1fr);
+  grid-template-columns: minmax(320px, 1fr) minmax(0, 2fr);
   height: 100%;
 }
 .module-list {
@@ -2663,4 +2663,125 @@ table.program tbody tr:hover {
 }
 .profile-btn:hover {
   opacity: 1;
+}
+
+/* ---------- top navigation (menu bar below the header) ---------- */
+.app.top-nav {
+  display: block;
+}
+.app.top-nav .main-col {
+  height: 100vh;
+}
+.topbar .brand.light {
+  padding: 0;
+  font-size: 18px;
+  color: #14263a;
+  white-space: nowrap;
+}
+.topbar .brand.light span {
+  color: #1c7ed6;
+}
+.topbar .brand.light .brand-sub {
+  display: inline;
+  margin-left: 10px;
+  color: var(--muted);
+  font-size: 11px;
+  letter-spacing: 0.04em;
+}
+.menubar {
+  display: flex;
+  align-items: stretch;
+  gap: 4px;
+  background: #14263a;
+  color: #e9eef5;
+  padding: 0 12px;
+  flex: none;
+  position: relative;
+  z-index: 20;
+}
+.menubar-items {
+  display: flex;
+  gap: 2px;
+  overflow-x: auto;
+  scrollbar-width: thin;
+  min-width: 0;
+  flex: 1;
+}
+.menubar .nav-item {
+  white-space: nowrap;
+  padding: 9px 10px 7px;
+  gap: 6px;
+  font-size: 13px;
+  border-radius: 0;
+  border-bottom: 2px solid transparent;
+}
+.menubar .nav-item.active {
+  background: rgba(116, 192, 252, 0.14);
+  border-bottom-color: #74c0fc;
+}
+.menubar .nav-icon {
+  width: auto;
+}
+.menubar-data {
+  position: relative;
+  flex: none;
+}
+.data-menu {
+  position: absolute;
+  right: 0;
+  top: 100%;
+  background: #fff;
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
+  padding: 8px;
+  display: grid;
+  gap: 6px;
+  min-width: 230px;
+}
+.data-menu button {
+  text-align: left;
+}
+
+/* ---------- compact lists ---------- */
+.module-list {
+  padding: 12px;
+  gap: 8px;
+}
+.module-list table.list th,
+.module-list table.list td {
+  font-size: 12px;
+  padding: 4px 6px;
+}
+.module-list .module-head h2 {
+  font-size: 18px;
+}
+
+/* ---------- read view of the forms ---------- */
+.field.view .field-label {
+  font-size: 11px;
+}
+.field-value {
+  font-size: 13px;
+  line-height: 1.45;
+  padding: 2px 0 4px;
+  min-height: 20px;
+}
+.view-text {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.view-list {
+  margin: 0;
+  padding-left: 18px;
+  display: grid;
+  gap: 3px;
+}
+fieldset.reading .grid {
+  row-gap: 6px;
+}
+.unsaved-note {
+  color: #e67700;
+  margin-bottom: 6px;
 }

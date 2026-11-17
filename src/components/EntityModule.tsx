@@ -1,4 +1,4 @@
-import { useMemo, useState, type ReactNode } from 'react';
+import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import type { AnyEntity, Audit, Control, EntityKind, Kpi, Mandate, Opportunity, Position, Risk, Role, User } from '../types';
 import { MandateInsights, MandateStatePill, MandateWorkflowBar } from './MandateViews';
 import { PositionInsights, PositionProfile } from './OrgViews';
@@ -19,7 +19,7 @@ import {
   scoreOf,
   roleHolders,
 } from '../logic';
-import { Field } from './Fields';
+import { Field, FieldView } from './Fields';
 import { ConfirmButton, Empty, LevelBadge, StatusPill, Tag, TrafficLight } from './common';
 import { useRights } from '../useRights';
 import { AiFieldSuggest, canSuggest } from './AiDraft';
@@ -34,6 +34,30 @@ import { SystemRoleMatrix, UserInsights } from './UserInsights';
 import { Heatmap } from './Heatmap';
 import { AuditFindingsList, AuditInsights, AuditProgram, FindingLine, auditTypeColor } from './AuditViews';
 import { Sparkline } from './Sparkline';
+
+/** Columns shown in the (narrow) list per module; the details are in the form. */
+const listColumns: Record<EntityKind, string[]> = {
+  risk: ['Bereich / Funktion', 'Score'],
+  opportunity: ['Kategorie', 'Potenzial'],
+  control: ['Art', 'Wirksamkeit'],
+  role: ['Typ', 'Inhaber'],
+  position: ['Org.-Einheit', 'Inhaber'],
+  mandate: ['Empfänger', 'Zustand'],
+  kpi: ['Ist', 'Ziel'],
+  audit: ['Termin', 'Status'],
+  user: ['Stelle', 'Bereich'],
+};
+
+/** At most two names in the narrow list, the rest as "+n" (all names in the tooltip). */
+function shortNames(names: string[]): ReactNode {
+  if (!names.length) return <span className="warn">{t('unbesetzt')}</span>;
+  return (
+    <span title={names.join(', ')}>
+      {names.slice(0, 2).join(', ')}
+      {names.length > 2 && <span className="muted"> +{names.length - 2}</span>}
+    </span>
+  );
+}
 
 interface Column {
   label: string;
@@ -100,10 +124,7 @@ function useColumns(kind: EntityKind): Column[] {
         { label: 'Typ', render: (e) => t((e as Role).roleType), sort: (e) => (e as Role).roleType },
         {
           label: 'Inhaber',
-          render: (e) =>
-            roleHolders(e as Role, org)
-              .map((m) => m.user.title)
-              .join(', ') || <span className="warn">{t('unbesetzt')}</span>,
+          render: (e) => shortNames([...new Set(roleHolders(e as Role, org).map((m) => m.user.title))]),
         },
         { label: 'Pflicht', render: (e) => ((e as Role).mandatory ? '●' : '') },
         { label: 'Status', render: (e) => <StatusPill status={(e as Role).status} /> },
@@ -115,8 +136,7 @@ function useColumns(kind: EntityKind): Column[] {
           label: 'Inhaber',
           render: (e) => {
             const p = e as Position;
-            const h = positionHolders(p, org.user);
-            return h.map((u) => u.title).join(', ') || <span className="warn">{t('unbesetzt')}</span>;
+            return shortNames(positionHolders(p, org.user).map((u) => u.title));
           },
         },
         {
@@ -147,6 +167,7 @@ function useColumns(kind: EntityKind): Column[] {
           render: (e) => org.position.find((p) => p.id === (e as User).positionId)?.title ?? '–',
           sort: (e) => (e as User).positionId,
         },
+        { label: 'Bereich', render: (e) => t((e as User).division) || '–', sort: (e) => (e as User).division },
         { label: 'Systemrollen', render: (e) => (e as User).systemRoles.map((id) => t(systemRoleById.get(id)?.name ?? id)).join(', ') },
         { label: 'Status', render: (e) => <StatusPill status={(e as User).status} /> },
       ];
@@ -211,7 +232,8 @@ export function EntityModule({ kind }: { kind: EntityKind }) {
   const createEntity = useStore((s) => s.createEntity);
   const selectedId = useUi((s) => s.selected[kind]);
   const select = useUi((s) => s.select);
-  const columns = useColumns(kind);
+  const allColumns = useColumns(kind);
+  const columns = useMemo(() => allColumns.filter((c) => listColumns[kind].includes(c.label)), [allColumns, kind]);
   const [q, setQ] = useState('');
   const [heatCell, setHeatCell] = useState<string | null>(null);
   const [sortCol, setSortCol] = useState<number | null>(null);
@@ -365,8 +387,7 @@ export function EntityModule({ kind }: { kind: EntityKind }) {
           <table className="list">
             <thead>
               <tr>
-                <th>ID</th>
-                <th>{t(kind === 'risk' ? 'Risiko' : 'Bezeichnung')}</th>
+                <th>{t(kind === 'risk' ? 'Risiko' : kind === 'user' ? 'Name' : 'Bezeichnung')}</th>
                 {columns.map((c, i) => (
                   <th key={c.label} className={c.sort ? 'sortable' : ''} onClick={() => c.sort && setSortCol(sortCol === i ? null : i)}>
                     {t(c.label)}
@@ -378,8 +399,7 @@ export function EntityModule({ kind }: { kind: EntityKind }) {
             <tbody>
               {filtered.map((e) => (
                 <tr key={e.id} className={e.id === selectedId ? 'selected' : ''} onClick={() => select(kind, e.id)}>
-                  <td className="mono">{e.code}</td>
-                  <td>
+                  <td title={e.code}>
                     {e.title}
                     {kind !== 'user' && isOwnerOf(kind, e) && <span className="owner-badge">{t('Owner')}</span>}
                   </td>
@@ -414,7 +434,27 @@ function EntityEditor({ kind, entity }: { kind: EntityKind; entity: AnyEntity })
   const [showProfile, setShowProfile] = useState(false);
   const [suggest, setSuggest] = useState(false);
   const sample = useSample();
-  const values = (viewingReleased ? { ...entity, ...snapshot } : { ...entity }) as unknown as Record<string, unknown>;
+  // read view by default; "Bearbeiten" switches to the inputs, changes are kept locally until "Speichern"
+  const [editing, setEditing] = useState(() => useUi.getState().justCreatedId === entity.id && editable);
+  useEffect(() => {
+    if (useUi.getState().justCreatedId === entity.id) useUi.setState({ justCreatedId: null });
+  }, [entity.id]);
+  const [draft, setDraft] = useState<Record<string, unknown>>({});
+  const inEdit = editing && editable;
+  const dirty = Object.keys(draft).length > 0;
+  const setDirty = useUi((s) => s.setDirty);
+  useEffect(() => setDirty(dirty), [dirty, setDirty]);
+  useEffect(() => () => setDirty(false), [setDirty]);
+  const save = () => {
+    if (dirty) update(kind, entity.id, draft as never);
+    setDraft({});
+    setEditing(false);
+  };
+  const cancel = () => {
+    setDraft({});
+    setEditing(false);
+  };
+  const values = (viewingReleased ? { ...entity, ...snapshot } : { ...entity, ...(inEdit ? draft : {}) }) as unknown as Record<string, unknown>;
   if (kind === 'risk') values['#score'] = { likelihood: values.likelihood, impact: values.impact };
 
   return (
@@ -437,6 +477,19 @@ function EntityEditor({ kind, entity }: { kind: EntityKind; entity: AnyEntity })
           </h3>
         </div>
         <div className="row gap">
+          {editable && !inEdit && (
+            <button className="primary" onClick={() => setEditing(true)}>
+              ✎ {t('Bearbeiten')}
+            </button>
+          )}
+          {inEdit && (
+            <>
+              <button className="primary" onClick={save} disabled={!dirty} title={!dirty ? t('Keine Änderungen') : undefined}>
+                ✓ {t('Speichern')}
+              </button>
+              <button onClick={cancel}>{t('Abbrechen')}</button>
+            </>
+          )}
           {editable && sample && canSuggest(kind) && <button onClick={() => setSuggest(true)}>✨ {t('Mit KI vorschlagen')}</button>}
           {!isAdmin &&
             (editable && !isOwnerOf(kind, entity) && isRecorder(kind, entity) ? (
@@ -487,29 +540,34 @@ function EntityEditor({ kind, entity }: { kind: EntityKind; entity: AnyEntity })
       ) : kind === 'risk' ? null : (
         <Insights kind={kind} entity={entity} />
       )}
-      <fieldset className="plain" disabled={!editable}>
+      {inEdit && dirty && <div className="unsaved-note small">● {t('Ungespeicherte Änderungen')}</div>}
+      <fieldset className={`plain ${inEdit ? 'editing' : 'reading'}`} disabled={!editable}>
         {def.sections.map((sec) => (
           <fieldset key={sec.title}>
             <legend>{t(sec.title)}</legend>
             <div className="grid">
               {sec.fields
                 .filter((f) => !f.showIf || f.showIf(values))
-                .map((f) => (
-                  <Field
-                    key={f.key}
-                    def={f}
-                    value={values[f.key]}
-                    entityId={entity.id}
-                    locked={
-                      editable &&
-                      !canEditField(kind, f.key, entity) &&
-                      ((f.key === 'status' && isWfKind(kind)) || (kind === 'mandate' && (f.key === 'status' || f.key === 'acceptedAt'))
-                        ? 'wird über den Freigabe-Workflow gesetzt'
-                        : true)
-                    }
-                    onChange={(v) => update(kind, entity.id, { [f.key]: v })}
-                  />
-                ))}
+                .map((f) =>
+                  !inEdit ? (
+                    <FieldView key={f.key} def={f} value={values[f.key]} entityId={entity.id} />
+                  ) : (
+                    <Field
+                      key={f.key}
+                      def={f}
+                      value={values[f.key]}
+                      entityId={entity.id}
+                      locked={
+                        editable &&
+                        !canEditField(kind, f.key, entity) &&
+                        ((f.key === 'status' && isWfKind(kind)) || (kind === 'mandate' && (f.key === 'status' || f.key === 'acceptedAt'))
+                          ? 'wird über den Freigabe-Workflow gesetzt'
+                          : true)
+                      }
+                      onChange={(v) => setDraft((d) => ({ ...d, [f.key]: v }))}
+                    />
+                  ),
+                )}
             </div>
           </fieldset>
         ))}

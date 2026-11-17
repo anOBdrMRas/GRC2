@@ -1,8 +1,8 @@
-import { useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import type { AssignableKind, ProcessModel } from '../types';
 import { useStore } from '../store';
 import { useUi } from '../ui';
-import { modules } from '../schema';
+import { modules, type FieldDef } from '../schema';
 import { activityTypes, allFindings, assignedIds, auditDate, emptyAssignment, isOpenFinding, parseElements } from '../logic';
 import { BpmnEditor, type BpmnEditorHandle, type SelectedElement } from '../bpmn/BpmnEditor';
 import { StepPanel } from './StepPanel';
@@ -15,6 +15,7 @@ import { WorkflowBar } from './WorkflowBar';
 import { stepsOfUser } from '../ownership';
 import { stageLabel, stageOf } from '../workflow';
 import { ExcelTools } from './ExcelTools';
+import { Field, FieldView } from './Fields';
 import { t } from '../i18n';
 
 const categories: ProcessModel['category'][] = ['Führungsprozess', 'Kernprozess', 'Unterstützungsprozess'];
@@ -321,7 +322,7 @@ function ProcessWorkspace({ process: current }: { process: ProcessModel }) {
       )}
       {tab === 'profile' && (
         <fieldset className="plain" disabled={!editable}>
-          <ProcessProfile process={process} />
+          <ProcessProfile process={process} editable={editable} />
         </fieldset>
       )}
       {tab === 'profile' && <ProcessAudits process={process} />}
@@ -330,106 +331,85 @@ function ProcessWorkspace({ process: current }: { process: ProcessModel }) {
   );
 }
 
-function ProcessProfile({ process }: { process: ProcessModel }) {
+const profileFields: FieldDef[] = [
+  { key: 'code', label: 'ID', type: 'readonly' },
+  { key: 'title', label: 'Bezeichnung', type: 'text' },
+  { key: 'category', label: 'Prozesskategorie', type: 'select', options: categories },
+  { key: 'ownerRoleId', label: 'Prozessverantwortlicher', type: 'ref', refKind: 'role' },
+  { key: 'area', label: 'Prozessbereich', type: 'text', hint: 'für die Prozesslandschaft' },
+  { key: 'version', label: 'Version', type: 'text' },
+  { key: 'status', label: 'Freigabestatus', type: 'select', options: ['Entwurf', 'In Prüfung', 'Freigegeben', 'Archiviert'] },
+  { key: 'nextReview', label: 'Nächste Überprüfung', type: 'date' },
+  { key: 'standards', label: 'Relevante Managementsysteme', type: 'multiselect', options: ['ISO 9001', 'ISO 14001', 'ISO 27001', 'ISO 37301'] },
+  { key: 'description', label: 'Zweck & Anwendungsbereich', type: 'textarea', wide: true },
+  { key: 'inputs', label: 'Eingaben (Inputs)', type: 'textarea', wide: true, hint: 'ISO 9001 4.4.1 a' },
+  { key: 'outputs', label: 'Ergebnisse (Outputs)', type: 'textarea', wide: true, hint: 'ISO 9001 4.4.1 a' },
+  { key: 'resources', label: 'Ressourcen', type: 'textarea', wide: true, hint: 'ISO 9001 4.4.1 d' },
+];
+
+/** Process profile: read view, "Bearbeiten" shows the inputs; changes are saved together. */
+function ProcessProfile({ process, editable }: { process: ProcessModel; editable: boolean }) {
   const update = useStore((s) => s.updateProcess);
   const { isAdmin } = useRights();
-  const roles = useStore((s) => s.role);
-  const set = (patch: Partial<ProcessModel>) => update(process.id, patch);
-  const text = (key: 'code' | 'title' | 'version', label: string) => (
-    <label className="field">
-      <span className="field-label">{t(label)}</span>
-      <input value={process[key]} onChange={(e) => set({ [key]: e.target.value })} />
-    </label>
-  );
-  const area = (key: 'description' | 'inputs' | 'outputs' | 'resources', label: string, hint?: string) => (
-    <label className="field wide">
-      <span className="field-label">
-        {t(label)}
-        {hint && <span className="hint"> · {t(hint)}</span>}
-      </span>
-      <textarea rows={3} value={process[key] ?? ''} onChange={(e) => set({ [key]: e.target.value })} />
-    </label>
-  );
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState<Record<string, unknown>>({});
+  const inEdit = editing && editable;
+  const dirty = Object.keys(draft).length > 0;
+  const setDirty = useUi((s) => s.setDirty);
+  useEffect(() => setDirty(dirty), [dirty, setDirty]);
+  useEffect(() => () => setDirty(false), [setDirty]);
+  const values = { ...process, ...(inEdit ? draft : {}) } as unknown as Record<string, unknown>;
+  const locked = (key: string) =>
+    key === 'status'
+      ? 'wird über den Freigabe-Workflow gesetzt'
+      : key === 'ownerRoleId' && !isAdmin
+        ? 'Nur die Administration ändert die Ownership.'
+        : false;
 
   return (
     <div className="profile">
-      <fieldset>
+      <fieldset className={inEdit ? 'editing' : 'reading'}>
         <legend>{t('Prozesssteckbrief (ISO 9001 4.4)')}</legend>
+        {editable && (
+          <div className="row gap profile-actions">
+            {!inEdit ? (
+              <button className="primary" onClick={() => setEditing(true)}>
+                ✎ {t('Bearbeiten')}
+              </button>
+            ) : (
+              <>
+                <button
+                  className="primary"
+                  disabled={!dirty}
+                  onClick={() => {
+                    update(process.id, draft as Partial<ProcessModel>);
+                    setDraft({});
+                    setEditing(false);
+                  }}
+                >
+                  ✓ {t('Speichern')}
+                </button>
+                <button
+                  onClick={() => {
+                    setDraft({});
+                    setEditing(false);
+                  }}
+                >
+                  {t('Abbrechen')}
+                </button>
+                {dirty && <span className="unsaved-note small">● {t('Ungespeicherte Änderungen')}</span>}
+              </>
+            )}
+          </div>
+        )}
         <div className="grid">
-          {text('code', 'ID')}
-          {text('title', 'Bezeichnung')}
-          <label className="field">
-            <span className="field-label">{t('Prozesskategorie')}</span>
-            <select value={process.category} onChange={(e) => set({ category: e.target.value as ProcessModel['category'] })}>
-              {categories.map((c) => (
-                <option key={c} value={c}>
-                  {t(c)}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label className="field">
-            <span className="field-label">{t('Prozessverantwortlicher')}</span>
-            <select
-              value={process.ownerRoleId}
-              disabled={!isAdmin}
-              title={isAdmin ? undefined : t('Nur die Administration ändert die Ownership.')}
-              onChange={(e) => set({ ownerRoleId: e.target.value })}
-            >
-              <option value="">{t('— nicht zugewiesen —')}</option>
-              {roles.map((r) => (
-                <option key={r.id} value={r.id}>
-                  {r.code} {r.title}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label className="field">
-            <span className="field-label">
-              {t('Prozessbereich')}
-              <span className="hint"> · {t('für die Prozesslandschaft')}</span>
-            </span>
-            <input value={process.area ?? ''} onChange={(e) => set({ area: e.target.value })} />
-          </label>
-          {text('version', 'Version')}
-          <label className="field">
-            <span className="field-label">{t('Freigabestatus')}</span>
-            <select
-              value={process.status}
-              disabled
-              title={t('wird über den Freigabe-Workflow gesetzt')}
-              onChange={(e) => set({ status: e.target.value })}
-            >
-              {['Entwurf', 'In Prüfung', 'Freigegeben', 'Archiviert'].map((s) => (
-                <option key={s} value={s}>
-                  {t(s)}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label className="field">
-            <span className="field-label">{t('Nächste Überprüfung')}</span>
-            <input type="date" value={process.nextReview} onChange={(e) => set({ nextReview: e.target.value })} />
-          </label>
-          <label className="field">
-            <span className="field-label">{t('Relevante Managementsysteme')}</span>
-            <div className="checks">
-              {['ISO 9001', 'ISO 14001', 'ISO 27001', 'ISO 37301'].map((s) => (
-                <label key={s} className="checkbox">
-                  <input
-                    type="checkbox"
-                    checked={process.standards.includes(s)}
-                    onChange={(e) => set({ standards: e.target.checked ? [...process.standards, s] : process.standards.filter((x) => x !== s) })}
-                  />
-                  {s}
-                </label>
-              ))}
-            </div>
-          </label>
-          {area('description', 'Zweck & Anwendungsbereich')}
-          {area('inputs', 'Eingaben (Inputs)', 'ISO 9001 4.4.1 a')}
-          {area('outputs', 'Ergebnisse (Outputs)', 'ISO 9001 4.4.1 a')}
-          {area('resources', 'Ressourcen', 'ISO 9001 4.4.1 d')}
+          {profileFields.map((f) =>
+            inEdit ? (
+              <Field key={f.key} def={f} value={values[f.key]} locked={locked(f.key)} onChange={(v) => setDraft((d) => ({ ...d, [f.key]: v }))} />
+            ) : (
+              <FieldView key={f.key} def={f} value={values[f.key]} />
+            ),
+          )}
         </div>
       </fieldset>
     </div>
