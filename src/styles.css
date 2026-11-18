@@ -2928,3 +2928,167 @@ fieldset.reading .grid {
 .history-new {
   background: #ebfbee;
 }
+
+/* ==========================================================================
+   Design of the server version (fidonis): colours, fonts, shapes.
+   One layer at the end so the prototype matches GRC Studio; remove it to go back.
+   ========================================================================== */
+:root {
+  --bg: #f3f5f7;
+  --panel: #ffffff;
+  --border: #e0e5ea;
+  --text: #0b0e12;
+  --muted: #5b6672;
+  --accent: #0a2f4d;
+  --accent-soft: #e6eef5;
+  --secondary: #1b5e8c;
+  --gold: #c8972a;
+  --ok: #0d724e;
+  --warn: #8a6014;
+  --error: #c53c3c;
+  --radius-box: 0.75rem;
+  --radius-btn: 0.5rem;
+  font-family: 'IBM Plex Sans', system-ui, sans-serif;
+}
+h1,
+h2,
+h3,
+.brand,
+.login-sub {
+  font-family: 'Manrope', 'IBM Plex Sans', system-ui, sans-serif;
+}
+h2 {
+  font-weight: 700;
+}
+
+/* header and menu bar */
+.topbar .brand {
+  font-weight: 800;
+  color: var(--text);
+}
+.brand span,
+.brand.light span,
+.brand.dark span {
+  color: var(--secondary);
+  font-weight: 500;
+}
+.brand-sub {
+  color: var(--muted);
+}
+.menubar {
+  background: var(--accent);
+  color: #fff;
+}
+.menubar .nav-item {
+  font-size: 14px;
+  opacity: 0.85;
+}
+.menubar .nav-item:hover {
+  opacity: 1;
+  background: rgba(255, 255, 255, 0.08);
+}
+.menubar .nav-item.active {
+  opacity: 1;
+  background: rgba(255, 255, 255, 0.12);
+  border-bottom-color: var(--gold);
+}
+.lang-switch.light button.active,
+.lang-switch button.active {
+  background: var(--secondary);
+  color: #fff;
+}
+.user-avatar {
+  background: var(--accent);
+}
+
+/* module titles in the text colour (the server version does not colour them per module) */
+.module-head h2 {
+  color: var(--text) !important;
+}
+
+/* controls */
+button,
+input,
+select,
+textarea {
+  border-radius: var(--radius-btn);
+}
+button:hover {
+  background: var(--accent-soft);
+}
+button.primary {
+  background: var(--accent);
+  border-color: var(--accent);
+}
+button.primary:hover {
+  background: #133f63;
+}
+button.danger {
+  color: var(--error);
+}
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible,
+button:focus-visible {
+  outline: 2px solid var(--secondary);
+  outline-offset: 1px;
+}
+a {
+  color: var(--secondary);
+}
+
+/* surfaces */
+.card {
+  border-radius: var(--radius-box);
+}
+.assistant-fab {
+  background: var(--accent);
+  border-color: var(--accent);
+}
+.assistant-fab:hover {
+  background: #133f63;
+}
+
+/* details like the server version */
+.brand span {
+  margin-left: 0.25em;
+}
+.login-page {
+  background: var(--bg);
+}
+.login-card {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-box);
+  box-shadow: 0 1px 3px rgba(11, 14, 18, 0.06);
+}
+.logout-btn {
+  border-color: transparent;
+  background: transparent;
+  font-weight: 600;
+}
+.assistant-head {
+  background: var(--accent-soft);
+}
+/* approval workflow: outlined chips on a white bar */
+.workflow-bar,
+.workflow-bar.stage-review,
+.workflow-bar.stage-released {
+  background: var(--panel);
+  border-color: var(--border);
+  border-radius: var(--radius-box);
+}
+.wf-step {
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+}
+.wf-step.done {
+  border-color: var(--ok);
+  color: var(--ok);
+  background: transparent;
+}
+.wf-step.current {
+  border-color: var(--secondary);
+  background: var(--secondary);
+  color: #fff;
+}
