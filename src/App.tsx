@@ -16,24 +16,36 @@ import { useRights } from './useRights';
 import { t, useLang } from './i18n';
 import { systemRoleById, type ModuleKey } from './permissions';
 
-const nav: { view: View; label: string; icon: string; color?: string }[] = [
-  { view: 'home', label: 'Startseite', icon: '⌂' },
-  { view: 'processes', label: 'Prozesse', icon: '▦' },
-  { view: 'instruction', label: 'Work Instructions', icon: '📝', color: modules.instruction.color },
-  { view: 'ia', label: 'I&A-Cockpit', icon: '✓', color: '#0c8599' },
-  ...kindOrder
-    .filter((k) => k !== 'instruction')
-    .flatMap((k) => {
-    const item = {
-      view: k as View,
-      label: modules[k].plural,
-      icon: { instruction: '📝', risk: '⚠', opportunity: '✦', control: '✔', role: '👤', position: '▤', mandate: '✍', kpi: '📈', audit: '🔍', user: '⚙' }[k],
-      color: modules[k].color,
-    };
-    // the org chart sits right below the positions it visualises
-    return k === 'position' ? [item, { view: 'orgchart' as View, label: 'Organigramm', icon: '⊞', color: modules.position.color }] : [item];
-  }),
+/** Menu order: cockpit, processes and work instructions, organisation, GRC modules, user management. */
+const menuOrder: View[] = [
+  'home',
+  'ia',
+  'processes',
+  'instruction',
+  'position',
+  'role',
+  'orgchart',
+  'mandate',
+  'risk',
+  'opportunity',
+  'control',
+  'kpi',
+  'audit',
+  'user',
 ];
+const nav: { view: View; label: string; color?: string }[] = menuOrder.map((v) => ({
+  view: v,
+  label:
+    v === 'home'
+      ? 'Startseite'
+      : v === 'ia'
+        ? 'I&A-Cockpit'
+        : v === 'processes'
+          ? 'Prozesse'
+          : v === 'orgchart'
+            ? 'Organigramm'
+            : modules[v as (typeof kindOrder)[number]].plural,
+}));
 
 /** Rights module that governs a navigation entry. */
 const moduleOf = (v: View): ModuleKey => (v === 'orgchart' ? 'position' : (v as ModuleKey));
