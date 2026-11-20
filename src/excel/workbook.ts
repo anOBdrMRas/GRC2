@@ -236,6 +236,7 @@ function extraSpecs(kind: EntityKind | 'processes', d: Data, lk: Lookup): SheetS
             e.name,
             e.type,
             a.roles.map((r) => `${lk.codeOf('role', r.roleId)}:${r.raci}`).join(', ') || null,
+            codes('instruction', a.instructions ?? []),
             codes('risk', a.risks),
             codes('control', a.controls),
             codes('opportunity', a.opportunities),
@@ -750,6 +751,7 @@ function importChildRows(
       }
     }
     const keyMap: [string, keyof StepAssignment][] = [
+      ['instructions', 'instructions'],
       ['risks', 'risks'],
       ['controls', 'controls'],
       ['opportunities', 'opportunities'],
@@ -759,7 +761,7 @@ function importChildRows(
       const c = stepCols.find((x) => x.key === key)!;
       if (s.colIndex.has(key)) (a as unknown as Record<string, unknown>)[field] = fromCell(c, get(c), lk, warn);
     }
-    if (s.colIndex.has('note')) a.note = cellText(get(stepCols[9]));
+    if (s.colIndex.has('note')) a.note = cellText(get(stepCols.find((x) => x.key === 'note')!));
     if (same(a, old)) sum.unchanged++;
     else {
       sum.updated++;

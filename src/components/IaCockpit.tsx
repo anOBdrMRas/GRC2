@@ -103,6 +103,7 @@ export function IaCockpit() {
   const name = (id: string) => d.user.find((u) => u.id === id)?.title ?? '–';
   const all: { kind: WfKind; item: WfItem }[] = [
     ...d.processes.map((item) => ({ kind: 'processes' as WfKind, item })),
+    ...d.instruction.map((item) => ({ kind: 'instruction' as WfKind, item })),
     ...d.role.map((item) => ({ kind: 'role' as WfKind, item })),
     ...d.position.map((item) => ({ kind: 'position' as WfKind, item })),
     ...d.risk.map((item) => ({ kind: 'risk' as WfKind, item })),
@@ -164,7 +165,7 @@ export function IaCockpit() {
 
       <h3 className="ia-heading">{t('Qualitätsübersicht')}</h3>
       <div className="ia-kpis">
-        {(['processes', 'role', 'position'] as WfKind[]).map((k) => (
+        {(['processes', 'instruction', 'role', 'position'] as WfKind[]).map((k) => (
           <div key={k} className="ia-kpi" style={{ borderTopColor: kindColor(k) }}>
             <div className="row space">
               <b>{k === 'processes' ? t('Prozesse') : t(modules[k].plural)}</b>

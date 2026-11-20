@@ -24,6 +24,7 @@ const snapshot = (): Data => {
   const s = useStore.getState();
   return {
     risk: s.risk,
+    instruction: s.instruction,
     opportunity: s.opportunity,
     control: s.control,
     role: s.role,

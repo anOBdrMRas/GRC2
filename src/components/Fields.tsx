@@ -1,11 +1,13 @@
 import { useState } from 'react';
 import type { FieldDef } from '../schema';
 import { modules } from '../schema';
-import type { AnyEntity, AuditFinding, Measurement, PositionRole, RiskAction } from '../types';
+import type { AnyEntity, AssignableKind, AuditFinding, Measurement, PositionRole, RiskAction } from '../types';
 import { PositionHolders, PositionRoles, RoleRelations } from './OrgViews';
 import { RiskActions, RiskEval, RiskScaleButton } from './RiskViews';
 import { FindingsEditor, ProcessRefs } from './AuditViews';
 import { MandateList } from './MandateViews';
+import { RichTextEditor, RichTextView } from './RichText';
+import { StepRefs } from './StepRefs';
 import { systemRoleConflicts, systemRoles } from '../permissions';
 import { annexA, isoById, isoCatalog, isoLabel } from '../iso';
 import { useStore } from '../store';
@@ -98,6 +100,10 @@ export function FieldValue({ def, value, entityId }: { def: FieldDef; value: unk
       return (value as string)?.trim() ? <div className="view-text">{value as string}</div> : empty;
     case 'readonly':
       return <span className="mono">{(value as string) || '–'}</span>;
+    case 'richtext':
+      return <RichTextView value={(value as string) ?? ''} />;
+    case 'stepRefs':
+      return <StepRefs kind={(def.refKind ?? 'instruction') as AssignableKind} entityId={entityId ?? ''} editable={false} />;
     case 'number':
       return value === undefined || value === null || value === '' ? empty : <>{Number(value).toLocaleString(dateLocale())}</>;
     case 'date':
@@ -372,6 +378,10 @@ function FieldInput({ def, value, onChange, entityId }: { def: FieldDef; value: 
       return <Measurements value={(value as Measurement[]) ?? []} onChange={onChange} />;
     case 'readonly':
       return <div className="readonly-value mono">{(value as string) || '–'}</div>;
+    case 'richtext':
+      return <RichTextEditor value={(value as string) ?? ''} onChange={onChange} />;
+    case 'stepRefs':
+      return <StepRefs kind={(def.refKind ?? 'instruction') as AssignableKind} entityId={entityId ?? ''} editable />;
     case 'positionRoles':
       return <PositionRoles value={(value as PositionRole[]) ?? []} onChange={onChange} />;
     case 'positionHolders':

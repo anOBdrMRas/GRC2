@@ -286,11 +286,12 @@ export const stepCols: Col[] = [
     width: 26,
     hint: 'z. B. „RO-003:R, RO-006:C“ – RACI: R, A, C oder I.',
   },
+  { key: 'instructions', label: 'Work Instructions', section: 'Zuordnungen', kind: 'refs', refKind: 'instruction', width: 16 },
   { key: 'risks', label: 'Risiken', section: 'Zuordnungen', kind: 'refs', refKind: 'risk', width: 16 },
   { key: 'controls', label: 'Controls', section: 'Zuordnungen', kind: 'refs', refKind: 'control', width: 16 },
   { key: 'opportunities', label: 'Chancen', section: 'Zuordnungen', kind: 'refs', refKind: 'opportunity', width: 14 },
   { key: 'kpis', label: 'KPI', section: 'Zuordnungen', kind: 'refs', refKind: 'kpi', width: 14 },
-  { key: 'note', label: 'Notiz', section: 'Zuordnungen', kind: 'long', width: 30 },
+  { key: 'note', label: 'Beschreibung', section: 'Zuordnungen', kind: 'long', width: 30 },
 ];
 
 /** Header text in the current language. */

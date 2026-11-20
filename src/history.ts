@@ -23,12 +23,15 @@ const IGNORE = new Set(['id', 'createdAt', 'updatedAt', 'history', 'workflow', '
 
 const same = (a: unknown, b: unknown) => JSON.stringify(a ?? '') === JSON.stringify(b ?? '');
 
+/** Embedded images (rich text) are not copied into the history: it would fill the browser storage. */
+const compact = (v: unknown) => (typeof v === 'string' && v.includes('src="data:') ? v.replace(/src="data:[^"]{1000,}"/g, 'src=""') : v);
+
 /** Field changes between two states of an element. */
 export function diff(before: object, after: object): Change[] {
   const a = before as Record<string, unknown>;
   const b = after as Record<string, unknown>;
   const keys = new Set([...Object.keys(a), ...Object.keys(b)]);
-  return [...keys].filter((k) => !IGNORE.has(k) && !same(a[k], b[k])).map((k) => ({ key: k, from: a[k], to: b[k] }));
+  return [...keys].filter((k) => !IGNORE.has(k) && !same(a[k], b[k])).map((k) => ({ key: k, from: compact(a[k]), to: compact(b[k]) }));
 }
 
 const MERGE_MS = 10 * 60_000;

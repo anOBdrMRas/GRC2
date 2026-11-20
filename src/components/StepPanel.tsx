@@ -1,11 +1,11 @@
 import { useState, type ReactNode } from 'react';
-import type { AnyEntity, Control, AssignableKind, Kpi, ProcessModel, Raci, Risk } from '../types';
+import type { AnyEntity, Control, AssignableKind, Kpi, ProcessModel, Raci, Risk, WorkInstruction } from '../types';
 import type { SelectedElement } from '../bpmn/BpmnEditor';
 import { useStore } from '../store';
 import { useUi } from '../ui';
 import { modules } from '../schema';
 import { allFindings, assignedIds, emptyAssignment, isOpenFinding, kpiStatus, parseElements, riskLevel, riskScore, scoreOf } from '../logic';
-import { LevelBadge, Picker, TrafficLight } from './common';
+import { LevelBadge, Picker, StatusPill, TrafficLight } from './common';
 import { useRights } from '../useRights';
 import { t } from '../i18n';
 import { auditBadge, badgeDefs } from '../bpmn/BpmnEditor';
@@ -66,7 +66,7 @@ export function StepPanel({
           <h3>{element.name || element.id}</h3>
         </div>
         <p className="muted">
-          {t('Risiken, Chancen, Rollen, KPI und Controls können Aktivitäten zugeordnet werden (Aufgaben, Subprozesse, Aufrufaktivitäten).')}
+          {t('Rollen, Work Instructions, Risiken, Controls, Chancen und KPI können Aktivitäten zugeordnet werden (Aufgaben, Subprozesse, Aufrufaktivitäten).')}
         </p>
       </div>
     );
@@ -152,6 +152,17 @@ function ActivityPanel({
         )}
       </div>
 
+      <div className="assign-section">
+        <div className="assign-title">{t('Beschreibung')}</div>
+        <textarea
+          rows={3}
+          value={a.note}
+          placeholder={t('Was passiert in diesem Schritt? Definition, Besonderheiten, Ein- und Ausgaben …')}
+          aria-label={t('Beschreibung des Prozessschritts')}
+          onChange={(e) => store.setStepNote(process.id, element.id, e.target.value)}
+        />
+      </div>
+
       {element.type === 'callActivity' && <CallLink process={process} elementId={element.id} />}
 
       {section('role', (e) => {
@@ -174,6 +185,10 @@ function ActivityPanel({
       {a.roles.length > 0 && !a.roles.some((r) => r.raci === 'R') && (
         <div className="warn small pad">{t('Keine durchführende Rolle (R) festgelegt.')}</div>
       )}
+
+      {section('instruction', (e) => {
+        return <StatusPill status={(e as WorkInstruction).status} />;
+      })}
 
       {section('risk', (e) => {
         const r = e as Risk;
@@ -223,11 +238,6 @@ function ActivityPanel({
       })}
 
       <StepFindings processId={process.id} elementId={element.id} />
-
-      <div className="assign-section">
-        <div className="assign-title">{t('Notiz / Arbeitsanweisung')}</div>
-        <textarea rows={3} value={a.note} onChange={(e) => store.setStepNote(process.id, element.id, e.target.value)} />
-      </div>
     </div>
   );
 }
@@ -279,9 +289,9 @@ function ProcessSummary({ process }: { process: ProcessModel }) {
         <div className="muted small">{t('Prozess')}</div>
         <h3>{process.title}</h3>
       </div>
-      <p className="muted small">{t('Element im Diagramm auswählen, um Rollen, Risiken, Chancen, Controls und KPI zuzuordnen.')}</p>
+      <p className="muted small">{t('Element im Diagramm auswählen, um Beschreibung, Rollen, Work Instructions, Risiken, Controls, Chancen und KPI zu pflegen.')}</p>
       <div className="stat-grid">
-        {(['role', 'risk', 'opportunity', 'control', 'kpi'] as AssignableKind[]).map((k) => (
+        {(['role', 'instruction', 'risk', 'control', 'opportunity', 'kpi'] as AssignableKind[]).map((k) => (
           <div
             className={`stat clickable ${open === k ? 'active' : ''}`}
             key={k}

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
-import type { AnyEntity, Audit, Control, EntityKind, Kpi, Mandate, Opportunity, Position, Risk, Role, User } from '../types';
+import type { AnyEntity, Audit, Control, EntityKind, Kpi, Mandate, Opportunity, Position, Risk, Role, User, WorkInstruction } from '../types';
 import { MandateInsights, MandateStatePill, MandateWorkflowBar } from './MandateViews';
 import { PositionInsights, PositionProfile } from './OrgViews';
 import { auditTypes, modules } from '../schema';
@@ -40,6 +40,7 @@ import { Sparkline } from './Sparkline';
 
 /** Columns shown in the (narrow) list per module; the details are in the form. */
 const listColumns: Record<EntityKind, string[]> = {
+  instruction: ['Owner', 'Status'],
   risk: ['Bereich / Funktion', 'Score'],
   opportunity: ['Kategorie', 'Potenzial'],
   control: ['Art', 'Wirksamkeit'],
@@ -75,6 +76,17 @@ function useColumns(kind: EntityKind): Column[] {
   const roleName = (id: string) => roles.find((r) => r.id === id)?.title ?? '—';
 
   switch (kind) {
+    case 'instruction':
+      return [
+        { label: 'Owner', render: (e) => org.user.find((u) => u.id === (e as WorkInstruction).ownerUserId)?.title ?? <span className="warn">–</span> },
+        {
+          label: 'Prozessschritte',
+          render: (e) => findUsages(org.processes, 'instruction', e.id).length || <span className="warn">0</span>,
+          sort: (e) => -findUsages(org.processes, 'instruction', e.id).length,
+        },
+        { label: 'Version', render: (e) => (e as WorkInstruction).version },
+        { label: 'Status', render: (e) => <StatusPill status={(e as WorkInstruction).status} /> },
+      ];
     case 'risk':
       return [
         { label: 'Bereich / Funktion', render: (e) => (e as Risk).department || '–', sort: (e) => (e as Risk).department },
@@ -550,7 +562,7 @@ function EntityEditor({ kind, entity }: { kind: EntityKind; entity: AnyEntity })
         <PositionInsights position={entity as Position} part="warnings" />
       ) : kind === 'mandate' ? (
         <MandateInsights mandate={entity as Mandate} />
-      ) : kind === 'risk' ? null : (
+      ) : kind === 'risk' || kind === 'instruction' ? null : (
         <Insights kind={kind} entity={entity} />
       )}
       {inEdit && dirty && <div className="unsaved-note small">● {t('Ungespeicherte Änderungen')}</div>}

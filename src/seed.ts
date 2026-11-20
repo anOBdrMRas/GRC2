@@ -15,7 +15,8 @@ import type {
   Role,
   User,
 } from './types';
-import { blankEntity, splitName, blankFinding, emptyAssignment, now } from './logic';
+import { blankEntity, splitName, blankFinding, emptyAssignment, now, parseElements } from './logic';
+import { demoInstructions } from './seedInstructions';
 import { accessManagementXml, purchaseToPayXml } from './bpmn/templates';
 import { generateProcessXml, type DraftStep } from './bpmn/generate';
 
@@ -2181,5 +2182,22 @@ export function seedData() {
     };
   }
 
-  return { user, role, position, mandate, risk, opportunity, control, kpi, audit, processes, currentUserId: 'U-001' };
+  const instruction = demoInstructions();
+  // work instructions at their process steps (P-003 "Budget planen" is found by its name)
+  const step = (pid: string, name: string) => parseElements(processes.find((p) => p.id === pid)?.xml ?? '').find((e) => e.name === name)?.id;
+  const attach = (pid: string, elementId: string | undefined, wi: string, note = '') => {
+    const p = processes.find((x) => x.id === pid);
+    if (!p || !elementId) return;
+    const cur = p.assignments[elementId] ?? a({});
+    p.assignments[elementId] = { ...cur, instructions: [...cur.instructions, wi], note: cur.note || note };
+  };
+  attach('P-001', 'Task_Genehmigen', 'WI-001');
+  attach('P-001', 'Task_Rechnung', 'WI-003');
+  attach(
+    'P-003',
+    step('P-003', 'Budget planen'),
+    'WI-002',
+    'Die Bereiche planen ihre Kosten und Investitionen für das Folgejahr auf Basis der strategischen Ziele. Finanzen konsolidiert, die Geschäftsführung gibt das Gesamtbudget frei.',
+  );
+  return { user, role, position, mandate, risk, opportunity, control, kpi, audit, processes, instruction, currentUserId: 'U-001' };
 }

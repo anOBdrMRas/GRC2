@@ -332,7 +332,7 @@ export function workflowCounts(d: OwnershipData) {
     for (const x of xs) c[stageOf(x.status)]++;
     return c;
   };
-  return { processes: count(d.processes), role: count(d.role), position: count(d.position), risk: count(d.risk), opportunity: count(d.opportunity) };
+  return { processes: count(d.processes), instruction: count(d.instruction), role: count(d.role), position: count(d.position), risk: count(d.risk), opportunity: count(d.opportunity) };
 }
 
 export type GradeModule = WfKind | 'risk' | 'opportunity' | 'control';
@@ -349,6 +349,10 @@ export function qualityGrade(d: OwnershipData, checks = imsChecks(d)): Record<Gr
     processes: grade(
       'processes',
       d.processes.map((p) => p.id),
+    ),
+    instruction: grade(
+      'instruction',
+      d.instruction.map((w) => w.id),
     ),
     role: grade(
       'role',

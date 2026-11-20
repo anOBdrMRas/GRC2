@@ -1,11 +1,12 @@
 // System roles of the tool itself (not to be confused with organisational roles in the role module).
 import type { User } from './types';
 
-export type ModuleKey = 'processes' | 'risk' | 'opportunity' | 'control' | 'role' | 'position' | 'mandate' | 'kpi' | 'audit' | 'user';
+export type ModuleKey = 'processes' | 'instruction' | 'risk' | 'opportunity' | 'control' | 'role' | 'position' | 'mandate' | 'kpi' | 'audit' | 'user';
 export type Right = 'none' | 'read' | 'edit';
 
 export const moduleLabels: Record<ModuleKey, string> = {
   processes: 'Prozesse',
+  instruction: 'Work Instructions',
   risk: 'Risiken',
   opportunity: 'Chancen',
   control: 'Controls (IKS)',
@@ -28,6 +29,7 @@ export interface SystemRole {
 
 const all = (r: Right, overrides: Partial<Record<ModuleKey, Right>> = {}): Record<ModuleKey, Right> => ({
   processes: r,
+  instruction: r,
   risk: r,
   opportunity: r,
   control: r,

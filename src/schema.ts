@@ -65,7 +65,9 @@ export type FieldType =
   | 'roleRelations' // read-only: positions and persons holding a role
   | 'mandates' // read-only: mandates related to the entity (refKind says which kind the entity is)
   | 'findings' // audit findings table
-  | 'systemRoles'; // tool system roles of a user
+  | 'systemRoles' // tool system roles of a user
+  | 'richtext' // formatted text with images and tables (HTML)
+  | 'stepRefs'; // read-only: process steps the element is assigned to
 
 export interface FieldDef {
   key: string;
@@ -115,6 +117,34 @@ const base: SectionDef = {
 };
 
 export const modules: Record<EntityKind, ModuleDef> = {
+  instruction: {
+    kind: 'instruction',
+    label: 'Work Instruction',
+    plural: 'Work Instructions',
+    codePrefix: 'WI',
+    color: '#5f3dc4',
+    sections: [
+      {
+        title: 'Stammdaten',
+        fields: [
+          { key: 'code', label: 'ID', type: 'readonly', hint: 'wird automatisch vergeben' },
+          { key: 'title', label: 'Bezeichnung', type: 'text' },
+          { key: 'description', label: 'Kurzbeschreibung', type: 'textarea', wide: true },
+          { key: 'ownerUserId', label: 'Owner', type: 'ref', refKind: 'user' },
+          { key: 'status', label: 'Status', type: 'select', options: ['Entwurf', 'In Prüfung', 'Freigegeben', 'Archiviert'] },
+          { key: 'version', label: 'Version', type: 'readonly' },
+        ],
+      },
+      {
+        title: 'Bezieht sich auf',
+        fields: [{ key: '#steps', label: 'Prozessschritte', type: 'stepRefs', refKind: 'instruction', wide: true, hint: 'Zuordnung hier oder im Prozessschritt' }],
+      },
+      {
+        title: 'Arbeitsanweisung',
+        fields: [{ key: 'content', label: 'Inhalt', type: 'richtext', wide: true }],
+      },
+    ],
+  },
   risk: {
     kind: 'risk',
     label: 'Risiko',
@@ -752,4 +782,4 @@ export const modules: Record<EntityKind, ModuleDef> = {
   },
 };
 
-export const kindOrder: EntityKind[] = ['risk', 'opportunity', 'control', 'role', 'position', 'mandate', 'kpi', 'audit', 'user'];
+export const kindOrder: EntityKind[] = ['instruction', 'risk', 'opportunity', 'control', 'role', 'position', 'mandate', 'kpi', 'audit', 'user'];

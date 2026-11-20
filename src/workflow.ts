@@ -1,12 +1,12 @@
-// Approval workflow for processes, roles, positions, risks and opportunities:
+// Approval workflow for processes, work instructions, roles, positions, risks and opportunities:
 // draft (owner / recorder) → business approval by the owner → I&A review → released.
-import type { Mandate, Opportunity, Position, ProcessModel, ReleasedSnapshot, Risk, Role, WorkflowEntry } from './types';
+import type { Mandate, Opportunity, Position, ProcessModel, ReleasedSnapshot, Risk, Role, WorkInstruction, WorkflowEntry } from './types';
 import { now } from './logic';
 
-export type WfKind = 'role' | 'position' | 'processes' | 'risk' | 'opportunity';
-export type WfItem = Role | Position | ProcessModel | Risk | Opportunity;
+export type WfKind = 'role' | 'position' | 'processes' | 'risk' | 'opportunity' | 'instruction';
+export type WfItem = Role | Position | ProcessModel | Risk | Opportunity | WorkInstruction;
 
-export const wfKinds: WfKind[] = ['processes', 'role', 'position', 'risk', 'opportunity'];
+export const wfKinds: WfKind[] = ['processes', 'instruction', 'role', 'position', 'risk', 'opportunity'];
 export const isWfKind = (k: string): k is WfKind => (wfKinds as string[]).includes(k);
 
 /** Stored status values (unchanged from earlier versions) and their meaning in the workflow. */

@@ -439,7 +439,7 @@ function ProcessProfile({ process, editable }: { process: ProcessModel; editable
   );
 }
 
-const matrixKinds: AssignableKind[] = ['role', 'risk', 'control', 'opportunity', 'kpi'];
+const matrixKinds: AssignableKind[] = ['role', 'instruction', 'risk', 'control', 'opportunity', 'kpi'];
 
 function StepMatrix({ process, onOpen }: { process: ProcessModel; onOpen: (elementId: string) => void }) {
   const store = useStore();

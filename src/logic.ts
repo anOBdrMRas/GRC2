@@ -64,7 +64,7 @@ export function kpiStatus(k: Kpi): Traffic {
 }
 
 export function emptyAssignment(): StepAssignment {
-  return { risks: [], opportunities: [], controls: [], roles: [], kpis: [], note: '' };
+  return { risks: [], opportunities: [], controls: [], roles: [], kpis: [], instructions: [], note: '' };
 }
 
 /** Maps entity kind to the key used in StepAssignment. */
@@ -73,10 +73,11 @@ export const assignmentKey = {
   opportunity: 'opportunities',
   control: 'controls',
   kpi: 'kpis',
+  instruction: 'instructions',
 } as const;
 
 export function assignedIds(a: StepAssignment, kind: AssignableKind): string[] {
-  return kind === 'role' ? a.roles.map((r) => r.roleId) : a[assignmentKey[kind]];
+  return kind === 'role' ? a.roles.map((r) => r.roleId) : (a[assignmentKey[kind]] ?? []);
 }
 
 export function blankEntity<K extends EntityKind>(kind: K, code: string, title = ''): EntityMap[K] {
@@ -296,6 +297,14 @@ export function blankEntity<K extends EntityKind>(kind: K, code: string, title =
       measurements: [],
       isoRefs: ['9001:9.1'],
     },
+    instruction: {
+      ...common,
+      ownerUserId: '',
+      content: '',
+      status: 'Entwurf',
+      version: '0.1',
+      workflow: [],
+    },
   };
   return byKind[kind];
 }
@@ -370,7 +379,7 @@ export function findUsages(processes: ProcessModel[], kind: EntityKind, id: stri
       if (kind === 'role') {
         const r = a.roles.find((x) => x.roleId === id);
         if (r) out.push({ process: p, elementId, elementName: names[elementId], raci: r.raci });
-      } else if (a[assignmentKey[kind]].includes(id)) {
+      } else if ((a[assignmentKey[kind]] ?? []).includes(id)) {
         out.push({ process: p, elementId, elementName: names[elementId] });
       }
     }

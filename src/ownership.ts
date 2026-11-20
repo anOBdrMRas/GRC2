@@ -1,5 +1,5 @@
 // Ownership and assignments: who owns an element (may edit it) and what is assigned to a person.
-import type { Audit, Control, EntityKind, Kpi, Mandate, Opportunity, Position, ProcessModel, Risk, Role, User } from './types';
+import type { Audit, Control, EntityKind, Kpi, Mandate, Opportunity, Position, ProcessModel, Risk, Role, User, WorkInstruction } from './types';
 import { allFindings, isOpenFinding, orgIssues, parseElements, roleHolders, rolesOfUser, type FindingRef, type OrgIssue } from './logic';
 
 /** Everything ownership is derived from (the store satisfies this). */
@@ -14,6 +14,7 @@ export interface OwnershipData {
   kpi: Kpi[];
   audit: Audit[];
   processes: ProcessModel[];
+  instruction: WorkInstruction[];
 }
 
 export type OwnKind = EntityKind | 'processes';
@@ -23,6 +24,7 @@ export const ownerFields: Partial<Record<OwnKind, string[]>> = {
   role: ['roleOwnerUserId'],
   position: ['reportsToDisciplinaryId'],
   risk: ['ownerUserId'],
+  instruction: ['ownerUserId'],
   opportunity: ['ownerRoleId'],
   control: ['ownerRoleId'],
   kpi: ['ownerRoleId'],
@@ -37,6 +39,7 @@ export const ownershipRule: Partial<Record<OwnKind, string>> = {
   role: 'Rollenverantwortlicher',
   position: 'Inhaber der disziplinarisch übergeordneten Stelle (Vorgesetzter)',
   risk: 'Risikoeigner (Person)',
+  instruction: 'Owner der Work Instruction (Person)',
   opportunity: 'Inhaber der verantwortlichen Rolle',
   control: 'Inhaber der Rolle „Kontrollverantwortlicher“',
   kpi: 'Inhaber der Rolle „Verantwortlich für Messung“',
@@ -60,6 +63,7 @@ export function ownersOf(kind: OwnKind, entity: unknown, d: Pick<OwnershipData, 
       return !sup || sup === 'n/a' ? [] : d.user.filter((u) => u.positionId === sup).map((u) => u.id);
     }
     case 'risk':
+    case 'instruction':
       return e.ownerUserId ? [e.ownerUserId] : [];
     case 'processes':
     case 'opportunity':
@@ -138,6 +142,7 @@ export interface MyOwnership {
   position: Position[];
   role: Role[];
   processes: ProcessModel[];
+  instruction: WorkInstruction[];
   risk: Risk[];
   opportunity: Opportunity[];
   control: Control[];
@@ -156,6 +161,7 @@ export function ownershipOf(userId: string, d: OwnershipData): MyOwnership {
     position: own('position', d.position),
     role: own('role', d.role),
     processes: own('processes', d.processes),
+    instruction: own('instruction', d.instruction),
     risk: own('risk', d.risk),
     opportunity: own('opportunity', d.opportunity),
     control: own('control', d.control),

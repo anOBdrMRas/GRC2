@@ -46,6 +46,7 @@ interface Props {
 
 export const badgeDefs: { key: keyof Omit<StepAssignment, 'note'>; label: string; color: string; title: string }[] = [
   { key: 'roles', label: 'Ro', color: modules.role.color, title: 'Rollen' },
+  { key: 'instructions', label: 'WI', color: modules.instruction.color, title: 'Work Instructions' },
   { key: 'risks', label: 'R', color: modules.risk.color, title: 'Risiken' },
   { key: 'opportunities', label: 'Ch', color: modules.opportunity.color, title: 'Chancen' },
   { key: 'controls', label: 'K', color: modules.control.color, title: 'Controls' },
@@ -94,7 +95,7 @@ export const BpmnEditor = forwardRef<BpmnEditorHandle, Props>(function BpmnEdito
         `<span class="grc-badge" style="background:${color}" title="${t(title)}">${t(label)} ${n}</span>`;
       const open = findings.current?.[id] ?? 0;
       const html =
-        (a ? badgeDefs.filter((b) => a[b.key].length > 0).map((b) => badge(b.color, b.title, b.label, a[b.key].length)) : []).join('') +
+        (a ? badgeDefs.filter((b) => (a[b.key] ?? []).length > 0).map((b) => badge(b.color, b.title, b.label, (a[b.key] ?? []).length)) : []).join('') +
         (open > 0 ? badge(auditBadge.color, auditBadge.title, auditBadge.label, open) : '');
       if (!html) continue;
       overlays.add(id, 'grc', { position: { bottom: 4, left: 0 }, html: `<div class="grc-badges">${html}</div>` });

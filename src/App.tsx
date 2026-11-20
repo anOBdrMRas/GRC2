@@ -19,12 +19,15 @@ import { systemRoleById, type ModuleKey } from './permissions';
 const nav: { view: View; label: string; icon: string; color?: string }[] = [
   { view: 'home', label: 'Startseite', icon: '⌂' },
   { view: 'processes', label: 'Prozesse', icon: '▦' },
+  { view: 'instruction', label: 'Work Instructions', icon: '📝', color: modules.instruction.color },
   { view: 'ia', label: 'I&A-Cockpit', icon: '✓', color: '#0c8599' },
-  ...kindOrder.flatMap((k) => {
+  ...kindOrder
+    .filter((k) => k !== 'instruction')
+    .flatMap((k) => {
     const item = {
       view: k as View,
       label: modules[k].plural,
-      icon: { risk: '⚠', opportunity: '✦', control: '✔', role: '👤', position: '▤', mandate: '✍', kpi: '📈', audit: '🔍', user: '⚙' }[k],
+      icon: { instruction: '📝', risk: '⚠', opportunity: '✦', control: '✔', role: '👤', position: '▤', mandate: '✍', kpi: '📈', audit: '🔍', user: '⚙' }[k],
       color: modules[k].color,
     };
     // the org chart sits right below the positions it visualises
@@ -54,10 +57,10 @@ export default function App() {
   if (!loggedIn || !user) return <Login key={lang} />;
 
   const exportAll = () => {
-    const { risk, opportunity, control, role, position, mandate, kpi, audit, user, processes, config } = useStore.getState();
+    const { instruction, risk, opportunity, control, role, position, mandate, kpi, audit, user, processes, config } = useStore.getState();
     download(
       `grc-export-${new Date().toISOString().slice(0, 10)}.json`,
-      JSON.stringify({ risk, opportunity, control, role, position, mandate, kpi, audit, user, processes, config }, null, 2),
+      JSON.stringify({ instruction, risk, opportunity, control, role, position, mandate, kpi, audit, user, processes, config }, null, 2),
       'application/json',
     );
   };

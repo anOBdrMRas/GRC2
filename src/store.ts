@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { persist } from 'zustand/middleware';
+import { createJSONStorage, persist } from 'zustand/middleware';
 import type {
   AssignableKind,
   Audit,
@@ -14,6 +14,7 @@ import type {
   Role,
   StepAssignment,
   User,
+  WorkInstruction,
 } from './types';
 import {
   assignmentKey,
@@ -436,7 +437,21 @@ export const useStore = create<State>()(
     }),
     {
       name: 'grc-prototype-v1',
-      version: 11,
+      version: 12,
+      // browser storage is limited (about 5 MB): tell the user instead of failing silently (e.g. many large images)
+      storage: createJSONStorage(() => ({
+        getItem: (k) => localStorage.getItem(k),
+        removeItem: (k) => localStorage.removeItem(k),
+        setItem: (k, v) => {
+          try {
+            localStorage.setItem(k, v);
+          } catch {
+            useUi
+              .getState()
+              .setNotice(t('Der Browser-Speicher ist voll – die letzte Änderung wurde nicht dauerhaft gespeichert. Bitte große Bilder verkleinern oder entfernen.'));
+          }
+        },
+      })),
       // v1 had no users and free-text role holders
       migrate: (persisted) => ({ ...normalizeData(persisted as Partial<State>), loggedIn: false }),
       onRehydrateStorage: () => (_state, error) => {
@@ -500,9 +515,28 @@ function normalizeData(data: Partial<State>): Partial<State> {
     // v6 added the process landscape (area, order) and more demo processes
     processes: addMissing(data.processes ?? seed.processes, seed.processes).map((p) => {
       const demo = seed.processes.find((x) => x.id === p.id);
-      const q = withHistory(p, seed.processes);
-      return demo && q.area === undefined ? { ...q, area: demo.area, landscapeOrder: demo.landscapeOrder } : q;
+      let q = withHistory(p, seed.processes);
+      if (demo && q.area === undefined) q = { ...q, area: demo.area, landscapeOrder: demo.landscapeOrder };
+      // v12: work instructions per step (older data: none; demo processes get the demo assignments)
+      const assignments = Object.fromEntries(
+        Object.entries(q.assignments ?? {}).map(([el, a]) => {
+          const filled = { ...emptyAssignment(), ...a };
+          if (!data.instruction && demo?.assignments[el]) {
+            filled.instructions = demo.assignments[el].instructions;
+            filled.note = filled.note || demo.assignments[el].note;
+          }
+          return [el, filled];
+        }),
+      );
+      if (!data.instruction && demo) {
+        for (const [el, a] of Object.entries(demo.assignments)) if (!(el in assignments) && a.instructions.length) assignments[el] = a;
+      }
+      return { ...q, assignments };
     }),
+    // v12: work instructions (data from the demo gets the demo instructions)
+    instruction: (data.instruction ?? (demoBased ? seed.instruction : [])).map(
+      (w) => ({ ...blankEntity('instruction', w.code ?? '', w.title ?? ''), ...w }) as WorkInstruction,
+    ),
     mandate: (data.mandate
       ? addMissing(data.mandate, seed.mandate)
       : migrateMandates(data.role ?? [], { role: roles, position: positions, user: users }, seed.mandate)

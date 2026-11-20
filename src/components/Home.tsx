@@ -199,6 +199,7 @@ export function Home() {
               <OwnerApprovals
                 items={[
                   ...own.processes.map((item) => ({ kind: 'processes' as WfKind, item })),
+                  ...own.instruction.map((item) => ({ kind: 'instruction' as WfKind, item })),
                   ...own.role.map((item) => ({ kind: 'role' as WfKind, item })),
                   ...own.position.map((item) => ({ kind: 'position' as WfKind, item })),
                   ...own.risk.map((item) => ({ kind: 'risk' as WfKind, item })),
@@ -422,7 +423,7 @@ function AdminHome() {
           <button onClick={() => go('ia')}>✓ {t('I&A-Cockpit')}</button>
         </div>
         <div className="ia-kpis">
-          {(['processes', 'role', 'position', 'risk', 'opportunity'] as WfKind[]).map((k) => (
+          {(['processes', 'instruction', 'role', 'position', 'risk', 'opportunity'] as WfKind[]).map((k) => (
             <div key={k} className="ia-kpi">
               <b>{k === 'processes' ? t('Prozesse') : t(modules[k].plural)}</b>
               <StatusBar c={counts[k]} />

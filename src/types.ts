@@ -1,7 +1,7 @@
 // Domain model of the GRC prototype.
 // Metadata fields are aligned with ISO 9001:2015, ISO/IEC 27001:2022 and ISO 37301:2021.
 
-export type EntityKind = 'risk' | 'opportunity' | 'control' | 'role' | 'position' | 'mandate' | 'kpi' | 'user' | 'audit';
+export type EntityKind = 'risk' | 'opportunity' | 'control' | 'role' | 'position' | 'mandate' | 'kpi' | 'user' | 'audit' | 'instruction';
 /** Kinds that can be assigned to process steps. */
 export type AssignableKind = Exclude<EntityKind, 'user' | 'audit' | 'position' | 'mandate'>;
 
@@ -105,6 +105,22 @@ export interface Control extends BaseEntity {
   testResult: string;
   mitigatesRiskIds: string[];
   isoRefs: string[];
+}
+
+/**
+ * Work instruction: how a process step is carried out in detail (ISO 9001 7.5 documented information).
+ * Assigned to process steps; the content is rich text (HTML from the editor, images embedded).
+ */
+export interface WorkInstruction extends BaseEntity {
+  ownerUserId: string;
+  /** rich text (HTML) */
+  content: string;
+  /** approval workflow (Entwurf → In Prüfung → Freigegeben) */
+  status: string;
+  version: string;
+  workflow?: WorkflowEntry[];
+  /** released state kept while a changed draft waits for approval */
+  released?: ReleasedSnapshot;
 }
 
 export type RoleType = 'Führungsrolle' | 'Fachrolle' | 'Gremium' | 'Beauftragter';
@@ -353,6 +369,8 @@ export interface StepAssignment {
   controls: string[];
   roles: { roleId: string; raci: Raci }[];
   kpis: string[];
+  instructions: string[];
+  /** description of the step (definition, specifics) */
   note: string;
 }
 
@@ -397,6 +415,7 @@ export interface EntityMap {
   kpi: Kpi;
   user: User;
   audit: Audit;
+  instruction: WorkInstruction;
 }
 
 export type AnyEntity = EntityMap[EntityKind];
